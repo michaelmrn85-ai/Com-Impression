@@ -465,7 +465,7 @@ app.get('/api/suivi/:numero', (req, res) => {
 });
 
 // ── AVIS CLIENTS ────────────────────────────────────────────────────────────
-const AVIS_FILE = '/var/data/avis.json';
+const AVIS_FILE = path.join(INCIDENT_DATA_DIR, 'avis.json');
 function lireAvis(){try{return JSON.parse(fs.readFileSync(AVIS_FILE,'utf8'));}catch(e){return [];}}
 function sauvegarderAvis(a){try{fs.writeFileSync(AVIS_FILE,JSON.stringify(a,null,2));}catch(e){}}
 
@@ -511,10 +511,8 @@ app.delete('/api/avis/:id', express.json(), (req,res)=>{
 // ESPACE CLIENT — Auth par lien magique + Carte de fidélité
 // ══════════════════════════════════════════════════════════════════════════════
 
-const CLIENTS_FILE  = '/var/data/clients.json';
-// Créer /var/data si inexistant (au cas où)
-try { if(!fs.existsSync('/var/data')) fs.mkdirSync('/var/data', {recursive:true}); } catch(e) { console.warn('/var/data non accessible:', e.message); }
-const TOKENS_FILE   = '/var/data/tokens.json';
+const CLIENTS_FILE  = path.join(INCIDENT_DATA_DIR, 'clients.json');
+const TOKENS_FILE   = path.join(INCIDENT_DATA_DIR, 'tokens.json');
 const CRYPTO        = require('crypto');
 
 function lireClients()  { try { return JSON.parse(fs.readFileSync(CLIENTS_FILE,'utf8')); } catch(e) { return []; } }
@@ -897,7 +895,7 @@ app.post('/api/client/code-promo', authClient, express.json(), (req, res) => {
 
 
 // ── DOCUMENTS CLIENT (dépôt admin) ──────────────────────────────────────────
-const DOCS_DIR = '/var/data/documents';
+const DOCS_DIR = path.join(INCIDENT_DATA_DIR, 'documents');
 if (!fs.existsSync(DOCS_DIR)) { try { fs.mkdirSync(DOCS_DIR, { recursive:true }); } catch(e){} }
 
 const uploadDoc = multer({
@@ -998,11 +996,7 @@ app.listen(process.env.PORT || 3000, () => console.log(`Serveur demarre sur le p
 // ============================================================
 
 // Chemin dynamique : /var/data si disque persistant Render, sinon /tmp
-const DATA_DIR = (() => {
-    const fs2 = require('fs');
-    try { fs2.mkdirSync('/var/data', { recursive: true }); return '/var/data'; }
-    catch(e) { return '/tmp'; }
-})();
+const DATA_DIR = INCIDENT_DATA_DIR;
 const COMMANDES_FILE = DATA_DIR + '/commandes.json';
 const ADMIN_PWD_SUIVI = process.env.ADMIN_PWD || 'comimpression2025';
 
