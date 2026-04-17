@@ -660,7 +660,7 @@ app.post('/api/client/register', express.json(), async (req, res) => {
         const tokens = lireTokens().filter(t => t.expire > Date.now());
         tokens.push({ token, email, expire: Date.now()+30*60*1000, type:'verify-client' });
         sauvegarderTokens(tokens);
-        const lien = `${publicBaseUrl}?client_token=${token}`;
+        const lien = `${publicBaseUrl}?verify_client_token=${token}`;
         try {
             const t = createTransporter();
             await t.sendMail({
@@ -678,8 +678,7 @@ app.post('/api/client/register', express.json(), async (req, res) => {
             });
         } catch(e) { console.warn('Email confirmation compte non envoyé:', e.message); }
 
-        const sessionToken = creerSessionClient(email);
-        res.json({ success:true, session_token: sessionToken, client: safeClient(client) });
+        res.json({ success:true, requires_email_confirmation:true, client: safeClient(client) });
     } catch(e) {
         console.error('Erreur register client:', e);
         res.status(500).json({ success:false, error:e.message });
@@ -693,6 +692,9 @@ app.post('/api/client/password-login', express.json(), (req, res) => {
     const client = lireClients().find(c => c.email === email);
     if (!client || !verifierPassword(password, client.password_hash)) {
         return res.status(401).json({ success:false, error:'Email ou mot de passe incorrect' });
+    }
+    if (!client.email_verified) {
+        return res.status(403).json({ success:false, error:'Veuillez confirmer votre compte via le mail reçu avant de vous connecter' });
     }
     const sessionToken = creerSessionClient(email);
     res.json({ success:true, session_token: sessionToken, client: safeClient(client) });
@@ -754,6 +756,10 @@ app.post('/api/client/login', express.json(), async (req, res) => {
     const publicBaseUrl = getPublicBaseUrl(req);
     const email = normaliserEmail(req.body.email);
     if (!email || !email.includes('@')) return res.status(400).json({ success: false, error: 'Email invalide' });
+    const client = lireClients().find(c => c.email === email);
+    if (client && !client.email_verified) {
+        return res.status(403).json({ success: false, error: 'Veuillez confirmer votre compte via le mail reçu avant de demander un lien magique.' });
+    }
 
     // Générer token
     const token  = CRYPTO.randomBytes(32).toString('hex');
@@ -790,6 +796,24 @@ app.post('/api/client/login', express.json(), async (req, res) => {
     }
 });
 
+// GET /api/client/verify?token=xxx — confirmer l'email du client
+app.get('/api/client/verify', (req, res) => {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ success: false, error: 'Token manquant' });
+    const tokens = lireTokens();
+    const entry = tokens.find(t => t.token === token && t.expire > Date.now() && t.type === 'verify-client');
+    if (!entry) return res.status(401).json({ success: false, error: 'Lien expiré ou invalide' });
+
+    const client = getOuCreerClient(entry.email);
+    client.email_verified = true;
+    client.updated_at = new Date().toISOString();
+    sauvegarderClient(client);
+
+    const sessionToken = creerSessionClient(entry.email);
+    sauvegarderTokens(tokens.filter(t => t.token !== token));
+    res.json({ success: true, session_token: sessionToken, client: safeClient(client) });
+});
+
 // GET /api/client/auth?token=xxx — valider le token
 app.get('/api/client/auth', (req, res) => {
     const { token } = req.query;
@@ -797,13 +821,11 @@ app.get('/api/client/auth', (req, res) => {
     const tokens = lireTokens();
     const entry  = tokens.find(t => t.token === token && t.expire > Date.now());
     if (!entry) return res.status(401).json({ success: false, error: 'Lien expiré ou invalide' });
+    if (entry.type === 'verify-client') {
+        return res.status(400).json({ success: false, error: 'Utilisez le lien de confirmation du compte reçu par email.' });
+    }
     const sessionToken = creerSessionClient(entry.email);
     const client = getOuCreerClient(entry.email);
-    if (entry.type === 'verify-client') {
-        client.email_verified = true;
-        client.updated_at = new Date().toISOString();
-        sauvegarderClient(client);
-    }
     sauvegarderTokens(lireTokens().filter(t => t.token !== token));
     res.json({ success: true, session_token: sessionToken, client: safeClient(client) });
 });
