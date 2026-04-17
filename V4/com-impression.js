@@ -1276,19 +1276,34 @@ document.addEventListener('DOMContentLoaded',function(){
 
   // Vérifier lien magique dans l'URL (espace client)
   var urlP=new URLSearchParams(window.location.search);
-  var ct=urlP.get('client_token');
-  if(ct){
-    fetch(API_BASE+'/api/client/auth?token='+ct)
+  var verifyToken=urlP.get('verify_client_token');
+  if(verifyToken){
+    fetch(API_BASE+'/api/client/verify?token='+verifyToken)
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.success){
         localStorage.setItem('ci_session_token',d.session_token);
         window.history.replaceState({},'',window.location.pathname);
-        toast('✅ Connexion réussie ! Bienvenue '+(d.client.prenom||''));
+        toast('✅ Compte confirmé ! Bienvenue '+(d.client.prenom||''));
         var mCompte=document.getElementById('m-compte');
         if(mCompte){afficherMCDash();chargerMCData(d.session_token);mCompte.classList.add('open');}
-      } else toast('❌ Lien expiré — demandez un nouveau lien.');
+      } else toast('❌ '+(d.error||'Lien expiré — demandez un nouveau lien.'));
     }).catch(function(){});
+  } else {
+    var ct=urlP.get('client_token');
+    if(ct){
+      fetch(API_BASE+'/api/client/auth?token='+ct)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.success){
+          localStorage.setItem('ci_session_token',d.session_token);
+          window.history.replaceState({},'',window.location.pathname);
+          toast('✅ Connexion réussie ! Bienvenue '+(d.client.prenom||''));
+          var mCompte=document.getElementById('m-compte');
+          if(mCompte){afficherMCDash();chargerMCData(d.session_token);mCompte.classList.add('open');}
+        } else toast('❌ '+(d.error||'Lien expiré — demandez un nouveau lien.'));
+      }).catch(function(){});
+    }
   }
 
 }); // fin DOMContentLoaded principal
@@ -1725,7 +1740,12 @@ document.addEventListener('DOMContentLoaded',function(){
     fetch(API+'/api/client/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r.json();}).then(function(d){
       btn.disabled=false;btn.textContent='Créer mon compte sécurisé';
-      if(d.success){mcStatus('mc-register-status',true,'✅ Compte créé. Un email de confirmation vient d’être envoyé.'); if(d.session_token)finishClientLogin(d);}
+      if(d.success){
+        mcStatus('mc-register-status',true,'✅ Compte créé. Veuillez confirmer votre compte via vos mails avant de vous connecter.');
+        ['mc-register-prenom','mc-register-nom','mc-register-email','mc-register-password','mc-register-password2','mc-register-adresse','mc-register-cp','mc-register-ville'].forEach(function(id){
+          var el=document.getElementById(id); if(el) el.value='';
+        });
+      }
       else mcStatus('mc-register-status',false,'❌ '+(d.error||'Création impossible'));
     }).catch(function(){btn.disabled=false;btn.textContent='Créer mon compte sécurisé';mcStatus('mc-register-status',false,'❌ Erreur réseau.');});
   });
