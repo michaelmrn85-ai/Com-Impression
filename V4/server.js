@@ -20,6 +20,7 @@ const fs         = require('fs');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -33,6 +34,13 @@ function createTransporter() {
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
         tls: { rejectUnauthorized: false }, connectionTimeout: 30000
     });
+}
+
+function getPublicBaseUrl(req) {
+    return process.env.PUBLIC_BASE_URL
+        || process.env.SITE_BASE_URL
+        || process.env.RENDER_EXTERNAL_URL
+        || `${req.protocol}://${req.get('host')}`;
 }
 
 function emailWrapper(content, couleur, nomBrand, lien, sousTitre) {
@@ -116,12 +124,13 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
     try {
         const d     = req.body;
         const files = req.files || [];
+        const publicBaseUrl = getPublicBaseUrl(req);
         const source = (d.source || 'imprylo').toLowerCase();
         const isCI   = source === 'com-impression';
         const couleur  = isCI ? '#F47B20' : '#059669';
         const nomBrand = isCI ? "COM' Impression" : 'IMPRYLO';
         const sousTitre = isCI ? 'Montreverd (85) - Vendee' : 'imprylo.fr';
-        const lien     = isCI ? 'https://com-impression.fr' : 'https://imprylo.fr';
+        const lien     = isCI ? publicBaseUrl : 'https://imprylo.fr';
 
         const prixTotal      = d.prix_total || '--';
         const panierTexte    = d.panier || '';
@@ -160,7 +169,7 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
         const anneePre   = new Date().getFullYear();
         const numCmd     = !isContact && !isPartenariat ? `CI-${anneePre}-${numPre}` : '';
         const codeAcces  = !isContact && !isPartenariat ? genererCode() : '';
-        const suiviUrl   = codeAcces ? `https://com-impression.fr?suivi=${numCmd}&code=${codeAcces}` : 'https://com-impression.fr';
+        const suiviUrl   = codeAcces ? `${publicBaseUrl}?suivi=${numCmd}&code=${codeAcces}` : publicBaseUrl;
         const suiviBtn  = !isContact && !isPartenariat && codeAcces ? `
             <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;">
               <tr><td style="background:#f7f3ef;border-radius:12px;padding:20px 24px;text-align:center;">
@@ -614,6 +623,7 @@ function ajouterPoints(email, montant, numCommande, prenom='', nom='') {
 // POST /api/client/register — création de compte sécurisé
 app.post('/api/client/register', express.json(), async (req, res) => {
     try {
+        const publicBaseUrl = getPublicBaseUrl(req);
         const email = normaliserEmail(req.body.email);
         const password = String(req.body.password || '');
         const prenom = String(req.body.prenom || '').trim();
@@ -650,7 +660,7 @@ app.post('/api/client/register', express.json(), async (req, res) => {
         const tokens = lireTokens().filter(t => t.expire > Date.now());
         tokens.push({ token, email, expire: Date.now()+30*60*1000, type:'verify-client' });
         sauvegarderTokens(tokens);
-        const lien = `https://com-impression.fr?client_token=${token}`;
+        const lien = `${publicBaseUrl}?client_token=${token}`;
         try {
             const t = createTransporter();
             await t.sendMail({
@@ -664,7 +674,7 @@ app.post('/api/client/register', express.json(), async (req, res) => {
                         <a href="${lien}" style="display:inline-block;max-width:320px;background:#F47B20;color:#fff;padding:14px 26px;border-radius:50px;font-weight:700;text-decoration:none;font-size:15px;line-height:1.3;box-shadow:0 4px 0 #D4621A;">Confirmer mon compte</a>
                     </div>
                     <p style="color:#aaa;font-size:12px;text-align:center;">Ce lien est valable 30 minutes.</p>
-                `, '#F47B20', "COM' Impression", 'https://com-impression.fr', 'Montreverd (85)')
+                `, '#F47B20', "COM' Impression", publicBaseUrl, 'Montreverd (85)')
             });
         } catch(e) { console.warn('Email confirmation compte non envoyé:', e.message); }
 
@@ -690,6 +700,7 @@ app.post('/api/client/password-login', express.json(), (req, res) => {
 
 // POST /api/client/forgot-password — demande de réinitialisation
 app.post('/api/client/forgot-password', express.json(), async (req, res) => {
+    const publicBaseUrl = getPublicBaseUrl(req);
     const email = normaliserEmail(req.body.email);
     if (!email || !email.includes('@')) return res.status(400).json({ success:false, error:'Email invalide' });
     const client = lireClients().find(c => c.email === email);
@@ -698,7 +709,7 @@ app.post('/api/client/forgot-password', express.json(), async (req, res) => {
         const tokens = lireTokens().filter(t => t.expire > Date.now());
         tokens.push({ token, email, expire: Date.now()+30*60*1000, type:'reset-password' });
         sauvegarderTokens(tokens);
-        const lien = `https://com-impression.fr?reset_client_token=${token}`;
+        const lien = `${publicBaseUrl}?reset_client_token=${token}`;
         try {
             const t = createTransporter();
             await t.sendMail({
@@ -712,7 +723,7 @@ app.post('/api/client/forgot-password', express.json(), async (req, res) => {
                         <a href="${lien}" style="display:inline-block;max-width:320px;background:#F47B20;color:#fff;padding:14px 26px;border-radius:50px;font-weight:700;text-decoration:none;font-size:15px;line-height:1.3;box-shadow:0 4px 0 #D4621A;">Choisir un nouveau mot de passe</a>
                     </div>
                     <p style="color:#aaa;font-size:12px;text-align:center;">Ce lien est valable 30 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>
-                `, '#F47B20', "COM' Impression", 'https://com-impression.fr', 'Montreverd (85)')
+                `, '#F47B20', "COM' Impression", publicBaseUrl, 'Montreverd (85)')
             });
         } catch(e) { console.warn('Email reset non envoyé:', e.message); }
     }
@@ -740,6 +751,7 @@ app.post('/api/client/reset-password', express.json(), (req, res) => {
 
 // POST /api/client/login — demander un lien magique
 app.post('/api/client/login', express.json(), async (req, res) => {
+    const publicBaseUrl = getPublicBaseUrl(req);
     const email = normaliserEmail(req.body.email);
     if (!email || !email.includes('@')) return res.status(400).json({ success: false, error: 'Email invalide' });
 
@@ -750,7 +762,7 @@ app.post('/api/client/login', express.json(), async (req, res) => {
     tokens.push({ token, email, expire: expire.getTime() });
     sauvegarderTokens(tokens);
 
-    const lienMagique = `https://com-impression.fr?client_token=${token}`;
+    const lienMagique = `${publicBaseUrl}?client_token=${token}`;
     try {
         const t = createTransporter();
         await t.sendMail({
@@ -769,7 +781,7 @@ app.post('/api/client/login', express.json(), async (req, res) => {
                     </a>
                 </div>
                 <p style="color:#aaa;font-size:12px;text-align:center;">Si vous n'avez pas demandé ce lien, ignorez cet email.</p>
-            `, '#F47B20', "COM' Impression", 'https://com-impression.fr', 'Montreverd (85)')
+            `, '#F47B20', "COM' Impression", publicBaseUrl, 'Montreverd (85)')
         });
         res.json({ success: true });
     } catch(e) {
@@ -879,6 +891,7 @@ const uploadDoc = multer({
 
 // POST /api/commandes/:id/document — déposer un PDF sur une commande (admin)
 app.post('/api/commandes/:id/document', uploadDoc.single('document'), async (req, res) => {
+    const publicBaseUrl = getPublicBaseUrl(req);
     const { mdp } = req.body;
     if (mdp !== ADMIN_PWD_SUIVI) return res.status(403).json({ success:false, error:'Non autorisé' });
     if (!req.file) return res.status(400).json({ success:false, error:'Fichier manquant' });
@@ -905,7 +918,7 @@ app.post('/api/commandes/:id/document', uploadDoc.single('document'), async (req
     if (doc.notif && cmd.email) {
         try {
             const t = createTransporter();
-            const lienEspace = `https://com-impression.fr?client_token=notif`;
+            const lienEspace = `${publicBaseUrl}?client_token=notif`;
             await t.sendMail({
                 from: `"COM' Impression" <${process.env.SMTP_USER}>`,
                 to:   cmd.email,
@@ -917,11 +930,11 @@ app.post('/api/commandes/:id/document', uploadDoc.single('document'), async (req
                         Votre <strong>${doc.type}</strong> pour la commande <strong>${cmd.numero}</strong> est disponible dans votre espace client.
                     </p>
                     <div style="text-align:center;margin:24px 0;">
-                        <a href="https://com-impression.fr" style="background:#F47B20;color:#fff;padding:12px 28px;border-radius:50px;font-weight:700;text-decoration:none;font-size:15px;box-shadow:0 4px 0 #D4621A;">
+                        <a href="${lienEspace}" style="background:#F47B20;color:#fff;padding:12px 28px;border-radius:50px;font-weight:700;text-decoration:none;font-size:15px;box-shadow:0 4px 0 #D4621A;">
                             👤 Accéder à mon espace
                         </a>
                     </div>
-                `, '#F47B20', "COM' Impression", 'https://com-impression.fr', 'Montreverd (85)')
+                `, '#F47B20', "COM' Impression", publicBaseUrl, 'Montreverd (85)')
             });
         } catch(e) { console.warn('Notif doc err:', e.message); }
     }
