@@ -17,6 +17,7 @@
     mdp: sessionStorage.getItem('ci_admin_pwd') || '',
     commandes: [],
     scope: 'cours',
+    activeSection: '',
     selected: null,
     avis: [],
     siteConfig: null,
@@ -93,24 +94,55 @@
     $('count-annulees').textContent = state.commandes.filter(isCancelled).length;
     if($('count-produits')) $('count-produits').textContent = state.catalog.length;
     if($('count-clients')) $('count-clients').textContent = state.clients.length;
+    if($('count-cours-summary')) $('count-cours-summary').textContent = state.commandes.filter(isInProgress).length;
+    if($('count-produits-summary')) $('count-produits-summary').textContent = state.catalog.length;
+    if($('count-clients-summary')) $('count-clients-summary').textContent = state.clients.length;
+    if($('count-avis-summary')) $('count-avis-summary').textContent = state.avis.length;
     $('last-update').textContent = 'Dernière mise à jour : ' + new Date().toLocaleString('fr-FR');
+  }
+  function hideAdminSections(){
+    document.querySelectorAll('.admin-section').forEach(function(section){
+      section.classList.remove('open');
+      section.style.display='none';
+    });
+  }
+  function setActiveScope(scope){
+    document.querySelectorAll('[data-open-scope]').forEach(function(btn){
+      btn.classList.toggle('active', btn.getAttribute('data-open-scope')===scope);
+    });
   }
   function showDashboard(){
     $('login-card').style.display='none';
     $('dashboard').style.display='block';
-    if($('site-editor-section')) $('site-editor-section').style.display='block';
+    hideAdminSections();
+    setActiveScope('');
   }
   function showLogin(){
     $('login-card').style.display='block';
     $('dashboard').style.display='none';
-    if($('site-editor-section')) $('site-editor-section').style.display='none';
+    hideAdminSections();
+    setActiveScope('');
   }
-  function openModal(id){
-    var el=$(id); if(el) el.classList.add('open');
+  function openModal(id, scope){
+    hideAdminSections();
+    var el=$(id);
+    if(el){
+      el.style.display='block';
+      el.classList.add('open');
+      state.activeSection=id;
+      if(typeof el.scrollIntoView==='function') el.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    setActiveScope(scope||'');
   }
   function closeModal(el){
-    var modal=el && el.closest ? el.closest('.modal') : el;
-    if(modal) modal.classList.remove('open');
+    var modal=el && el.closest ? el.closest('.admin-section') : el;
+    if(modal){
+      modal.classList.remove('open');
+      modal.style.display='none';
+    }
+    state.activeSection='';
+    setActiveScope('');
+    if($('dashboard') && typeof $('dashboard').scrollIntoView==='function') $('dashboard').scrollIntoView({behavior:'smooth',block:'start'});
   }
 
   function login(){
@@ -159,7 +191,7 @@
     $('orders-title').textContent=titles[scope]||'Commandes';
     $('orders-search').value='';
     renderOrders();
-    openModal('modal-orders');
+    openModal('modal-orders',scope);
   }
 
   function renderOrders(){
@@ -292,7 +324,7 @@
       +'<section class="panel"><h3>Panier</h3>'+renderPanierTable(cmd)+'</section>'
       +'<section class="panel"><h3>Documents disponibles</h3>'+(docs||'<p class="muted">Aucun document déposé pour cette commande.</p>')+docUpload+'</section>'
       +'</div>';
-    openModal('modal-detail');
+    openModal('modal-detail',state.scope||'cours');
   }
 
   function saveStatut(){
@@ -392,13 +424,15 @@
       .then(function(data){
         state.avis = Array.isArray(data.avis) ? data.avis : [];
         var count = $('count-avis'); if(count) count.textContent = state.avis.length;
+        var summary = $('count-avis-summary'); if(summary) summary.textContent = state.avis.length;
         var title = $('avis-title-count'); if(title) title.textContent = state.avis.length+' avis en attente';
         renderAvisList();
-        if(openAfterLoad) openModal('modal-avis');
+        if(openAfterLoad) openModal('modal-avis','avis');
       })
       .catch(function(){
         state.avis = [];
         var count = $('count-avis'); if(count) count.textContent = '0';
+        var summary = $('count-avis-summary'); if(summary) summary.textContent = '0';
         renderAvisList();
       });
   }
@@ -563,7 +597,7 @@
         state.catalog = flattenCatalog((data.catalog && data.catalog.gammes) || []);
         updateCounts();
         renderProductsList();
-        if(openAfterLoad) openModal('modal-products');
+        if(openAfterLoad) openModal('modal-products','produits');
       });
   }
 
@@ -650,7 +684,7 @@
       +'</div>'
       +'<button class="btn btn-orange" id="product-edit-save" type="button">'+(entryRef.isNew?'Creer le produit':'Enregistrer le produit')+'</button>'
       +'<div class="status" id="product-edit-status"></div>';
-    openModal('modal-product-edit');
+    openModal('modal-product-edit','produits');
   }
 
   function saveProductEditor(){
@@ -692,7 +726,7 @@
         state.clients = Array.isArray(data.clients) ? data.clients : [];
         updateCounts();
         renderClientsList();
-        if(openAfterLoad) openModal('modal-clients');
+        if(openAfterLoad) openModal('modal-clients','clients');
       });
   }
 
@@ -762,7 +796,7 @@
       +'</div>'
       +'<button class="btn btn-orange" id="client-edit-save" type="button">'+(current.isNew?'Creer le client':'Enregistrer le client')+'</button>'
       +'<div class="status" id="client-edit-status"></div>';
-    openModal('modal-client-edit');
+    openModal('modal-client-edit','clients');
   }
 
   function saveClientEditor(){
@@ -933,13 +967,12 @@
         var scope=btn.getAttribute('data-open-scope');
         if(scope==='site'){
           loadSiteConfig().then(function(){
-            var section=$('site-editor-section');
-            if(section && typeof section.scrollIntoView==='function') section.scrollIntoView({behavior:'smooth',block:'start'});
+            openModal('site-editor-section','site');
           });
           return;
         }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
-        if(scope==='manual'){ resetManualForm(); openModal('modal-manual'); return; }
+        if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }
         if(scope==='produits'){ loadProductsAdmin(true); return; }
         if(scope==='clients'){ loadClientsAdmin(true); return; }
         openOrders(scope);
@@ -948,7 +981,6 @@
     document.addEventListener('click',function(e){
       var close=e.target.closest('[data-close]');
       if(close){ closeModal(close); return; }
-      if(e.target.classList && e.target.classList.contains('modal')) closeModal(e.target);
       var detail=e.target.closest('[data-detail]');
       if(detail) openDetail(detail.getAttribute('data-detail'));
       if(e.target && e.target.id==='save-statut') saveStatut();

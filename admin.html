@@ -38,16 +38,17 @@
     .status.err{display:block;background:#fee2e2;color:#991b1b}
     .dashboard,.admin-section{display:none;padding:28px}
     .dash-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px}
-    .cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:18px}
-    .card{background:var(--paper);border:3px solid var(--ink);box-shadow:5px 5px 0 var(--ink);border-radius:22px;padding:22px;min-height:180px;cursor:pointer;text-align:left;transition:.18s}
-    .card:hover{transform:translateY(-4px);box-shadow:8px 8px 0 var(--ink)}
-    .card .icon{font-size:1.8rem;margin-bottom:12px}
-    .card strong{display:block;font-family:'Baloo 2',cursive;font-size:1.35rem;line-height:1.05}
-    .card .count{font-family:'Baloo 2',cursive;font-size:2.4rem;color:var(--or);font-weight:800;margin:12px 0 2px}
-    .card p{margin:0;color:var(--muted);font-size:.92rem;line-height:1.45}
-    .card.site{background:#151515;color:#fff}
-    .card.site p{color:rgba(255,255,255,.72)}
-    .card.site .count{font-size:1rem;color:#fff;background:var(--or);display:inline-flex;padding:7px 12px;border-radius:999px}
+    .admin-tabs{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+    .admin-tab{border:2px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);padding:12px 18px;font-family:'Baloo 2',cursive;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:10px;transition:.18s}
+    .admin-tab:hover{transform:translateY(-2px)}
+    .admin-tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .admin-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:999px;background:var(--orange-soft);color:var(--or2);padding:0 8px;font-size:.86rem;font-weight:900}
+    .admin-tab.active .admin-tab-count{background:var(--or);color:#fff}
+    .admin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+    .admin-summary-card{background:var(--paper);border:2px solid #eee0d6;border-radius:20px;padding:16px}
+    .admin-summary-card strong{display:block;font-family:'Baloo 2',cursive;font-size:1.12rem;line-height:1}
+    .admin-summary-card .count{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:2rem;color:var(--or)}
+    .admin-summary-card p{margin:6px 0 0;color:var(--muted);font-size:.9rem;line-height:1.45}
     .admin-section.open{display:block}
     .box{background:#fff;border:4px solid var(--ink);box-shadow:10px 10px 0 rgba(0,0,0,.45);border-radius:26px;width:min(1040px,100%);max-height:88vh;overflow:hidden;display:flex;flex-direction:column}
     .box.small{width:min(620px,100%)}
@@ -92,9 +93,8 @@
     .season-item strong{display:block;font-size:.9rem}
     .season-item span{display:block;color:var(--muted);font-size:.8rem;line-height:1.35}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:2px dashed var(--line);border-radius:20px}
-    @media(max-width:1080px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
-    @media(max-width:900px){.cards{grid-template-columns:1fr 1fr}.order,.manual-line,.season-list{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}}
-    @media(max-width:560px){.cards{grid-template-columns:1fr}.page{width:min(100% - 20px,1180px)}.login-card,.dashboard,.admin-section,.box{border-width:3px;box-shadow:5px 5px 0 #151515}.card{min-height:150px}}
+    @media(max-width:900px){.admin-summary{grid-template-columns:1fr 1fr}.order,.manual-line,.season-list{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}}
+    @media(max-width:560px){.admin-summary{grid-template-columns:1fr}.page{width:min(100% - 20px,1180px)}.login-card,.dashboard,.admin-section,.box{border-width:3px;box-shadow:5px 5px 0 #151515}}
   </style>
 </head>
 <body>
@@ -132,55 +132,37 @@
         </div>
         <button class="btn btn-light btn-small" id="btn-logout" type="button">Déconnexion</button>
       </div>
-      <div class="cards">
-        <button class="card" data-open-scope="cours" type="button">
-          <div class="icon">📦</div>
-          <strong>Commandes en cours</strong>
-          <div class="count" id="count-cours">0</div>
-          <p>Reçues, BAT, production et commandes à traiter.</p>
-        </button>
-        <button class="card" data-open-scope="terminees" type="button">
-          <div class="icon">✅</div>
-          <strong>Commandes terminées</strong>
-          <div class="count" id="count-terminees">0</div>
-          <p>Commandes expédiées ou finalisées.</p>
-        </button>
-        <button class="card" data-open-scope="annulees" type="button">
-          <div class="icon">⛔</div>
-          <strong>Commandes annulées</strong>
-          <div class="count" id="count-annulees">0</div>
-          <p>Séparées du flux principal pour garder l’admin lisible.</p>
-        </button>
-        <button class="card" data-open-scope="manual" type="button">
-          <div class="icon">✍️</div>
-          <strong>Commande manuelle</strong>
-          <div class="count">Créer</div>
-          <p>Ajouter une commande passée hors formulaire client.</p>
-        </button>
-        <button class="card" data-open-scope="avis" type="button">
-          <div class="icon">⭐</div>
-          <strong>Gestion des avis</strong>
-          <div class="count" id="count-avis">0</div>
-          <p>Valider, supprimer et garder les avis clients propres.</p>
-        </button>
-        <button class="card" data-open-scope="produits" type="button">
-          <div class="icon">🧾</div>
+      <div class="admin-tabs">
+        <button class="admin-tab" data-open-scope="cours" type="button">Commandes en cours <span class="admin-tab-count" id="count-cours">0</span></button>
+        <button class="admin-tab" data-open-scope="terminees" type="button">Terminees <span class="admin-tab-count" id="count-terminees">0</span></button>
+        <button class="admin-tab" data-open-scope="annulees" type="button">Annulees <span class="admin-tab-count" id="count-annulees">0</span></button>
+        <button class="admin-tab" data-open-scope="manual" type="button">Commande manuelle</button>
+        <button class="admin-tab" data-open-scope="avis" type="button">Avis <span class="admin-tab-count" id="count-avis">0</span></button>
+        <button class="admin-tab" data-open-scope="produits" type="button">Produits <span class="admin-tab-count" id="count-produits">0</span></button>
+        <button class="admin-tab" data-open-scope="clients" type="button">Clients <span class="admin-tab-count" id="count-clients">0</span></button>
+        <button class="admin-tab" data-open-scope="site" type="button">Accueil et contenu</button>
+      </div>
+      <div class="admin-summary">
+        <article class="admin-summary-card">
+          <strong>Commandes a traiter</strong>
+          <span class="count" id="count-cours-summary">0</span>
+          <p>Recues, BAT, production et suivis actifs.</p>
+        </article>
+        <article class="admin-summary-card">
           <strong>Produits</strong>
-          <div class="count" id="count-produits">0</div>
-          <p>Nom, description, quantites, papiers et finitions.</p>
-        </button>
-        <button class="card" data-open-scope="clients" type="button">
-          <div class="icon">👥</div>
+          <span class="count" id="count-produits-summary">0</span>
+          <p>Catalogue, quantites, papiers, finitions et prix.</p>
+        </article>
+        <article class="admin-summary-card">
           <strong>Clients</strong>
-          <div class="count" id="count-clients">0</div>
-          <p>Gestion des comptes et choix de reglement des pros.</p>
-        </button>
-        <button class="card site" data-open-scope="site" type="button">
-          <div class="icon">🛠️</div>
-          <strong>Accueil et contenu</strong>
-          <div class="count">Modifier</div>
-          <p>Hero, bloc accueil, mise en avant produits et message client.</p>
-        </button>
+          <span class="count" id="count-clients-summary">0</span>
+          <p>Comptes clients, reglages pros et informations.</p>
+        </article>
+        <article class="admin-summary-card">
+          <strong>Avis en attente</strong>
+          <span class="count" id="count-avis-summary">0</span>
+          <p>Validation et moderation avant publication.</p>
+        </article>
       </div>
     </section>
   </main>
@@ -211,11 +193,11 @@
     </div>
   </section>
 
-  <section class="dashboard" id="site-editor-section" style="display:none;width:min(1180px,calc(100% - 32px));margin:0 auto 40px;padding:0 0 28px;">
+  <section class="admin-section" id="site-editor-section" style="width:min(1180px,calc(100% - 32px));margin:0 auto 40px;padding:0 0 28px;">
     <div class="box" style="max-height:none;">
       <div class="box-head">
         <h2>Gestion du site</h2>
-        <a class="btn btn-light btn-small" href="#dashboard">Retour au tableau de bord</a>
+        <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
         <div class="site-grid">

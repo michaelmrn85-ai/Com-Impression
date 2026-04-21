@@ -93,21 +93,24 @@
       </div>
 
       <div class="form-card">
-        <div class="section-head">
-          <div>
-            <div class="pill">Finalisation</div>
-            <h2>Envoi et paiement</h2>
-          </div>
-        </div>
         <form id="cart-form" hidden>
           <div class="field">
             <label for="checkout-message">Message complementaire</label>
             <textarea id="checkout-message" placeholder="Delai, contraintes, infos techniques, precisions de commande..."></textarea>
           </div>
           <div class="field">
-            <label for="checkout-files">Fichiers de production</label>
-            <input id="checkout-files" type="file" multiple>
-            <p>Joins ici tes PDF, visuels ou documents a imprimer. Ils seront envoyes avec la commande.</p>
+            <label for="checkout-promo">Code reduction</label>
+            <div class="inline-fields">
+              <input id="checkout-promo" type="text" placeholder="Ex : FID5-AB12CD">
+              <button class="btn-light" id="checkout-promo-apply" type="button">Appliquer</button>
+            </div>
+            <p>Si vous avez un code fidelite ou une remise, appliquez-le avant le paiement.</p>
+          </div>
+          <div class="summary-box" id="cart-payment-summary">
+            <div class="split-line">
+              <span>Total a regler</span>
+              <strong class="total" id="cart-payable-total">0,00 EUR</strong>
+            </div>
           </div>
           <button class="btn" id="cart-submit" type="submit">Envoyer ma demande</button>
           <div class="status" id="cart-status"></div>
@@ -115,7 +118,7 @@
 
         <div class="summary-box" id="stripe-box" style="margin-top:18px;" hidden>
           <div class="pill">Paiement CB</div>
-          <p>Le paiement se fait apres validation du panier. Le detail de commande transmis restera identique a celui du recapitulatif.</p>
+          <p>Le paiement se fait apres validation du panier, avec le montant final apres remise si un code a ete applique.</p>
           <div class="field">
             <label for="stripe-card-element">Carte bancaire</label>
             <div id="stripe-card-element"></div>

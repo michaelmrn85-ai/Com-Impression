@@ -854,6 +854,7 @@
     var sessionToken = localStorage.getItem(SESSION_KEY);
     var connectedClient = null;
     var cartValidated = false;
+    var appliedPromo = null;
 
     if (goProducts) {
       goProducts.addEventListener("click", function () {
@@ -863,11 +864,33 @@
 
     function invalidateCheckout() {
       cartValidated = false;
+      appliedPromo = null;
       clearStatus(validateStatus);
       clearStatus(status);
       clearStatus(stripeStatus);
       if (form) form.hidden = true;
       if (stripeBox) stripeBox.hidden = true;
+      updatePayableTotal();
+    }
+
+    function getBaseCartTotalInfo() {
+      return getCartTotal(readCart());
+    }
+
+    function getPayableTotalInfo() {
+      var totalInfo = getBaseCartTotalInfo();
+      if (typeof totalInfo.numeric !== "number") return totalInfo;
+      if (!appliedPromo || !appliedPromo.discount) return totalInfo;
+      var discounted = Math.max(0, totalInfo.numeric * (1 - (appliedPromo.discount / 100)));
+      return {
+        numeric: Math.round(discounted * 100) / 100,
+        label: euro(Math.round(discounted * 100) / 100)
+      };
+    }
+
+    function updatePayableTotal() {
+      var payable = getPayableTotalInfo();
+      if ($("cart-payable-total")) $("cart-payable-total").textContent = payable.label || "0,00 EUR";
     }
 
     function openAuthModal() {
@@ -958,11 +981,13 @@
         if (empty) empty.hidden = false;
         if (list) list.innerHTML = "";
         if (total) total.textContent = "0,00 EUR";
+        updatePayableTotal();
         return;
       }
 
       if (empty) empty.hidden = true;
       if (total) total.textContent = totalInfo.label;
+      updatePayableTotal();
 
       if (list) {
         list.innerHTML =
@@ -1053,7 +1078,7 @@
       if (!validateCheckoutBasics(targetStatus || validateStatus)) return false;
       cartValidated = true;
       if (form) form.hidden = false;
-      var totalInfo = getCartTotal(readCart());
+      var totalInfo = getPayableTotalInfo();
       if (stripeBox) stripeBox.hidden = totalInfo.numeric == null;
       ensureStripe();
       setStatus(targetStatus || validateStatus, "ok", "Panier valide. Vous pouvez maintenant envoyer la demande ou proceder au paiement.");
@@ -1078,8 +1103,8 @@
           ["checkout-prenom", "checkout-nom", "checkout-email", "checkout-tel", "checkout-adresse"].forEach(function (id) {
             if (!connectedClient && $(id)) $(id).value = "";
           });
-          var checkoutFiles = $("checkout-files");
-          if (checkoutFiles) checkoutFiles.value = "";
+          if ($("checkout-promo")) $("checkout-promo").value = "";
+          appliedPromo = null;
           renderCart();
           return true;
         });
@@ -1100,13 +1125,14 @@
       formData.append("cart_upload_tokens", JSON.stringify(cart.reduce(function (tokens, item) {
         return tokens.concat(item.uploadTokens || []);
       }, [])));
-      formData.append("prix_total", getCartTotal(cart).label);
+      formData.append("prix_total", getPayableTotalInfo().label);
       formData.append("source", "com-impression");
+      if (appliedPromo && appliedPromo.code) {
+        formData.append("promo_code", appliedPromo.code);
+        formData.append("promo_discount", String(appliedPromo.discount || 0));
+      }
       if (paymentMeta && paymentMeta.payment_id) formData.append("payment_id", paymentMeta.payment_id);
       if (paymentMeta && paymentMeta.payment_status) formData.append("payment_status", paymentMeta.payment_status);
-      Array.prototype.forEach.call((($("checkout-files") || {}).files || []), function (file) {
-        formData.append("fichiers", file);
-      });
       return formData;
     }
 
@@ -1192,6 +1218,46 @@
       });
     }
 
+    if ($("checkout-promo-apply")) {
+      $("checkout-promo-apply").addEventListener("click", function () {
+        if (!connectedClient) {
+          setStatus(status, "err", "Connectez-vous a votre compte pour appliquer un code reduction.");
+          return;
+        }
+        var code = (($("checkout-promo") || {}).value || "").trim();
+        if (!code) {
+          setStatus(status, "err", "Entrez un code reduction.");
+          return;
+        }
+        fetch(API_BASE + "/api/client/code-promo", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-session-token": sessionToken || ""
+          },
+          body: JSON.stringify({ code: code })
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (json) {
+              if (!response.ok || !json.success) throw new Error(json.error || ("HTTP " + response.status));
+              return json;
+            });
+          })
+          .then(function (json) {
+            appliedPromo = {
+              code: code,
+              discount: Number(json.remise || 0)
+            };
+            updatePayableTotal();
+            if (cartValidated && stripeBox) stripeBox.hidden = getPayableTotalInfo().numeric == null;
+            setStatus(status, "ok", "Code applique : " + appliedPromo.discount + "% de remise.");
+          })
+          .catch(function (error) {
+            setStatus(status, "err", error.message || "Impossible d'appliquer ce code.");
+          });
+      });
+    }
+
     if (form) {
       form.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -1241,7 +1307,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: Math.round(totalInfo.numeric * 100),
+            amount: Math.round(getPayableTotalInfo().numeric * 100),
             currency: "eur",
             description: "Commande COM' Impression"
           })
