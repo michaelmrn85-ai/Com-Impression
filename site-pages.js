@@ -1603,7 +1603,8 @@
     var status = $("rdv-status");
     var selectedDay = null;
     var selectedSlot = "";
-    var slots = ["09:00", "10:30", "14:00", "15:30", "17:00"];
+    var businessDaySlots = ["09:00", "10:30", "14:00", "15:30", "17:00"];
+    var eveningSlots = ["19:30"];
     var params = new URLSearchParams(window.location.search);
     if ($("rdv-produit")) $("rdv-produit").value = params.get("produit") || "";
 
@@ -1618,9 +1619,19 @@
       return result;
     }
 
+    function getSlotsForSelectedDay() {
+      if (!selectedDay) return businessDaySlots;
+      var day = new Date(selectedDay + "T12:00:00");
+      var weekday = day.getDay();
+      if (weekday === 2 || weekday === 5) return businessDaySlots;
+      return eveningSlots;
+    }
+
     function renderSlots() {
       if (!slotsWrap) return;
-      slotsWrap.innerHTML = slots.map(function (slot) {
+      var availableSlots = getSlotsForSelectedDay();
+      if (availableSlots.indexOf(selectedSlot) === -1) selectedSlot = availableSlots[0] || "";
+      slotsWrap.innerHTML = availableSlots.map(function (slot) {
         return '<button type="button" class="slot-btn' + (slot === selectedSlot ? " active" : "") + '" data-slot="' + esc(slot) + '">' + esc(slot) + "</button>";
       }).join("");
       slotsWrap.querySelectorAll("[data-slot]").forEach(function (button) {
@@ -1644,6 +1655,7 @@
         button.addEventListener("click", function () {
           selectedDay = button.getAttribute("data-day");
           renderDays();
+          renderSlots();
         });
       });
     }
