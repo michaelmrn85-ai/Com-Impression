@@ -1317,15 +1317,7 @@
   function initClientPage() {
     var authView = $("client-auth-view");
     var dashboardView = $("client-dashboard-view");
-    var loginView = $("client-login-block");
-    var registerView = $("client-register-block");
     var COOKIE_KEY = "ci_cookie_consent";
-
-    function showAuthBlock(target) {
-      [loginView, registerView].forEach(function (view) {
-        if (view) view.hidden = view !== target;
-      });
-    }
 
     function renderCookieBanner() {
       var banner = $("cookie-banner");
@@ -1481,7 +1473,6 @@
         });
     }
 
-    showAuthBlock(loginView);
     renderCookieBanner();
 
     $("login-form").addEventListener("submit", function (event) {
@@ -1558,7 +1549,6 @@
       updateHeaderState();
       if (authView) authView.hidden = false;
       if (dashboardView) dashboardView.hidden = true;
-      showAuthBlock(loginView);
     });
 
     var params = new URLSearchParams(window.location.search);
@@ -1570,18 +1560,7 @@
     if (resetToken) {
       if (authView) authView.hidden = false;
       if (dashboardView) dashboardView.hidden = true;
-      showAuthBlock(resetView);
-      $("reset-form").addEventListener("submit", function (event) {
-        event.preventDefault();
-        handleJsonForm("/api/client/reset-password", {
-          token: resetToken,
-          password: $("reset-password").value
-        }, $("reset-status"), function (json) {
-          finishLogin(json);
-          setStatus($("reset-status"), "ok", "Mot de passe mis a jour.");
-          history.replaceState({}, "", "/client");
-        });
-      }, { once: true });
+      setStatus($("login-status"), "err", "La reinitialisation du mot de passe n'est pas disponible sur cette page.");
     } else if (magicToken) {
       fetch(API_BASE + "/api/client/auth?token=" + encodeURIComponent(magicToken))
         .then(function (response) {
@@ -1614,8 +1593,6 @@
         });
     } else if (storedToken) {
       loadDashboard(storedToken);
-    } else {
-      showAuthBlock(loginView);
     }
   }
 
