@@ -836,14 +836,12 @@
     var list = $("cart-items");
     var total = $("cart-total");
     var empty = $("cart-empty");
-    var form = $("cart-form");
-    var sendBtn = $("cart-submit");
-    var status = $("cart-status");
     var goProducts = $("cart-go-products");
     var validateBtn = $("cart-validate");
     var validateStatus = $("cart-validate-status");
     var guestFields = $("cart-guest-fields");
     var clientSummary = $("cart-client-summary");
+    var paymentCard = $("payment-card");
     var authModal = $("checkout-auth-modal");
     var authStatus = $("checkout-auth-status");
     var stripeBox = $("stripe-box");
@@ -866,9 +864,8 @@
       cartValidated = false;
       appliedPromo = null;
       clearStatus(validateStatus);
-      clearStatus(status);
       clearStatus(stripeStatus);
-      if (form) form.hidden = true;
+      if (paymentCard) paymentCard.hidden = true;
       if (stripeBox) stripeBox.hidden = true;
       updatePayableTotal();
     }
@@ -1057,13 +1054,13 @@
     }
 
     function validateCheckoutBasics(targetStatus) {
-      clearStatus(targetStatus || status);
+      clearStatus(targetStatus || validateStatus);
       var cart = readCart();
       if (!cart.length) {
-        setStatus(targetStatus || status, "err", "Votre panier est vide.");
+        setStatus(targetStatus || validateStatus, "err", "Votre panier est vide.");
         return false;
       }
-      if (!getCustomerDetails(targetStatus || status)) {
+      if (!getCustomerDetails(targetStatus || validateStatus)) {
         return false;
       }
       return true;
@@ -1077,16 +1074,16 @@
       }
       if (!validateCheckoutBasics(targetStatus || validateStatus)) return false;
       cartValidated = true;
-      if (form) form.hidden = false;
+      if (paymentCard) paymentCard.hidden = false;
       var totalInfo = getPayableTotalInfo();
       if (stripeBox) stripeBox.hidden = totalInfo.numeric == null;
       ensureStripe();
-      setStatus(targetStatus || validateStatus, "ok", "Panier valide. Vous pouvez maintenant envoyer la demande ou proceder au paiement.");
+      setStatus(targetStatus || validateStatus, "ok", "Panier valide. Le bloc paiement est maintenant disponible.");
       return true;
     }
 
     function submitOrder(paymentMeta) {
-      if (!getCustomerDetails(status)) return Promise.reject(new Error("Coordonnees client invalides."));
+      if (!getCustomerDetails(validateStatus)) return Promise.reject(new Error("Coordonnees client invalides."));
       return fetch(API_BASE + "/api/devis", {
         method: "POST",
         body: buildCheckoutFormData(paymentMeta)
@@ -1099,10 +1096,10 @@
         })
         .then(function () {
           writeCart([]);
-          form.reset();
           ["checkout-prenom", "checkout-nom", "checkout-email", "checkout-tel", "checkout-adresse"].forEach(function (id) {
             if (!connectedClient && $(id)) $(id).value = "";
           });
+          if ($("checkout-message")) $("checkout-message").value = "";
           if ($("checkout-promo")) $("checkout-promo").value = "";
           appliedPromo = null;
           renderCart();
@@ -1112,7 +1109,7 @@
 
     function buildCheckoutFormData(paymentMeta) {
       var cart = readCart();
-      var customer = getCustomerDetails(status) || {};
+      var customer = getCustomerDetails(validateStatus) || {};
       var formData = new FormData();
       formData.append("prenom", customer.prenom || "");
       formData.append("nom", customer.nom || "");
@@ -1221,12 +1218,12 @@
     if ($("checkout-promo-apply")) {
       $("checkout-promo-apply").addEventListener("click", function () {
         if (!connectedClient) {
-          setStatus(status, "err", "Connectez-vous a votre compte pour appliquer un code reduction.");
+          setStatus(validateStatus, "err", "Connectez-vous a votre compte pour appliquer un code reduction.");
           return;
         }
         var code = (($("checkout-promo") || {}).value || "").trim();
         if (!code) {
-          setStatus(status, "err", "Entrez un code reduction.");
+          setStatus(validateStatus, "err", "Entrez un code reduction.");
           return;
         }
         fetch(API_BASE + "/api/client/code-promo", {
@@ -1249,38 +1246,12 @@
               discount: Number(json.remise || 0)
             };
             updatePayableTotal();
+            if (cartValidated && paymentCard) paymentCard.hidden = false;
             if (cartValidated && stripeBox) stripeBox.hidden = getPayableTotalInfo().numeric == null;
-            setStatus(status, "ok", "Code applique : " + appliedPromo.discount + "% de remise.");
+            setStatus(validateStatus, "ok", "Code applique : " + appliedPromo.discount + "% de remise.");
           })
           .catch(function (error) {
-            setStatus(status, "err", error.message || "Impossible d'appliquer ce code.");
-          });
-      });
-    }
-
-    if (form) {
-      form.addEventListener("submit", function (event) {
-        event.preventDefault();
-        if (!cartValidated && !confirmValidatedCheckout(status)) {
-          return;
-        }
-        if (!validateCheckoutBasics(status)) {
-          return;
-        }
-
-        sendBtn.disabled = true;
-        sendBtn.textContent = "Envoi en cours...";
-
-        submitOrder()
-          .then(function () {
-            setStatus(status, "ok", "Votre demande a bien ete envoyee. Nous revenons vers vous rapidement.");
-          })
-          .catch(function (error) {
-            setStatus(status, "err", error.message || "Impossible d'envoyer votre demande.");
-          })
-          .finally(function () {
-            sendBtn.disabled = false;
-            sendBtn.textContent = "Envoyer ma demande";
+            setStatus(validateStatus, "err", error.message || "Impossible d'appliquer ce code.");
           });
       });
     }
@@ -1332,7 +1303,7 @@
             });
           })
           .then(function () {
-            setStatus(status, "ok", "Paiement accepte et commande enregistree.");
+            setStatus(validateStatus, "ok", "Paiement accepte et commande enregistree.");
             setStatus(stripeStatus, "ok", "Paiement Stripe accepte.");
           })
           .catch(function (error) {

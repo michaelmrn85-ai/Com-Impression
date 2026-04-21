@@ -820,9 +820,22 @@ textarea {
 
 .cart-checkout-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
   gap: 24px;
   align-items: start;
+}
+
+.cart-checkout-card {
+  display: grid;
+  gap: 16px;
+}
+
+.cart-coords-landscape {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cart-promo-row {
+  grid-template-columns: minmax(0, 1fr) 220px;
 }
 
 .appointment-page {
