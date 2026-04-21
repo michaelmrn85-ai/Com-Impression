@@ -918,7 +918,9 @@
       }
       clearStatus(stripeStatus);
       updatePayableTotal();
-      ensureStripe();
+      window.requestAnimationFrame(function () {
+        ensureStripe();
+      });
     }
 
     function closePaymentModal() {
@@ -1087,7 +1089,12 @@
     }
 
     function ensureStripe() {
-      if (!paymentModal || paymentModal.hidden || typeof window.Stripe !== "function") return;
+      if (!paymentModal || paymentModal.hidden || typeof window.Stripe !== "function") {
+        if (typeof window.Stripe !== "function") {
+          setStatus(stripeStatus, "err", "Le module de paiement Stripe ne s'est pas charge.");
+        }
+        return;
+      }
       if (!stripeClient) {
         stripeClient = window.Stripe(STRIPE_PK);
         var elements = stripeClient.elements();
@@ -1100,7 +1107,12 @@
             }
           }
         });
-        stripeCard.mount("#stripe-card-element");
+        var stripeMount = paymentModal.querySelector("#stripe-card-element");
+        if (!stripeMount) {
+          setStatus(stripeStatus, "err", "Le champ de carte bancaire est introuvable.");
+          return;
+        }
+        stripeCard.mount(stripeMount);
       }
     }
 
@@ -1963,6 +1975,68 @@
     if (productsCta) {
       productsCta.addEventListener("click", function () {
         goTo("/produits");
+      });
+    }
+
+    var partnershipForm = $("partnership-form");
+    var partnershipStatus = $("partner-status");
+    if (partnershipForm && partnershipStatus) {
+      partnershipForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        clearStatus(partnershipStatus);
+
+        var prenom = (($("partner-prenom") || {}).value || "").trim();
+        var nom = (($("partner-nom") || {}).value || "").trim();
+        var structure = (($("partner-structure") || {}).value || "").trim();
+        var projetType = (($("partner-type") || {}).value || "").trim();
+        var email = (($("partner-email") || {}).value || "").trim();
+        var tel = (($("partner-tel") || {}).value || "").trim();
+        var message = (($("partner-message") || {}).value || "").trim();
+
+        if (!prenom || !nom || !structure || !email || !message) {
+          setStatus(partnershipStatus, "err", "Prenom, nom, structure, email et besoin sont obligatoires.");
+          return;
+        }
+
+        var fd = new FormData();
+        fd.append("prenom", prenom);
+        fd.append("nom", nom);
+        fd.append("email", email);
+        fd.append("tel", tel);
+        fd.append("message", "Structure: " + structure + " | Type: " + (projetType || "Partenariat") + " | " + message);
+        fd.append("panier", "Partenariat - " + structure + " - " + (projetType || "Partenariat"));
+        fd.append("prix_total", "-");
+        fd.append("source", "com-impression");
+
+        var submit = $("partner-submit");
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "Envoi en cours...";
+        }
+
+        fetch(API_BASE + "/api/devis", {
+          method: "POST",
+          body: fd
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (json) {
+              if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+              return json;
+            });
+          })
+          .then(function () {
+            partnershipForm.reset();
+            setStatus(partnershipStatus, "ok", "Votre demande de partenariat a bien ete envoyee.");
+          })
+          .catch(function (error) {
+            setStatus(partnershipStatus, "err", error.message || "Impossible d'envoyer votre demande.");
+          })
+          .finally(function () {
+            if (submit) {
+              submit.disabled = false;
+              submit.textContent = "Envoyer ma demande";
+            }
+          });
       });
     }
   }

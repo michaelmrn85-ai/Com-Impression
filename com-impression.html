@@ -714,6 +714,169 @@
       border-radius: 16px;
     }
 
+    .partnership-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .partnership-card,
+    .partnership-form {
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+
+    .partnership-card {
+      background: linear-gradient(155deg, #1b1612 0%, #302720 100%);
+      color: var(--white);
+      padding: 30px;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .partnership-card::before {
+      content: "";
+      position: absolute;
+      right: -36px;
+      top: -26px;
+      width: 160px;
+      height: 160px;
+      border-radius: 999px;
+      background: rgba(255, 122, 26, 0.22);
+    }
+
+    .partnership-card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .partnership-card h3 {
+      font-family: "Sora", sans-serif;
+      font-size: clamp(1.8rem, 3vw, 2.5rem);
+      line-height: 1.03;
+      letter-spacing: -0.05em;
+      margin-bottom: 12px;
+    }
+
+    .partnership-card p {
+      color: rgba(255, 255, 255, 0.82);
+      line-height: 1.8;
+    }
+
+    .partnership-points {
+      list-style: none;
+      display: grid;
+      gap: 12px;
+      margin: 22px 0;
+    }
+
+    .partnership-points li {
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 18px;
+      color: rgba(255, 255, 255, 0.84);
+      line-height: 1.6;
+    }
+
+    .partnership-contact {
+      display: grid;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .partnership-contact a {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--white);
+      font-weight: 700;
+      width: fit-content;
+    }
+
+    .partnership-form {
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid var(--line);
+      padding: 26px;
+      box-shadow: 0 18px 36px rgba(23, 19, 16, 0.06);
+    }
+
+    .partnership-form h4 {
+      font-family: "Sora", sans-serif;
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    .partnership-form p {
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    .partnership-fields {
+      display: grid;
+      gap: 12px;
+    }
+
+    .partnership-inline {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .partnership-field label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .partnership-field input,
+    .partnership-field textarea,
+    .partnership-field select {
+      width: 100%;
+      border: 1.5px solid rgba(23, 19, 16, 0.12);
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 18px;
+      padding: 14px 16px;
+      color: var(--ink);
+      outline: none;
+    }
+
+    .partnership-field textarea {
+      min-height: 128px;
+      resize: vertical;
+    }
+
+    .partnership-field input:focus,
+    .partnership-field textarea:focus,
+    .partnership-field select:focus {
+      border-color: var(--orange);
+    }
+
+    .partnership-status {
+      display: none;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .partnership-status.show {
+      display: block;
+    }
+
+    .partnership-status.ok {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .partnership-status.err {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
     .footer {
       margin-top: 20px;
       background: linear-gradient(180deg, #1d1713 0%, #120f0d 100%);
@@ -838,6 +1001,7 @@
 
       .hero-grid,
       .rdv-grid,
+      .partnership-grid,
       .section-title,
       .gammes-grid,
       .avis-grid {
@@ -890,6 +1054,10 @@
       }
 
       .panel-card {
+        grid-template-columns: 1fr;
+      }
+
+      .partnership-inline {
         grid-template-columns: 1fr;
       }
 
@@ -1095,6 +1263,84 @@
       </div>
     </section>
 
+    <section class="section" id="partenariats">
+      <div class="section-title">
+        <div>
+          <div class="hero-tag">Partenariats</div>
+          <h2>Ecoles, festivals et evenements : parlons-en.</h2>
+        </div>
+        <p>Un accompagnement dedie pour les besoins en serie, les supports de communication et les projets a calendrier precis.</p>
+      </div>
+
+      <div class="partnership-grid">
+        <div class="partnership-card">
+          <h3>Des partenariats simples, souples et bien suivis.</h3>
+          <p>
+            COM' Impression accompagne les ecoles, associations, festivals et organisateurs d'evenements pour les supports
+            imprimes, la signaletique, les goodies et les demandes sur mesure.
+          </p>
+          <ul class="partnership-points">
+            <li>Supports adaptes aux budgets, aux delais et a la saisonnalite de votre projet.</li>
+            <li>Un seul interlocuteur pour cadrer les besoins, les quantites et les formats.</li>
+            <li>Ideal pour les kermesses, festivals, concerts, clubs, BDE, mairies et structures locales.</li>
+          </ul>
+          <div class="partnership-contact">
+            <a href="tel:+33743695641">07 43 69 56 41</a>
+            <a href="mailto:michael@com-impression.fr">michael@com-impression.fr</a>
+          </div>
+        </div>
+
+        <div class="partnership-form">
+          <h4>Faire une demande de partenariat</h4>
+          <p>Expliquez rapidement votre besoin et nous revenons vers vous pour construire une proposition adaptee.</p>
+          <form id="partnership-form" class="partnership-fields">
+            <div class="partnership-inline">
+              <div class="partnership-field">
+                <label for="partner-prenom">Prenom *</label>
+                <input id="partner-prenom" type="text" required>
+              </div>
+              <div class="partnership-field">
+                <label for="partner-nom">Nom *</label>
+                <input id="partner-nom" type="text" required>
+              </div>
+            </div>
+            <div class="partnership-inline">
+              <div class="partnership-field">
+                <label for="partner-structure">Structure *</label>
+                <input id="partner-structure" type="text" placeholder="Ecole, festival, association, evenement..." required>
+              </div>
+              <div class="partnership-field">
+                <label for="partner-type">Type de projet</label>
+                <select id="partner-type">
+                  <option value="Ecole">Ecole</option>
+                  <option value="Festival">Festival</option>
+                  <option value="Evenement">Evenement</option>
+                  <option value="Association">Association</option>
+                  <option value="Collectivite">Collectivite</option>
+                </select>
+              </div>
+            </div>
+            <div class="partnership-inline">
+              <div class="partnership-field">
+                <label for="partner-email">Email *</label>
+                <input id="partner-email" type="email" required>
+              </div>
+              <div class="partnership-field">
+                <label for="partner-tel">Telephone</label>
+                <input id="partner-tel" type="tel" placeholder="07 43 69 56 41">
+              </div>
+            </div>
+            <div class="partnership-field">
+              <label for="partner-message">Votre besoin *</label>
+              <textarea id="partner-message" placeholder="Dates, quantites, supports souhaites, budget estime, type d'evenement..." required></textarea>
+            </div>
+            <button class="main-btn" id="partner-submit" type="submit">Envoyer ma demande</button>
+            <div class="partnership-status" id="partner-status"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="rdv">
       <div class="section-title">
         <div>
@@ -1180,6 +1426,8 @@
           <a href="./produits.html">Nos gammes</a>
           <a href="#avis">Avis clients</a>
           <a href="./rendez-vous.html">Prise de rendez-vous</a>
+          <a href="tel:+33743695641">07 43 69 56 41</a>
+          <a href="mailto:michael@com-impression.fr">michael@com-impression.fr</a>
           <p>Com'Pro, Com'Exterieur, Com'Evenementiel, Com'Personnalisee, Com'Services et bientot Com'Gourmand.</p>
         </div>
       </div>
