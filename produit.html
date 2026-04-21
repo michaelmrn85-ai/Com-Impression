@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produit | COM' Impression</title>
+  <meta name="description" content="Consultez le detail d'un produit COM' Impression et ajoutez-le au panier.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./site-theme.css">
+</head>
+<body data-page="produit">
+  <header class="topbar">
+    <div class="nav">
+      <a class="brand" href="./com-impression.html">
+        <img class="brand-mark" src="./com-logo.png" alt="Logo COM' Impression">
+        <div class="brand-copy">
+          <strong>COM' Impression</strong>
+          <span>Fiche produit</span>
+        </div>
+      </a>
+      <form class="search-shell" data-search-form>
+        <input type="search" placeholder="Rechercher un produit ou une gamme...">
+        <button class="btn" type="submit">Rechercher</button>
+      </form>
+      <div class="nav-actions">
+        <button class="action-btn" data-account-button type="button"><span data-account-label>Mon compte</span></button>
+        <button class="action-btn cart" data-cart-button type="button">Panier <span class="cart-count" data-cart-count>0</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="section">
+      <a class="btn-light back-link" id="product-back-link" href="./produits.html">Retour aux produits</a>
+    </section>
+
+    <section class="section">
+      <div id="product-page-root"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="./com-logo.png" alt="Logo COM' Impression">
+          <div>
+            <strong>COM' Impression</strong>
+            <p>Vos impressions, conceptions visuelles et commandes personnalisees sont concues en Vendee, expediees depuis la Vendee et imprimees sur site.</p>
+            <div class="footer-tags">
+              <span class="footer-tag">Concu en Vendee</span>
+              <span class="footer-tag">Expedie depuis la Vendee</span>
+              <span class="footer-tag">Imprime sur site</span>
+            </div>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>Informations</h4>
+          <a href="./mentions-legales.html">Mentions legales</a>
+          <a href="./cgv.html">CGV</a>
+          <a href="./faq.html">FAQ</a>
+          <a href="./rendez-vous.html">Prendre rendez-vous</a>
+        </div>
+        <div class="footer-col">
+          <h4>Paiement securise</h4>
+          <p>Paiement securise par carte bancaire via Stripe, avec prise en charge CB, Mastercard et Visa, ou reglement par virement bancaire selon votre commande.</p>
+        </div>
+        <div class="footer-col">
+          <h4>COM' Impression</h4>
+          <a href="./produits.html">Produits</a>
+          <a href="./panier.html">Panier</a>
+          <a href="./client.html">Mon compte</a>
+        </div>
+      </div>
+      <div class="footer-payments">
+        <div class="payment-strip"><img src="./footer-paiements.png" alt="Logos Visa, Mastercard, Carte Bancaire, Virement bancaire et Stripe"></div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 COM' Impression. Tous droits reserves.</span>
+        <span>Conception, impression et expedition realisees en Vendee.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./catalog-data.js"></script>
+  <script src="./site-pages.js"></script>
+</body>
+</html>

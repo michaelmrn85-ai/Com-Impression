@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COM' Impression | Com'Pro, Com'Exterieur, Com'Evenementiel, Com'Personnalisee, Com'Services</title>
+  <meta
+    name="description"
+    content="COM' Impression propose vos univers Com'Pro, Com'Exterieur, Com'Evenementiel, Com'Personnalisee, Com'Services et bientot Com'Gourmand."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --orange: #ff7a1a;
+      --orange-deep: #dc6208;
+      --orange-soft: #fff0e3;
+      --ink: #171310;
+      --muted: #5f5751;
+      --sand: #f6eee7;
+      --cream: #fffaf5;
+      --white: #ffffff;
+      --line: rgba(23, 19, 16, 0.08);
+      --shadow: 0 22px 50px rgba(23, 19, 16, 0.1);
+      --radius-xl: 30px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --max: 1180px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(255, 122, 26, 0.17), transparent 25%),
+        linear-gradient(180deg, #fff8f2 0%, #fffdfb 48%, #f7efe8 100%);
+      min-height: 100vh;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      backdrop-filter: blur(14px);
+      background: rgba(255, 248, 242, 0.88);
+      border-bottom: 1px solid rgba(23, 19, 16, 0.06);
+    }
+
+    .nav {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: grid;
+      grid-template-columns: auto minmax(260px, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 66px;
+      flex: 0 0 auto;
+      filter: drop-shadow(0 12px 24px rgba(255, 122, 26, 0.18));
+    }
+
+    .brand-copy strong,
+    .section-title h2,
+    .hero-copy h1,
+    .gamme-card h3,
+    .avis-card h3,
+    .rdv-card h3,
+    .footer-brand strong,
+    .action-btn,
+    .search-btn,
+    .hero-tag,
+    .metric strong {
+      font-family: "Sora", sans-serif;
+    }
+
+    .brand-copy strong {
+      display: block;
+      font-size: 1rem;
+      letter-spacing: -0.04em;
+    }
+
+    .brand-copy span {
+      display: block;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .search-shell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(23, 19, 16, 0.08);
+      border-radius: 999px;
+      padding: 8px 10px 8px 18px;
+      box-shadow: 0 8px 20px rgba(23, 19, 16, 0.04);
+    }
+
+    .search-shell input {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      outline: none;
+      color: var(--ink);
+    }
+
+    .search-btn,
+    .action-btn,
+    .main-btn,
+    .alt-btn,
+    .mini-btn {
+      border: 0;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .search-btn,
+    .main-btn {
+      background: linear-gradient(135deg, var(--orange), #ff9446);
+      color: var(--white);
+      box-shadow: 0 14px 24px rgba(255, 122, 26, 0.22);
+    }
+
+    .search-btn:hover,
+    .action-btn:hover,
+    .main-btn:hover,
+    .alt-btn:hover,
+    .mini-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .search-btn {
+      padding: 11px 16px;
+      border-radius: 999px;
+      white-space: nowrap;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: var(--white);
+      color: var(--ink);
+      border: 1px solid rgba(23, 19, 16, 0.08);
+      font-size: 0.92rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .action-btn.cart {
+      background: var(--ink);
+      color: var(--white);
+    }
+
+    .cart-count {
+      min-width: 26px;
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: var(--orange);
+      color: var(--white);
+      font-size: 0.8rem;
+      font-weight: 800;
+      padding: 0 8px;
+    }
+
+    .hero {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 48px 24px 20px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 28px;
+      align-items: center;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 999px;
+      background: rgba(255, 122, 26, 0.12);
+      color: var(--orange-deep);
+      padding: 9px 14px;
+      margin-bottom: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hero-copy h1 {
+      font-size: clamp(2.8rem, 6vw, 5.2rem);
+      line-height: 0.94;
+      letter-spacing: -0.06em;
+      margin-bottom: 18px;
+      max-width: 10ch;
+    }
+
+    .hero-copy p {
+      max-width: 58ch;
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 1.03rem;
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .main-btn,
+    .alt-btn,
+    .mini-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border-radius: 999px;
+      padding: 14px 22px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .alt-btn,
+    .mini-btn {
+      background: var(--white);
+      color: var(--ink);
+      border: 1px solid rgba(23, 19, 16, 0.08);
+    }
+
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 28px;
+    }
+
+    .metric {
+      padding: 18px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(23, 19, 16, 0.06);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1.5rem;
+      letter-spacing: -0.05em;
+      margin-bottom: 4px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .hero-panel {
+      position: relative;
+      min-height: 540px;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      background: linear-gradient(160deg, #1c1713 0%, #2b241e 100%);
+      color: var(--white);
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+
+    .hero-panel::before {
+      content: "";
+      position: absolute;
+      right: -70px;
+      top: -50px;
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(255, 122, 26, 0.95), rgba(255, 122, 26, 0.2));
+      opacity: 0.9;
+    }
+
+    .hero-panel::after {
+      content: "";
+      position: absolute;
+      left: -36px;
+      bottom: 30px;
+      width: 150px;
+      height: 150px;
+      border-radius: 999px;
+      background: rgba(255, 122, 26, 0.22);
+    }
+
+    .panel-card,
+    .hero-list {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .panel-card {
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+
+    .hero-logo {
+      width: min(100%, 390px);
+      margin: 0 auto 16px;
+    }
+
+    .panel-card h2 {
+      font-family: "Sora", sans-serif;
+      font-size: 1.56rem;
+      line-height: 1.08;
+      margin-bottom: 10px;
+    }
+
+    .panel-card p,
+    .hero-list li,
+    .section-title p,
+    .gamme-card p,
+    .avis-card p,
+    .rdv-card p,
+    .footer-brand p,
+    .footer-links a,
+    .search-empty p {
+      color: rgba(255, 255, 255, 0.76);
+      line-height: 1.7;
+    }
+
+    .hero-list {
+      list-style: none;
+      padding: 18px 20px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .hero-list li {
+      color: rgba(255, 255, 255, 0.82);
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .hero-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--orange);
+    }
+
+    .section {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 48px 24px;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .section-title h2 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 0.98;
+      letter-spacing: -0.06em;
+      max-width: 11ch;
+    }
+
+    .section-title p {
+      max-width: 50ch;
+      color: var(--muted);
+    }
+
+    .gammes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .gamme-card {
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      padding: 24px;
+      box-shadow: 0 16px 32px rgba(23, 19, 16, 0.06);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .gamme-card:hover,
+    .avis-card:hover,
+    .rdv-box:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 22px 40px rgba(23, 19, 16, 0.1);
+    }
+
+    .gamme-card h3 {
+      font-size: 1.3rem;
+      line-height: 1.08;
+      margin-bottom: 10px;
+    }
+
+    .gamme-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--orange-soft);
+      color: var(--orange-deep);
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .gamme-card p {
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .gamme-card ul {
+      list-style: none;
+      display: grid;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .gamme-card li {
+      color: var(--muted);
+      line-height: 1.6;
+      position: relative;
+      padding-left: 16px;
+    }
+
+    .gamme-card li::before {
+      content: "•";
+      color: var(--orange);
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+
+    .mini-btn {
+      padding: 12px 18px;
+    }
+
+    .search-empty {
+      display: none;
+      margin-top: 18px;
+      padding: 24px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px dashed rgba(23, 19, 16, 0.15);
+      text-align: center;
+    }
+
+    .search-empty.show {
+      display: block;
+    }
+
+    .avis-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .avis-card {
+      background: linear-gradient(180deg, #fff 0%, #fff8f2 100%);
+      border: 1px solid rgba(255, 122, 26, 0.12);
+      border-radius: 26px;
+      padding: 24px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .avis-stars {
+      color: var(--orange);
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+
+    .avis-card p {
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .avis-card h3 {
+      font-size: 1.02rem;
+      margin-bottom: 4px;
+    }
+
+    .avis-role {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .rdv-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .rdv-card,
+    .rdv-box {
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+
+    .rdv-card {
+      background: linear-gradient(155deg, #1b1612 0%, #302720 100%);
+      color: var(--white);
+      padding: 30px;
+      box-shadow: var(--shadow);
+    }
+
+    .rdv-card h3 {
+      font-size: clamp(1.8rem, 3vw, 2.5rem);
+      line-height: 1.03;
+      letter-spacing: -0.05em;
+      margin-bottom: 12px;
+    }
+
+    .rdv-points {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .rdv-points div {
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 18px;
+    }
+
+    .rdv-points strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .rdv-box {
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid var(--line);
+      padding: 26px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .rdv-box h4 {
+      font-family: "Sora", sans-serif;
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    .rdv-box p {
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    .rdv-list {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .rdv-list li {
+      color: var(--muted);
+      padding: 12px 14px;
+      background: var(--sand);
+      border-radius: 16px;
+    }
+
+    .footer {
+      margin-top: 20px;
+      background: linear-gradient(180deg, #1d1713 0%, #120f0d 100%);
+      color: var(--white);
+    }
+
+    .footer-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 38px 24px 18px;
+    }
+
+    .footer-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(180px, 1fr));
+      gap: 24px;
+      padding-bottom: 10px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .footer-brand img {
+      width: 62px;
+      flex: 0 0 auto;
+    }
+
+    .footer-brand p {
+      color: rgba(255, 255, 255, 0.72);
+      margin-top: 8px;
+    }
+
+    .footer-col h4 {
+      font-family: "Sora", sans-serif;
+      font-size: 0.98rem;
+      margin-bottom: 12px;
+      color: var(--orange);
+    }
+
+    .footer-col a,
+    .footer-col p,
+    .payment-note,
+    .footer-bottom {
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.7;
+      font-size: 0.94rem;
+    }
+
+    .footer-col {
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .payment-badge,
+    .footer-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--white);
+    }
+
+    .payment-badge svg {
+      display: block;
+      height: 28px;
+      width: auto;
+      flex: 0 0 auto;
+    }
+
+    .payment-note {
+      max-width: 34ch;
+    }
+
+    .footer-payments {
+      margin-top: 0;
+      padding-top: 0;
+      display: grid;
+      gap: 0;
+    }
+
+    .payment-strip {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .payment-strip img {
+      width: min(100%, 560px);
+      height: auto;
+      display: block;
+    }
+
+    .footer-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      padding-top: 14px;
+    }
+
+    @media (max-width: 1024px) {
+      .nav {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-grid,
+      .rdv-grid,
+      .section-title,
+      .gammes-grid,
+      .avis-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-title {
+        align-items: start;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .nav,
+      .hero,
+      .section,
+      .footer-inner {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .nav-actions {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .nav-actions .action-btn {
+        flex: 1;
+      }
+
+      .hero-copy h1 {
+        max-width: 100%;
+      }
+
+      .hero-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-cta {
+        flex-direction: column;
+      }
+
+      .main-btn,
+      .alt-btn,
+      .mini-btn {
+        width: 100%;
+      }
+
+      .hero-panel {
+        min-height: auto;
+      }
+
+      .footer-top {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-payments {
+        align-items: flex-start;
+      }
+
+      .payment-strip {
+        justify-content: flex-start;
+      }
+
+      .payment-strip img {
+        width: min(100%, 420px);
+      }
+    }
+  </style>
+</head>
+<body data-page="home">
+  <header class="topbar">
+    <div class="nav">
+      <a class="brand" href="#accueil">
+        <img class="brand-mark" src="./com-logo.png" alt="Logo COM' Impression">
+        <div class="brand-copy">
+          <strong>COM' Impression</strong>
+          <span id="home-brand-subtitle">Vos vraies gammes COM' Impression, reunies proprement</span>
+        </div>
+      </a>
+
+      <form class="search-shell" id="search-form">
+        <input
+          id="site-search"
+          type="search"
+          placeholder="Rechercher une gamme ou un produit..."
+          aria-label="Rechercher une gamme ou un produit"
+        >
+        <button class="search-btn" type="submit">Rechercher</button>
+      </form>
+
+      <div class="nav-actions">
+        <button class="action-btn" id="account-btn" type="button">Mon compte</button>
+        <button class="action-btn cart" id="cart-btn" type="button">
+          Panier
+          <span class="cart-count" id="cart-count">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="accueil">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="hero-tag" id="home-hero-badge">Communication visuelle qui vend mieux</div>
+          <h1 id="home-hero-title">Vos supports, vos gammes, votre image.</h1>
+          <p id="home-hero-text">
+            Retrouvez vos gammes COM' Impression pour choisir rapidement le bon support, du print professionnel
+            aux produits personnalises, avec un acces simple au compte, au panier et a la prise de rendez-vous.
+          </p>
+          <div class="hero-cta">
+            <a class="main-btn" href="./produits.html" id="home-go-products">Voir les gammes</a>
+            <a class="alt-btn" href="./rendez-vous.html">Prendre rendez-vous</a>
+          </div>
+          <div class="hero-metrics">
+            <div class="metric">
+              <strong>5 + 1</strong>
+              <span>Univers pour repondre a tous vos besoins print et personnalises</span>
+            </div>
+            <div class="metric">
+              <strong>1 clic</strong>
+              <span>Pour acceder au compte ou au panier</span>
+            </div>
+            <div class="metric">
+              <strong>Rapide</strong>
+              <span>Recherche immediate pour aller droit au bon support</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-panel">
+          <div class="panel-card">
+            <img class="hero-logo" id="home-hero-image" src="./com-logo.png" alt="COM' Impression">
+            <h2 id="home-panel-title">Un accueil plus complet et plus utile</h2>
+            <p id="home-panel-text">
+              Decouvrez rapidement les gammes, accedez a votre compte et trouvez le bon produit selon votre besoin.
+            </p>
+          </div>
+          <ul class="hero-list" id="home-panel-list">
+            <li>Barre de recherche visible en haut</li>
+            <li>Bouton Mon compte avec affichage du nom si client connecte</li>
+            <li>Bouton Panier avec compteur</li>
+            <li>Les vraies gammes COM' Impression mises en avant</li>
+            <li>Avis clients et prise de rendez-vous integres</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="gammes">
+      <div class="section-title">
+        <div>
+          <div class="hero-tag">Nos gammes</div>
+          <h2>Les vraies gammes COM' Impression.</h2>
+        </div>
+        <p>
+          Chaque gamme est pensee comme une porte d'entree simple pour que le client trouve vite ce qu'il veut,
+          sans devoir parcourir un menu trop charge.
+        </p>
+      </div>
+
+      <div class="gammes-grid" id="gammes-grid">
+        <article class="gamme-card" data-search="com pro impression supports cartes flyers brochures affiches">
+          <div class="gamme-badge">Gamme 1</div>
+          <h3>Com'Pro</h3>
+          <p>Les supports essentiels pour les entreprises, associations et commercants.</p>
+          <ul>
+            <li>Cartes de visite</li>
+            <li>Flyers et depliants</li>
+            <li>Brochures et affiches</li>
+          </ul>
+          <a class="mini-btn" href="./produits.html?gamme=com-pro" data-gamme-link="com-pro">Choisir cette gamme</a>
+        </article>
+
+        <article class="gamme-card" data-search="com exterieur exterieur signaletique panneaux pvc bache enseigne vitrine plv stand">
+          <div class="gamme-badge">Gamme 2</div>
+          <h3>Com'Exterieur</h3>
+          <p>Pour rendre votre marque visible dehors, en facade, sur stand ou sur evenement.</p>
+          <ul>
+            <li>Baches et panneaux</li>
+            <li>Beach flags et roll-up</li>
+            <li>Signaletique terrain</li>
+          </ul>
+          <a class="mini-btn" href="./produits.html?gamme=com-exterieur" data-gamme-link="com-exterieur">Choisir cette gamme</a>
+        </article>
+
+        <article class="gamme-card" data-search="com evenementiel evenementiel mariage menu invitation faire part plan table fete salon reception">
+          <div class="gamme-badge">Gamme 3</div>
+          <h3>Com'Evenementiel</h3>
+          <p>Des supports personnalises pour vos mariages, salons, receptions et temps forts.</p>
+          <ul>
+            <li>Faire-part et invitations</li>
+            <li>Menus et plans de table</li>
+            <li>Supports d'accueil evenementiels</li>
+          </ul>
+          <a class="mini-btn" href="./produits.html?gamme=com-evenementiel" data-gamme-link="com-evenementiel">Choisir cette gamme</a>
+        </article>
+
+        <article class="gamme-card" data-search="com personnalisee textile goodies objets publicitaires tshirt polo veste casquette mug gobelet tote bag">
+          <div class="gamme-badge">Gamme 4</div>
+          <h3>Com'Personnalisee</h3>
+          <p>Tout ce qui habille, accompagne ou fait durer votre image au quotidien.</p>
+          <ul>
+            <li>Textile et broderie</li>
+            <li>Goodies et objets pub</li>
+            <li>Cadeaux clients personnalises</li>
+          </ul>
+          <a class="mini-btn" href="./produits.html?gamme=com-personnalisee" data-gamme-link="com-personnalisee">Choisir cette gamme</a>
+        </article>
+
+        <article class="gamme-card" data-search="com services services impression document plastification photo scan reliure">
+          <div class="gamme-badge">Gamme 5</div>
+          <h3>Com'Services</h3>
+          <p>Les prestations rapides et pratiques pour les besoins de tous les jours.</p>
+          <ul>
+            <li>Impression de documents</li>
+            <li>Photos et plastification</li>
+            <li>Finitions utiles au comptoir</li>
+          </ul>
+          <a class="mini-btn" href="./produits.html?gamme=com-services" data-gamme-link="com-services">Choisir cette gamme</a>
+        </article>
+
+        <article class="gamme-card" data-search="com gourmand gourmandises evenement cadeaux clients douceurs chocolats bonbons">
+          <div class="gamme-badge">Gamme 6</div>
+          <h3>Com'Gourmand</h3>
+          <p>Un assortiment de gourmandises pour vos evenements, vos cadeaux clients et vos moments de marque.</p>
+          <ul>
+            <li>Gamme annoncee prochainement</li>
+            <li>Pour evenements et cadeaux</li>
+            <li>Version site bientot disponible</li>
+          </ul>
+          <a class="mini-btn" href="./produits.html?gamme=com-gourmand" data-gamme-link="com-gourmand">Decouvrir bientot</a>
+        </article>
+      </div>
+
+      <div class="search-empty" id="search-empty">
+        <p>Aucune gamme ne correspond a cette recherche. Essaie un mot-cle comme "flyer", "exterieur", "personnalisee", "mariage" ou "gourmand".</p>
+      </div>
+    </section>
+
+    <section class="section" id="avis">
+      <div class="section-title">
+        <div>
+          <div class="hero-tag">Avis clients</div>
+          <h2>Des retours qui rassurent avant de commander.</h2>
+        </div>
+        <p>
+          Les avis donnent de la confiance tout de suite et montrent que COM' Impression accompagne aussi bien
+          les pros que les particuliers.
+        </p>
+      </div>
+
+      <div class="avis-grid">
+        <article class="avis-card">
+          <div class="avis-stars">★★★★★</div>
+          <p>
+            Equipe reactive, rendu tres propre et delais tenus. Nos cartes de visite et nos flyers ont fait une vraie difference.
+          </p>
+          <h3>Camille R.</h3>
+          <div class="avis-role">Commerce local</div>
+        </article>
+
+        <article class="avis-card">
+          <div class="avis-stars">★★★★★</div>
+          <p>
+            On a commande textile et goodies pour un evenement. Tout etait coherent, bien conseille et super qualitatif.
+          </p>
+          <h3>Julien M.</h3>
+          <div class="avis-role">Association / evenementiel</div>
+        </article>
+
+        <article class="avis-card">
+          <div class="avis-stars">★★★★★</div>
+          <p>
+            Tres bonne experience du debut a la fin. La signaletique et les panneaux ont tout de suite modernise notre accueil.
+          </p>
+          <h3>Sophie D.</h3>
+          <div class="avis-role">Entreprise</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="rdv">
+      <div class="section-title">
+        <div>
+          <div class="hero-tag">Prise de rendez-vous</div>
+          <h2>Proposer un echange simple et rapide.</h2>
+        </div>
+        <p>
+          Certains clients preferent parler de leur projet avant de choisir. Ce bloc sert a les rassurer et a declencher le contact.
+        </p>
+      </div>
+
+      <div class="rdv-grid">
+        <div class="rdv-card">
+          <h3>Parlons de votre projet avant impression.</h3>
+          <p>
+            Un rendez-vous permet de cadrer vos quantites, vos delais, vos supports et le rendu attendu. C'est ideal
+            pour les demandes pro, les projets evenementiels et les commandes personnalisees.
+          </p>
+          <div class="rdv-points">
+            <div>
+              <strong>Conseil</strong>
+              On vous oriente vers le bon support, le bon format et la bonne finition.
+            </div>
+            <div>
+              <strong>Gain de temps</strong>
+              Le devis est plus juste et le projet avance plus vite.
+            </div>
+            <div>
+              <strong>Souplesse</strong>
+              Echange possible pour un besoin pro, un mariage, une enseigne ou du textile.
+            </div>
+          </div>
+        </div>
+
+        <aside class="rdv-box">
+          <h4>Prendre rendez-vous</h4>
+          <p>Choisissez le format d'echange le plus simple pour presenter votre projet et obtenir un accompagnement adapte.</p>
+          <ul class="rdv-list">
+            <li>Appel conseil de 15 min</li>
+            <li>Rendez-vous devis en boutique</li>
+            <li>Point projet pour commande personnalisee</li>
+          </ul>
+          <a class="main-btn" href="./rendez-vous.html">Demander un rendez-vous</a>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="./com-logo.png" alt="Logo COM' Impression">
+          <div>
+            <strong>COM' Impression</strong>
+            <p>
+              Vos impressions, conceptions visuelles et commandes personnalisees sont concues en Vendee,
+              expediees depuis la Vendee et imprimees sur site pour garder un vrai niveau de suivi et de qualite.
+            </p>
+            <div class="footer-tags">
+              <span class="footer-tag">Concu en Vendee</span>
+              <span class="footer-tag">Expedie depuis la Vendee</span>
+              <span class="footer-tag">Imprime sur site</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4>Informations</h4>
+          <a href="./mentions-legales.html">Mentions legales</a>
+          <a href="./cgv.html">CGV</a>
+          <a href="./faq.html">FAQ</a>
+          <a href="./rendez-vous.html">Prendre rendez-vous</a>
+        </div>
+
+        <div class="footer-col">
+          <h4>Paiement securise</h4>
+          <p class="payment-note">
+            Paiement securise par carte bancaire via Stripe, avec prise en charge CB, Mastercard et Visa, ou reglement par virement bancaire selon votre commande.
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h4>COM' Impression</h4>
+          <a href="./produits.html">Nos gammes</a>
+          <a href="#avis">Avis clients</a>
+          <a href="./rendez-vous.html">Prise de rendez-vous</a>
+          <p>Com'Pro, Com'Exterieur, Com'Evenementiel, Com'Personnalisee, Com'Services et bientot Com'Gourmand.</p>
+        </div>
+      </div>
+
+      <div class="footer-payments">
+        <div class="payment-strip" aria-label="Logos des moyens de paiement acceptes">
+          <img src="./footer-paiements.png" alt="Logos Visa, Mastercard, Carte Bancaire, Virement bancaire et Stripe">
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 COM' Impression. Tous droits reserves.</span>
+        <span>Conception, impression et expedition realisees en Vendee.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var accountBtn = document.getElementById("account-btn");
+      var cartCount = document.getElementById("cart-count");
+      var cartBtn = document.getElementById("cart-btn");
+      var searchForm = document.getElementById("search-form");
+      var searchInput = document.getElementById("site-search");
+      var emptyState = document.getElementById("search-empty");
+      var avisGrid = document.querySelector(".avis-grid");
+      var gammeCards = Array.prototype.slice.call(document.querySelectorAll(".gamme-card"));
+
+      function readConnectedName() {
+        var keys = ["ci_user_name", "clientName", "customerName", "userName", "prenom"];
+        for (var i = 0; i < keys.length; i += 1) {
+          var value = localStorage.getItem(keys[i]);
+          if (value && value.trim()) {
+            return value.trim();
+          }
+        }
+        return "";
+      }
+
+      function updateAccountLabel() {
+        var name = readConnectedName();
+        accountBtn.textContent = name ? name : "Mon compte";
+      }
+
+      function updateCartCount() {
+        var raw = localStorage.getItem("ci_cart_count") || localStorage.getItem("cartCount");
+        var count = parseInt(raw || "0", 10);
+        if (isNaN(count) || count < 0) {
+          count = 0;
+        }
+        cartCount.textContent = String(count);
+      }
+
+      var isFileProtocol = window.location.protocol === "file:";
+
+      function goTo(path) {
+        if (!isFileProtocol) {
+          window.location.href = path;
+          return;
+        }
+        var map = {
+          "/produits": "./produits.html",
+          "/client": "./client.html",
+          "/panier": "./panier.html"
+        };
+        var parts = String(path || "").split("?");
+        window.location.href = (map[parts[0]] || path) + (parts[1] ? "?" + parts[1] : "");
+      }
+
+      function runSearch() {
+        var query = searchInput.value.trim();
+        if (!query) {
+          goTo("/produits");
+          return;
+        }
+        goTo("/produits?q=" + encodeURIComponent(query));
+      }
+
+      function loadAvis() {
+        if (!avisGrid) return;
+        fetch(window.location.origin + "/api/avis")
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            var avis = Array.isArray(data.avis) ? data.avis.slice(0, 3) : [];
+            if (!avis.length) return;
+            avisGrid.innerHTML = avis.map(function (avis) {
+              var note = Math.max(1, Math.min(5, parseInt(avis.note, 10) || 5));
+              var stars = "★★★★★".slice(0, note);
+              var role = [avis.prenom || "Client", avis.ville || ""].filter(Boolean).join(" - ");
+              return '<article class="avis-card">'
+                + '<div class="avis-stars">' + stars + '</div>'
+                + '<p>« ' + (avis.texte || "") + ' »</p>'
+                + '<h3>' + (avis.prenom || "Client") + '</h3>'
+                + '<div class="avis-role">' + (role || "Client COM Impression") + '</div>'
+                + '</article>';
+            }).join("");
+          })
+          .catch(function () {});
+      }
+
+      accountBtn.addEventListener("click", function () {
+        goTo("/client");
+      });
+
+      cartBtn.addEventListener("click", function () {
+        goTo("/panier");
+      });
+
+      searchForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        runSearch();
+      });
+
+      updateAccountLabel();
+      updateCartCount();
+      loadAvis();
+    })();
+  </script>
+</body>
+</html>

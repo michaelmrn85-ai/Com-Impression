@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: com-impression-v4
+    env: node
+    plan: starter
+    rootDir: V4
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
