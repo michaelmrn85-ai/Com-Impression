@@ -156,6 +156,10 @@
       z-index: 40;
     }
 
+    .search-suggestions[hidden] {
+      display: none !important;
+    }
+
     .search-suggestion {
       width: 100%;
       border: 0;
@@ -918,7 +922,7 @@
         </div>
       </a>
 
-      <form class="search-shell" id="search-form">
+      <form class="search-shell" id="search-form" data-search-form>
         <input
           id="site-search"
           type="search"
@@ -929,10 +933,10 @@
       </form>
 
       <div class="nav-actions">
-        <button class="action-btn" id="account-btn" type="button">Mon compte</button>
-        <button class="action-btn cart" id="cart-btn" type="button">
+        <button class="action-btn" id="account-btn" data-account-button type="button"><span data-account-label>Mon compte</span></button>
+        <button class="action-btn cart" id="cart-btn" data-cart-button type="button">
           Panier
-          <span class="cart-count" id="cart-count">0</span>
+          <span class="cart-count" id="cart-count" data-cart-count>0</span>
         </button>
       </div>
     </div>
@@ -1192,13 +1196,9 @@
     </div>
   </footer>
 
+  <script src="./site-pages.js"></script>
   <script>
     (function () {
-      var accountBtn = document.getElementById("account-btn");
-      var cartCount = document.getElementById("cart-count");
-      var cartBtn = document.getElementById("cart-btn");
-      var searchForm = document.getElementById("search-form");
-      var searchInput = document.getElementById("site-search");
       var emptyState = document.getElementById("search-empty");
       var avisGrid = document.querySelector(".avis-grid");
       var gammeCards = Array.prototype.slice.call(document.querySelectorAll(".gamme-card"));
@@ -1212,45 +1212,6 @@
           }
         }
         return "";
-      }
-
-      function updateAccountLabel() {
-        var name = readConnectedName();
-        accountBtn.textContent = name ? name : "Mon compte";
-      }
-
-      function updateCartCount() {
-        var raw = localStorage.getItem("ci_cart_count") || localStorage.getItem("cartCount");
-        var count = parseInt(raw || "0", 10);
-        if (isNaN(count) || count < 0) {
-          count = 0;
-        }
-        cartCount.textContent = String(count);
-      }
-
-      var isFileProtocol = window.location.protocol === "file:";
-
-      function goTo(path) {
-        if (!isFileProtocol) {
-          window.location.href = path;
-          return;
-        }
-        var map = {
-          "/produits": "./produits.html",
-          "/client": "./client.html",
-          "/panier": "./panier.html"
-        };
-        var parts = String(path || "").split("?");
-        window.location.href = (map[parts[0]] || path) + (parts[1] ? "?" + parts[1] : "");
-      }
-
-      function runSearch() {
-        var query = searchInput.value.trim();
-        if (!query) {
-          goTo("/produits");
-          return;
-        }
-        goTo("/produits?q=" + encodeURIComponent(query));
       }
 
       function loadAvis() {
@@ -1275,21 +1236,6 @@
           .catch(function () {});
       }
 
-      accountBtn.addEventListener("click", function () {
-        goTo("/client");
-      });
-
-      cartBtn.addEventListener("click", function () {
-        goTo("/panier");
-      });
-
-      searchForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        runSearch();
-      });
-
-      updateAccountLabel();
-      updateCartCount();
       loadAvis();
     })();
   </script>
