@@ -377,6 +377,69 @@ textarea {
   gap: 6px;
 }
 
+.loyalty-box {
+  gap: 10px !important;
+}
+
+.loyalty-head {
+  align-items: baseline;
+}
+
+.loyalty-rule {
+  color: var(--orange-deep);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.loyalty-meter {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #f2e6dc;
+  overflow: hidden;
+}
+
+.loyalty-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff8b2b 0%, #f47b20 100%);
+  transition: width 0.25s ease;
+}
+
+.loyalty-caption {
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.loyalty-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loyalty-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loyalty-tier {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #f7efe7;
+  color: #6f6155;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.loyalty-tier.active {
+  background: #fff1e3;
+  color: var(--orange-deep);
+  box-shadow: inset 0 0 0 1px #f7c89e;
+}
+
 .card-title,
 .panel-title {
   margin: 0 0 8px;
@@ -504,7 +567,7 @@ textarea {
   right: 18px;
   bottom: 18px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   padding: 16px 18px;
@@ -518,6 +581,36 @@ textarea {
 .cookie-banner p {
   margin: 4px 0 0;
   color: rgba(255, 255, 255, 0.76);
+}
+
+.cookie-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.cookie-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cookie-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cookie-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.92rem;
+}
+
+.cookie-option input {
+  accent-color: var(--orange);
 }
 
 .product-card {
@@ -730,6 +823,30 @@ textarea {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
+}
+
+.appointment-page {
+  margin-top: 6px;
+}
+
+.appointment-landscape {
+  display: grid;
+  gap: 20px;
+}
+
+.appointment-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.8fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.appointment-slots-head {
+  margin-bottom: 14px;
+}
+
+.appointment-form-below {
+  width: 100%;
 }
 
 .cart-table {
@@ -1171,6 +1288,10 @@ body[data-page="produit"] .page-shell {
     align-items: stretch;
   }
 
+  .cookie-actions {
+    justify-content: stretch;
+  }
+
   .nav-actions > * {
     flex: 1;
   }
@@ -1191,6 +1312,10 @@ body[data-page="produit"] .page-shell {
   }
 
   .product-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .appointment-calendar-layout {
     grid-template-columns: 1fr;
   }
 

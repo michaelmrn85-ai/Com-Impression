@@ -1322,16 +1322,78 @@
     function renderCookieBanner() {
       var banner = $("cookie-banner");
       var accept = $("cookie-accept");
-      if (!banner || !accept) return;
-      if (localStorage.getItem(COOKIE_KEY) === "accepted") {
+      var essential = $("cookie-essential");
+      var customize = $("cookie-customize");
+      var save = $("cookie-save");
+      var options = $("cookie-options");
+      var analytics = $("cookie-analytics");
+      var personalization = $("cookie-personalization");
+      if (!banner || !accept || !essential || !customize || !save || !options) return;
+      try {
+        var stored = JSON.parse(localStorage.getItem(COOKIE_KEY) || "null");
+        if (stored && stored.essential) {
+          banner.hidden = true;
+          return;
+        }
+      } catch (error) {}
+
+      function persistCookieChoice(choice) {
+        localStorage.setItem(COOKIE_KEY, JSON.stringify(choice));
         banner.hidden = true;
-        return;
       }
+
       banner.hidden = false;
       accept.addEventListener("click", function () {
-        localStorage.setItem(COOKIE_KEY, "accepted");
-        banner.hidden = true;
+        persistCookieChoice({
+          essential: true,
+          analytics: true,
+          personalization: true
+        });
       });
+      essential.addEventListener("click", function () {
+        persistCookieChoice({
+          essential: true,
+          analytics: false,
+          personalization: false
+        });
+      });
+      customize.addEventListener("click", function () {
+        var isOpen = !options.hidden;
+        options.hidden = isOpen;
+        save.hidden = isOpen;
+        customize.textContent = isOpen ? "Personnaliser" : "Fermer";
+      });
+      save.addEventListener("click", function () {
+        persistCookieChoice({
+          essential: true,
+          analytics: !!(analytics && analytics.checked),
+          personalization: !!(personalization && personalization.checked)
+        });
+      });
+    }
+
+    function buildLoyaltyState(points) {
+      var tiers = [
+        { threshold: 100, discount: 5 },
+        { threshold: 250, discount: 15 },
+        { threshold: 500, discount: 35 }
+      ];
+      var value = Number(points || 0);
+      var currentDiscount = 0;
+      var nextTier = tiers.find(function (tier) { return value < tier.threshold; }) || null;
+      tiers.forEach(function (tier) {
+        if (value >= tier.threshold) currentDiscount = tier.discount;
+      });
+      var maxThreshold = tiers[tiers.length - 1].threshold;
+      var progress = Math.max(0, Math.min(100, (value / maxThreshold) * 100));
+      var caption = nextTier
+        ? ("Encore " + Math.max(0, nextTier.threshold - value) + " points pour debloquer " + nextTier.discount + "% de remise.")
+        : "Palier maximum atteint : 35% de remise debloques.";
+      return {
+        progress: progress,
+        caption: caption,
+        currentDiscount: currentDiscount
+      };
     }
 
     function buildTimeline(status) {
@@ -1366,6 +1428,21 @@
       $("profile-ville").value = client.ville || "";
       $("client-points").textContent = String(client.points || 0);
       $("client-order-count").textContent = String(commandes.length || 0);
+      var loyalty = buildLoyaltyState(client.points || 0);
+      if ($("client-loyalty-fill")) $("client-loyalty-fill").style.width = loyalty.progress + "%";
+      if ($("client-loyalty-caption")) $("client-loyalty-caption").textContent = loyalty.caption;
+      if ($("client-loyalty-codes")) {
+        var activeCodes = (client.codes_promo || []).filter(function (code) { return !code.utilise; });
+        $("client-loyalty-codes").innerHTML = activeCodes.length
+          ? activeCodes.map(function (code) {
+              return '<span class="tag">' + esc(code.code) + ' · ' + esc(String(code.remise)) + '%</span>';
+            }).join("")
+          : '<span class="muted">Aucune remise debloquee pour le moment.</span>';
+      }
+      document.querySelectorAll("[data-tier]").forEach(function (node) {
+        var threshold = Number(node.getAttribute("data-tier") || 0);
+        node.classList.toggle("active", (client.points || 0) >= threshold);
+      });
 
       var rendezvous = commandes.filter(function (cmd) {
         return /^Rendez-vous/i.test(String(cmd.panier || ""));

@@ -1430,6 +1430,8 @@ app.post('/api/client/login', express.json(), async (req, res) => {
 app.get('/api/client/verify', (req, res) => {
     const { token } = req.query;
     if (!token) return res.status(400).json({ success: false, error: 'Token manquant' });
+    const publicBaseUrl = getPublicBaseUrl(req);
+    const siteHomeUrl = publicBaseUrl.replace(/\/$/, '') + '/';
     let email = '';
     const signedEntry = verifierSignatureClientToken(token, 'verify-client');
     if (signedEntry) {
@@ -1446,6 +1448,35 @@ app.get('/api/client/verify', (req, res) => {
     client.email_verified = true;
     client.updated_at = new Date().toISOString();
     sauvegarderClient(client);
+    const welcomeName = client.prenom || 'chez COM\' Impression';
+
+    Promise.resolve()
+        .then(async () => {
+            try {
+                const t = createTransporter();
+                await t.sendMail({
+                    from: `"COM' Impression" <${process.env.SMTP_USER}>`,
+                    to: email,
+                    subject: "Bienvenue chez COM' Impression",
+                    html: emailWrapper(`
+                        <h2 style="color:#F47B20;margin:0 0 12px;">Bienvenue ${welcomeName} !</h2>
+                        <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 16px;">
+                            Votre compte est maintenant bien valide.
+                        </p>
+                        <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 22px;">
+                            Venez decouvrir sur notre site toutes nos gammes d'impression, nos services, vos rendez-vous, vos devis et le suivi de vos commandes.
+                        </p>
+                        <div style="text-align:center;margin:28px 0;">
+                            <a href="${siteHomeUrl}" style="display:inline-block;max-width:320px;background:#F47B20;color:#fff;padding:14px 26px;border-radius:50px;font-weight:700;text-decoration:none;font-size:15px;line-height:1.3;box-shadow:0 4px 0 #D4621A;">Decouvrir le site</a>
+                        </div>
+                        <p style="color:#888;font-size:13px;text-align:center;margin:0;">COM' Impression vous accompagne pour vos impressions, supports personnalises et demandes sur mesure.</p>
+                    `, '#F47B20', "COM' Impression", publicBaseUrl, 'Montreverd (85)'),
+                    attachments: getBrandingAttachments()
+                });
+            } catch(e) {
+                console.warn('Email bienvenue client non envoyé:', e.message);
+            }
+        });
 
     const sessionToken = creerSessionClient(email);
     res.json({ success: true, session_token: sessionToken, client: safeClient(client) });

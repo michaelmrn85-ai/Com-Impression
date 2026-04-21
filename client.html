@@ -149,9 +149,22 @@
           <button class="btn-light" id="logout-btn" type="button">Deconnexion</button>
         </div>
         <div class="grid-4 client-overview">
-          <div class="summary-box">
-            <span class="muted">Carte de fidelite</span>
-            <strong class="total" id="client-points">0</strong>
+          <div class="summary-box loyalty-box">
+            <div class="split-line loyalty-head">
+              <span class="muted">Carte de fidelite</span>
+              <strong class="total" id="client-points">0</strong>
+            </div>
+            <strong class="loyalty-rule">1 EUR = 1 point</strong>
+            <div class="loyalty-meter">
+              <div class="loyalty-meter-fill" id="client-loyalty-fill" style="width:0%;"></div>
+            </div>
+            <div class="muted loyalty-caption" id="client-loyalty-caption">Commencez a cumuler des points avec vos commandes.</div>
+            <div class="loyalty-tiers" id="client-loyalty-tiers">
+              <span class="loyalty-tier" data-tier="100">100 pts · 5%</span>
+              <span class="loyalty-tier" data-tier="250">250 pts · 15%</span>
+              <span class="loyalty-tier" data-tier="500">500 pts · 35%</span>
+            </div>
+            <div class="loyalty-codes" id="client-loyalty-codes"></div>
           </div>
           <div class="summary-box">
             <span class="muted">Rendez-vous</span>
@@ -242,11 +255,30 @@
   </main>
 
   <div class="cookie-banner" id="cookie-banner" hidden>
-    <div>
+    <div class="cookie-copy">
       <strong>Cookies</strong>
-      <p>Nous utilisons des cookies pour garder votre connexion et ameliorer votre experience client.</p>
+      <p>Choisissez les cookies que vous souhaitez autoriser pour votre navigation, votre connexion et vos preferences client.</p>
+      <div class="cookie-options" id="cookie-options" hidden>
+        <label class="cookie-option">
+          <input type="checkbox" checked disabled>
+          <span>Cookies essentiels (obligatoires)</span>
+        </label>
+        <label class="cookie-option">
+          <input type="checkbox" id="cookie-analytics">
+          <span>Mesure d'audience</span>
+        </label>
+        <label class="cookie-option">
+          <input type="checkbox" id="cookie-personalization">
+          <span>Preferences et personnalisation</span>
+        </label>
+      </div>
     </div>
-    <button class="btn" id="cookie-accept" type="button">Autoriser</button>
+    <div class="cookie-actions">
+      <button class="btn-light" id="cookie-essential" type="button">Essentiels uniquement</button>
+      <button class="btn-light" id="cookie-customize" type="button">Personnaliser</button>
+      <button class="btn" id="cookie-accept" type="button">Tout accepter</button>
+      <button class="btn" id="cookie-save" type="button" hidden>Enregistrer</button>
+    </div>
   </div>
 
   <footer class="footer">

@@ -32,39 +32,34 @@
   </header>
 
   <main class="page-shell">
-    <section class="page-hero">
-      <div class="hero-card">
-        <div class="pill">Rendez-vous</div>
-        <h1>Choisir une date et echanger sur votre projet.</h1>
-        <p>Selectionnez un jour, un creneau et decrivez votre besoin pour etre recontacte dans les meilleures conditions.</p>
-      </div>
-      <aside class="hero-aside">
-        <div class="pill" style="background:rgba(255,255,255,.1);color:#fff;">Projet accompagne</div>
-        <p>Ideal pour les demandes plus complexes: produits sur mesure, evenementiel, textile, signaletique, quantites importantes ou besoin d'un devis bien cadre.</p>
-      </aside>
-    </section>
-
-    <section class="section grid-2">
-      <div class="dashboard-card">
+    <section class="section appointment-page">
+      <div class="dashboard-card appointment-landscape">
         <div class="section-head">
           <div>
             <div class="pill">Calendrier</div>
             <h2>Selectionner un jour</h2>
           </div>
         </div>
-        <div class="calendar-grid" id="calendar-days"></div>
-
-        <div class="section-head" style="margin-top:22px;">
+        <div class="appointment-calendar-layout">
           <div>
-            <div class="pill">Creneaux</div>
-            <h2>Choisir l'horaire</h2>
-            <p style="margin:8px 0 0;color:#6e655f;font-size:.98rem;">Mardi et vendredi en journee. Les autres jours sont proposes a partir de 19h30.</p>
+            <div class="calendar-grid" id="calendar-days"></div>
+          </div>
+          <div>
+            <div class="section-head appointment-slots-head">
+              <div>
+                <div class="pill">Creneaux</div>
+                <h2>Choisir l'horaire</h2>
+                <p style="margin:8px 0 0;color:#6e655f;font-size:.98rem;">Mardi et vendredi en journee. Les autres jours sont proposes a partir de 19h30.</p>
+              </div>
+            </div>
+            <div class="slots" id="calendar-slots"></div>
           </div>
         </div>
-        <div class="slots" id="calendar-slots"></div>
       </div>
+    </section>
 
-      <div class="form-card">
+    <section class="section">
+      <div class="form-card appointment-form-below">
         <div class="section-head">
           <div>
             <div class="pill">Projet</div>
