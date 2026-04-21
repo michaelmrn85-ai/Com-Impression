@@ -905,7 +905,7 @@
   document.addEventListener('DOMContentLoaded',function(){
     if(state.mdp){
       showDashboard();
-      Promise.all([loadCommandes(), loadProductsAdmin(false), loadClientsAdmin(false)]).catch(function(){
+      Promise.all([loadCommandes(), loadProductsAdmin(false), loadClientsAdmin(false), loadSiteConfig()]).catch(function(){
         sessionStorage.removeItem('ci_admin_pwd');
         state.mdp='';
         showLogin();

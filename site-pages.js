@@ -1319,11 +1319,44 @@
     var dashboardView = $("client-dashboard-view");
     var loginView = $("client-login-block");
     var registerView = $("client-register-block");
+    var COOKIE_KEY = "ci_cookie_consent";
 
     function showAuthBlock(target) {
       [loginView, registerView].forEach(function (view) {
         if (view) view.hidden = view !== target;
       });
+    }
+
+    function renderCookieBanner() {
+      var banner = $("cookie-banner");
+      var accept = $("cookie-accept");
+      if (!banner || !accept) return;
+      if (localStorage.getItem(COOKIE_KEY) === "accepted") {
+        banner.hidden = true;
+        return;
+      }
+      banner.hidden = false;
+      accept.addEventListener("click", function () {
+        localStorage.setItem(COOKIE_KEY, "accepted");
+        banner.hidden = true;
+      });
+    }
+
+    function buildTimeline(status) {
+      var current = String(status || "Recue");
+      var steps = ["Commande recue", "BAT", "Production", "Livraison", "Terminee"];
+      var currentIndex = 0;
+      if (/BAT/i.test(current)) currentIndex = 1;
+      else if (current === "En production") currentIndex = 2;
+      else if (current === "En cours de livraison") currentIndex = 3;
+      else if (current === "Expediee") currentIndex = 4;
+      else if (current === "Annulee") currentIndex = -1;
+      return '<div class="client-timeline">' + steps.map(function (step, index) {
+        var classes = "client-step";
+        if (currentIndex >= index) classes += " done";
+        if (currentIndex === index) classes += " active";
+        return '<div class="' + classes + '"><span>' + esc(step) + '</span></div>';
+      }).join("") + '</div>';
     }
 
     function showDashboard(client, commandes) {
@@ -1340,27 +1373,61 @@
       $("profile-cp").value = client.cp || "";
       $("profile-ville").value = client.ville || "";
       $("client-points").textContent = String(client.points || 0);
+      $("client-order-count").textContent = String(commandes.length || 0);
+
+      var rendezvous = commandes.filter(function (cmd) {
+        return /^Rendez-vous/i.test(String(cmd.panier || ""));
+      });
+      var docs = commandes.reduce(function (items, cmd) {
+        return items.concat((cmd.documents || []).map(function (doc) {
+          return { cmd: cmd, doc: doc };
+        }));
+      }, []);
+      var billingDocs = docs.filter(function (item) {
+        return /devis|facture/i.test(String((item.doc && item.doc.type) || ""));
+      });
+      var regularOrders = commandes.filter(function (cmd) {
+        return !/^Rendez-vous/i.test(String(cmd.panier || ""));
+      });
+
+      $("client-rdv-count").textContent = String(rendezvous.length || 0);
+      $("client-doc-count").textContent = String(billingDocs.length || 0);
+
+      var rdvList = $("client-rendezvous");
+      if (rdvList) {
+        rdvList.innerHTML = rendezvous.length ? rendezvous.map(function (cmd) {
+          return '<article class="order-row">'
+            + '<div class="split-line"><strong>' + esc(cmd.numero) + '</strong><span class="tag">Rendez-vous</span></div>'
+            + '<div class="muted">' + esc(cmd.date || "") + '</div>'
+            + '<div>' + esc(cmd.panier || "").replace(/\n/g, "<br>") + '</div>'
+          + '</article>';
+        }).join("") : '<div class="empty-state">Aucun rendez-vous pour le moment.</div>';
+      }
+
+      var docList = $("client-documents");
+      if (docList) {
+        docList.innerHTML = billingDocs.length ? billingDocs.map(function (item) {
+          return '<article class="order-row">'
+            + '<div class="split-line"><strong>' + esc(item.cmd.numero) + '</strong><span class="tag">' + esc(item.doc.type || "Document") + '</span></div>'
+            + '<a class="tag" href="/api/commandes/' + encodeURIComponent(item.cmd.numero) + '/document/' + encodeURIComponent(item.doc.id) + '?session_token=' + encodeURIComponent(localStorage.getItem(SESSION_KEY) || "") + '" target="_blank" rel="noopener">Ouvrir le document</a>'
+          + '</article>';
+        }).join("") : '<div class="empty-state">Aucun devis ou facture disponible.</div>';
+      }
 
       var list = $("client-orders");
       if (list) {
-        if (!commandes.length) {
-          list.innerHTML = '<div class="empty-state">Aucune commande pour le moment.</div>';
-        } else {
-          list.innerHTML = commandes.map(function (cmd) {
-            var docs = (cmd.documents || []).map(function (doc) {
-              return '<a class="tag" href="/api/commandes/' + encodeURIComponent(cmd.numero) + '/document/' + encodeURIComponent(doc.id) + '?session_token=' + encodeURIComponent(localStorage.getItem(SESSION_KEY) || "") + '" target="_blank" rel="noopener">Document ' + esc(doc.type || "PDF") + "</a>";
-            }).join("");
-            return '<article class="order-row">'
-              + '<div class="split-line">'
-                + '<strong>' + esc(cmd.numero) + '</strong>'
-                + '<span class="tag">' + esc(cmd.statut || "Recue") + '</span>'
-              + '</div>'
-              + '<div class="muted">' + esc(cmd.date || "") + '</div>'
-              + '<div>' + esc(cmd.panier || "").replace(/\n/g, "<br>") + '</div>'
-              + '<div class="split-line"><strong class="product-price">' + esc(cmd.prix_total || "-") + '</strong><div class="tags">' + docs + '</div></div>'
-            + '</article>';
-          }).join("");
-        }
+        list.innerHTML = regularOrders.length ? regularOrders.map(function (cmd) {
+          return '<article class="order-row client-order-card">'
+            + '<div class="split-line">'
+              + '<strong>' + esc(cmd.numero) + '</strong>'
+              + '<span class="tag">' + esc(cmd.statut || "Recue") + '</span>'
+            + '</div>'
+            + buildTimeline(cmd.statut)
+            + '<div class="muted">' + esc(cmd.date || "") + '</div>'
+            + '<div>' + esc(cmd.panier || "").replace(/\n/g, "<br>") + '</div>'
+            + '<div class="split-line"><strong class="product-price">' + esc(cmd.prix_total || "-") + '</strong></div>'
+          + '</article>';
+        }).join("") : '<div class="empty-state">Aucune commande pour le moment.</div>';
       }
     }
 
@@ -1414,12 +1481,8 @@
         });
     }
 
-    $("open-register").addEventListener("click", function () {
-      showAuthBlock(registerView);
-    });
-    $("back-login-from-register").addEventListener("click", function () {
-      showAuthBlock(loginView);
-    });
+    showAuthBlock(loginView);
+    renderCookieBanner();
 
     $("login-form").addEventListener("submit", function (event) {
       event.preventDefault();

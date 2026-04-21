@@ -32,23 +32,21 @@
   </header>
 
   <main class="page-shell">
-    <section class="page-hero">
-      <div class="hero-card">
-        <div class="pill">Espace client</div>
-        <h1>Suivre vos commandes et gerer votre profil.</h1>
-        <p>Retrouvez vos commandes, vos documents et vos informations client dans un seul espace.</p>
+    <section id="client-auth-view" class="section">
+      <div class="section-head client-simple-head">
+        <div>
+          <h1>Mon compte</h1>
+        </div>
       </div>
-    </section>
 
-    <section id="client-auth-view" class="section grid-2">
-      <div class="form-card">
-        <div id="client-login-block">
-          <div class="section-head">
-            <div>
-              <div class="pill">Connexion</div>
-              <h2>Acceder a mon compte</h2>
+      <div class="grid-2">
+        <div class="form-card">
+          <div id="client-login-block">
+            <div class="section-head">
+              <div>
+                <h2>Connexion</h2>
+              </div>
             </div>
-          </div>
           <form id="login-form">
             <div class="field">
               <label for="login-email">Email *</label>
@@ -62,14 +60,15 @@
             <div class="status" id="login-status"></div>
           </form>
         </div>
+        </div>
 
-        <div id="client-register-block" hidden>
-          <div class="section-head">
-            <div>
-              <div class="pill">Inscription</div>
-              <h2>Creer mon compte</h2>
+        <div class="form-card">
+          <div id="client-register-block">
+            <div class="section-head">
+              <div>
+                <h2>Creer mon compte</h2>
+              </div>
             </div>
-          </div>
           <form id="register-form">
             <div class="field">
               <label for="register-type-client">Vous etes *</label>
@@ -134,88 +133,121 @@
               </div>
             </div>
             <button class="btn" type="submit">Creer mon compte</button>
-            <button class="btn-light" id="back-login-from-register" type="button" style="margin-top:10px;">Retour a la connexion</button>
             <div class="status" id="register-status"></div>
           </form>
         </div>
-
-      </div>
-
-      <div class="dashboard-card">
-        <div class="section-head">
-          <div>
-            <div class="pill">Votre espace</div>
-            <h2>Un acces simple a vos commandes</h2>
-          </div>
-        </div>
-        <p>Connectez-vous pour retrouver vos commandes, telecharger vos documents et mettre a jour vos informations en quelques clics.</p>
-        <div class="hero-actions" style="margin-top:18px;">
-          <button class="btn-light" id="open-register" type="button">Creer un compte</button>
-          <a class="btn-light" href="./produits.html">Voir les produits</a>
         </div>
       </div>
     </section>
 
-    <section id="client-dashboard-view" class="section grid-2" hidden>
+    <section id="client-dashboard-view" class="section" hidden>
       <div class="dashboard-card">
         <div class="section-head">
           <div>
-            <div class="pill">Bonjour</div>
             <h2 id="client-dashboard-name">Client</h2>
           </div>
           <button class="btn-light" id="logout-btn" type="button">Deconnexion</button>
         </div>
-        <div class="summary-box" style="margin-bottom:18px;">
-          <div class="split-line">
-            <span>Points fidelite</span>
+        <div class="grid-4 client-overview">
+          <div class="summary-box">
+            <span class="muted">Carte de fidelite</span>
             <strong class="total" id="client-points">0</strong>
           </div>
+          <div class="summary-box">
+            <span class="muted">Rendez-vous</span>
+            <strong class="total" id="client-rdv-count">0</strong>
+          </div>
+          <div class="summary-box">
+            <span class="muted">Devis / factures</span>
+            <strong class="total" id="client-doc-count">0</strong>
+          </div>
+          <div class="summary-box">
+            <span class="muted">Commandes</span>
+            <strong class="total" id="client-order-count">0</strong>
+          </div>
         </div>
-        <div id="client-orders" class="order-list"></div>
       </div>
 
-      <div class="form-card">
-        <div class="section-head">
-          <div>
-            <div class="pill">Profil</div>
-            <h2>Mes informations</h2>
+      <div class="grid-2">
+        <div class="dashboard-card">
+          <div class="section-head">
+            <div>
+              <h2>Rendez-vous pris</h2>
+            </div>
           </div>
+          <div id="client-rendezvous" class="order-list"></div>
         </div>
-        <form id="profile-form">
-          <div class="inline-fields">
-            <div class="field">
-              <label for="profile-prenom">Prenom</label>
-              <input id="profile-prenom" type="text">
-            </div>
-            <div class="field">
-              <label for="profile-nom">Nom</label>
-              <input id="profile-nom" type="text">
+
+        <div class="dashboard-card">
+          <div class="section-head">
+            <div>
+              <h2>Devis et factures</h2>
             </div>
           </div>
-          <div class="field">
-            <label for="profile-email">Email</label>
-            <input id="profile-email" type="email" disabled>
-          </div>
-          <div class="field">
-            <label for="profile-adresse">Adresse</label>
-            <input id="profile-adresse" type="text">
-          </div>
-          <div class="inline-fields">
-            <div class="field">
-              <label for="profile-cp">Code postal</label>
-              <input id="profile-cp" type="text">
-            </div>
-            <div class="field">
-              <label for="profile-ville">Ville</label>
-              <input id="profile-ville" type="text">
+          <div id="client-documents" class="order-list"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="dashboard-card">
+          <div class="section-head">
+            <div>
+              <h2>Suivi de commande</h2>
             </div>
           </div>
-          <button class="btn" type="submit">Enregistrer mes informations</button>
-          <div class="status" id="profile-status"></div>
-        </form>
+          <div id="client-orders" class="order-list"></div>
+        </div>
+
+        <div class="form-card">
+          <div class="section-head">
+            <div>
+              <h2>Informations personnelles</h2>
+            </div>
+          </div>
+          <form id="profile-form">
+            <div class="inline-fields">
+              <div class="field">
+                <label for="profile-prenom">Prenom</label>
+                <input id="profile-prenom" type="text">
+              </div>
+              <div class="field">
+                <label for="profile-nom">Nom</label>
+                <input id="profile-nom" type="text">
+              </div>
+            </div>
+            <div class="field">
+              <label for="profile-email">Email</label>
+              <input id="profile-email" type="email" disabled>
+            </div>
+            <div class="field">
+              <label for="profile-adresse">Adresse</label>
+              <input id="profile-adresse" type="text">
+            </div>
+            <div class="inline-fields">
+              <div class="field">
+                <label for="profile-cp">Code postal</label>
+                <input id="profile-cp" type="text">
+              </div>
+              <div class="field">
+                <label for="profile-ville">Ville</label>
+                <input id="profile-ville" type="text">
+              </div>
+            </div>
+            <button class="btn" type="submit">Enregistrer mes informations</button>
+            <div class="status" id="profile-status"></div>
+          </form>
+        </div>
       </div>
     </section>
   </main>
+
+  <div class="cookie-banner" id="cookie-banner" hidden>
+    <div>
+      <strong>Cookies</strong>
+      <p>Nous utilisons des cookies pour garder votre connexion et ameliorer votre experience client.</p>
+    </div>
+    <button class="btn" id="cookie-accept" type="button">Autoriser</button>
+  </div>
 
   <footer class="footer">
     <div class="footer-inner">
