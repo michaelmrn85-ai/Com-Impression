@@ -98,10 +98,12 @@
   function showDashboard(){
     $('login-card').style.display='none';
     $('dashboard').style.display='block';
+    if($('site-editor-section')) $('site-editor-section').style.display='block';
   }
   function showLogin(){
     $('login-card').style.display='block';
     $('dashboard').style.display='none';
+    if($('site-editor-section')) $('site-editor-section').style.display='none';
   }
   function openModal(id){
     var el=$(id); if(el) el.classList.add('open');
@@ -929,7 +931,13 @@
     document.querySelectorAll('[data-open-scope]').forEach(function(btn){
       btn.addEventListener('click',function(){
         var scope=btn.getAttribute('data-open-scope');
-        if(scope==='site'){ loadSiteConfig().then(function(){ openModal('modal-site'); }); return; }
+        if(scope==='site'){
+          loadSiteConfig().then(function(){
+            var section=$('site-editor-section');
+            if(section && typeof section.scrollIntoView==='function') section.scrollIntoView({behavior:'smooth',block:'start'});
+          });
+          return;
+        }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual'); return; }
         if(scope==='produits'){ loadProductsAdmin(true); return; }

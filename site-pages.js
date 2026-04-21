@@ -1683,6 +1683,18 @@
         } else if ($("home-panel-list")) {
           $("home-panel-list").innerHTML = "";
         }
+        if ($("home-products-title")) {
+          $("home-products-title").textContent = [config.productsTitle, config.productsAccent].filter(Boolean).join(" ").trim() || $("home-products-title").textContent;
+        }
+        if ($("home-products-subtitle")) {
+          if (config.productsSubtitle) {
+            $("home-products-subtitle").hidden = false;
+            $("home-products-subtitle").textContent = config.productsSubtitle;
+          } else {
+            $("home-products-subtitle").hidden = true;
+            $("home-products-subtitle").textContent = "";
+          }
+        }
         if ($("home-hero-image") && config.heroImage) {
           $("home-hero-image").src = config.heroImage;
         }
