@@ -36,6 +36,14 @@
     'Association'
   ];
 
+  var PRODUCT_GAMME_OPTIONS = [
+    { value:'compro', label:"Com'Pro" },
+    { value:'comext', label:"Com'Exterieur" },
+    { value:'comevt', label:"Com'Evenementiel" },
+    { value:'comperso', label:"Com'Personnalisee" },
+    { value:'comservices', label:"Com'Services" }
+  ];
+
   var SITE_PRODUCT_OPTIONS = [
     { id:'fairepart-a5', label:'Faire-part A5', meta:'Mariage, baptême, invitation' },
     { id:'fairepart-a6', label:'Faire-part A6', meta:'Petit format événementiel' },
@@ -172,7 +180,7 @@
   }
 
   function loadCommandes(){
-    return fetch(api('/api/commandes'))
+    return fetch(api('/api/commandes?mdp='+encodeURIComponent(state.mdp)))
       .then(function(r){ return r.json(); })
       .then(function(data){
         if(!data.success) throw new Error(data.error||'Chargement impossible');
@@ -636,7 +644,7 @@
       gammeTitle:'',
       legacyCat:'compro',
       product:{
-        ref:'Nouvelle reference',
+        ref:getNextProductRef(),
         id:'',
         title:'',
         priceLabel:'',
@@ -654,50 +662,41 @@
     var entryRef = state.selectedProduct;
     var paperOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /papier|grammage/i.test(k); })]||[]);
     var finishOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /finit|pellic|vernis|soft/i.test(k); })]||[]);
-    var gammeOptions = [
-      { value:'compro', label:"Com'Pro" },
-      { value:'comext', label:"Com'Exterieur" },
-      { value:'comevt', label:"Com'Evenementiel" },
-      { value:'comperso', label:"Com'Personnalisee" },
-      { value:'comservices', label:"Com'Services" }
-    ].map(function(item){
+    var gammeOptions = PRODUCT_GAMME_OPTIONS.map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
     }).join('');
+    var pricingRows = buildProductPricingRows(entryRef.product || {});
     $('product-edit-body').innerHTML=
-      '<div class="site-grid">'
-      +'<div class="field"><label>Reference</label><input value="'+esc(entryRef.product.ref||'')+'" disabled></div>'
+      '<div class="product-meta-grid">'
       +'<div class="field"><label>Gamme</label><select id="product-edit-gamme">'+gammeOptions+'</select></div>'
+      +'<div class="field"><label>Reference</label><input value="'+esc(entryRef.product.ref||'')+'" disabled></div>'
+      +'<div class="field"><label>Libelle</label><input id="product-edit-name" value="'+esc(entryRef.product.title||'')+'"></div>'
       +'</div>'
       +'<div class="site-grid">'
-      +'<div class="field"><label>Nom</label><input id="product-edit-name" value="'+esc(entryRef.product.title||'')+'"></div>'
-      +'<div class="field"><label>Prix de depart</label><input id="product-edit-price" value="'+esc(entryRef.product.priceLabel||'')+'" placeholder="15,90 EUR"></div>'
-      +'</div>'
-      +'<div class="site-grid">'
-      +'<div class="field"><label>Prix d achat</label><input id="product-edit-purchase" value="'+esc(entryRef.product.purchasePrice==null?'':entryRef.product.purchasePrice)+'" placeholder="8.50"></div>'
-      +'<div class="field"><label>Prix de vente</label><input id="product-edit-sale" value="'+esc(entryRef.product.salePrice==null?'':entryRef.product.salePrice)+'" placeholder="15.90"></div>'
-      +'</div>'
       +'<div class="field"><label>Description</label><textarea id="product-edit-summary">'+esc(entryRef.product.summary||'')+'</textarea></div>'
-      +'<div class="site-grid">'
-      +'<div class="field"><label>Lots / quantites</label><textarea id="product-edit-qty" placeholder="100,250,500">'+esc((entryRef.product.quantityOptions||[]).join(', '))+'</textarea></div>'
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'</div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
-      +'<div class="field"><label>Tarifs par lot (format quantite=total, un par ligne)</label><textarea id="product-edit-pricing" placeholder="100=15.90&#10;250=24.90">'+esc((entryRef.product.quantityPricing||[]).map(function(row){ return row.quantity+'='+row.total; }).join('\n'))+'</textarea></div>'
+      +'<div class="field"><label>Lots / unitaire</label>'+renderProductPricingEditor(pricingRows)+'</div>'
       +'<div class="site-grid">'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-upload" type="checkbox" style="width:auto;" '+(entryRef.product.uploadEnabled!==false?'checked':'')+'> Upload actif sur la fiche produit</label>'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-dimensions" type="checkbox" style="width:auto;" '+(entryRef.product.hasDimensions?'checked':'')+'> Produit avec dimensions libres</label>'
       +'</div>'
       +'<button class="btn btn-orange" id="product-edit-save" type="button">'+(entryRef.isNew?'Creer le produit':'Enregistrer le produit')+'</button>'
       +'<div class="status" id="product-edit-status"></div>';
+    refreshProductPricingTable();
     openModal('modal-product-edit','produits');
   }
 
   function saveProductEditor(){
     var entry=state.selectedProduct; if(!entry) return;
-    var pricing=String(($('product-edit-pricing').value||'')).split('\n').map(function(line){
-      var parts=line.split('=');
-      return { quantity:(parts[0]||'').trim(), total:(parts[1]||'').trim() };
-    }).filter(function(row){ return row.quantity && row.total; });
+    var pricingRows = getProductPricingRows();
+    var pricing=pricingRows.filter(function(row){ return row.quantity && row.salePrice; }).map(function(row){
+      return { quantity:row.quantity, total:row.salePrice };
+    });
+    var firstRow = pricingRows[0] || {};
+    var quantityOptions = pricingRows.map(function(row){ return row.quantity; }).filter(Boolean).join(',');
+    var saleLabel = firstRow.salePrice ? formatPriceValue(firstRow.salePrice) : ((entry.product||{}).priceLabel||'Sur devis');
     var endpoint = entry.isNew ? '/api/admin/products' : ('/api/admin/products/'+encodeURIComponent(entry.legacyCat)+'/'+encodeURIComponent(entry.product.id));
     fetch(api(endpoint),{
       method:'POST',
@@ -707,10 +706,10 @@
         legacyCat:($('product-edit-gamme').value||entry.legacyCat||'').trim(),
         title:($('product-edit-name').value||'').trim(),
         summary:($('product-edit-summary').value||'').trim(),
-        priceLabel:($('product-edit-price').value||'').trim(),
-        purchasePrice:($('product-edit-purchase').value||'').trim(),
-        salePrice:($('product-edit-sale').value||'').trim(),
-        quantityOptions:($('product-edit-qty').value||'').trim(),
+        priceLabel:saleLabel,
+        purchasePrice:(firstRow.purchasePrice||'').trim(),
+        salePrice:(firstRow.salePrice||'').trim(),
+        quantityOptions:quantityOptions,
         paperOptions:($('product-edit-paper').value||'').trim(),
         finishOptions:($('product-edit-finish').value||'').trim(),
         quantityPricing:pricing,
@@ -838,6 +837,101 @@
   function parseAmount(value){
     var n=parseFloat(String(value||'').replace(/\s/g,'').replace('€','').replace(',','.'));
     return isNaN(n) ? 0 : n;
+  }
+
+  function formatPriceValue(value){
+    var n=parseAmount(value);
+    return n ? n.toFixed(2).replace('.',',')+' EUR' : 'Sur devis';
+  }
+
+  function formatPlainNumber(value){
+    var n=parseAmount(value);
+    if(!n) return '0,00';
+    return n.toFixed(2).replace('.',',');
+  }
+
+  function getNextProductRef(){
+    var max=0;
+    state.catalog.forEach(function(entry){
+      var ref=String((entry.product||{}).ref||'');
+      var match=ref.match(/COM(\d+)/i);
+      if(match){
+        var num=parseInt(match[1],10);
+        if(num>max) max=num;
+      }
+    });
+    return 'COM'+String(max+1).padStart(4,'0');
+  }
+
+  function buildProductPricingRows(product){
+    var rows=[];
+    if(product && Array.isArray(product.quantityPricing) && product.quantityPricing.length){
+      rows = product.quantityPricing.map(function(row){
+        return {
+          type:'lot',
+          quantity:String(row.quantity||'').trim(),
+          purchasePrice:product.purchasePrice == null ? '' : String(product.purchasePrice),
+          salePrice:row.total == null ? '' : String(row.total)
+        };
+      });
+    } else if(product && (product.salePrice != null || product.purchasePrice != null)) {
+      rows = [{
+        type:'unitaire',
+        quantity:(product.quantityOptions && product.quantityOptions[0]) ? String(product.quantityOptions[0]) : '1',
+        purchasePrice:product.purchasePrice == null ? '' : String(product.purchasePrice),
+        salePrice:product.salePrice == null ? '' : String(product.salePrice)
+      }];
+    }
+    if(!rows.length){
+      rows = [{ type:'lot', quantity:'100', purchasePrice:'', salePrice:'' }];
+    }
+    return rows;
+  }
+
+  function renderProductPricingEditor(rows){
+    return '<div class="pricing-editor">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +rows.map(function(row){
+        return '<tr class="product-pricing-row">'
+          +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Unitaire</option></select></td>'
+          +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"></td>'
+          +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
+          +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
+          +'<td><span class="pricing-margin">0,00</span></td>'
+          +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
+        +'</tr>';
+      }).join('')
+      +'</tbody></table></div>'
+      +'<div class="product-pricing-add"><button class="btn btn-light btn-small" id="product-pricing-add" type="button">+ Ajouter un lot ou unitaire</button></div>'
+    +'</div>';
+  }
+
+  function refreshProductPricingTable(){
+    document.querySelectorAll('#product-pricing-rows .product-pricing-row').forEach(function(row){
+      var qty = parseAmount((row.querySelector('.product-pricing-qty')||{}).value || '1') || 1;
+      var purchase = parseAmount((row.querySelector('.product-pricing-purchase')||{}).value);
+      var sale = parseAmount((row.querySelector('.product-pricing-sale')||{}).value);
+      var type = ((row.querySelector('.product-pricing-type')||{}).value || 'lot');
+      var marginValue = type === 'unitaire' ? (sale - purchase) : (sale - purchase);
+      var marginCell = row.querySelector('.pricing-margin');
+      if(marginCell) marginCell.textContent = formatPlainNumber(marginValue);
+      if(type === 'unitaire' && !((row.querySelector('.product-pricing-qty')||{}).value||'').trim()){
+        row.querySelector('.product-pricing-qty').value = '1';
+      }
+    });
+  }
+
+  function getProductPricingRows(){
+    return Array.prototype.slice.call(document.querySelectorAll('#product-pricing-rows .product-pricing-row')).map(function(row){
+      return {
+        type:((row.querySelector('.product-pricing-type')||{}).value || 'lot').trim(),
+        quantity:((row.querySelector('.product-pricing-qty')||{}).value || '').trim(),
+        purchasePrice:((row.querySelector('.product-pricing-purchase')||{}).value || '').trim(),
+        salePrice:((row.querySelector('.product-pricing-sale')||{}).value || '').trim()
+      };
+    }).filter(function(row){
+      return row.quantity || row.purchasePrice || row.salePrice;
+    });
   }
 
   function formatAmount(value){
@@ -1073,6 +1167,30 @@
       if(productBtn) openProductEditor(productBtn.getAttribute('data-edit-product'));
       var clientBtn = e.target.closest ? e.target.closest('[data-edit-client]') : null;
       if(clientBtn) openClientEditor(clientBtn.getAttribute('data-edit-client'));
+      if(e.target && e.target.id==='product-pricing-add'){
+        var rowsWrap=$('product-pricing-rows');
+        if(rowsWrap){
+          rowsWrap.insertAdjacentHTML('beforeend',
+            '<tr class="product-pricing-row">'
+            +'<td><select class="product-pricing-type"><option value="lot" selected>Lot</option><option value="unitaire">Unitaire</option></select></td>'
+            +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
+            +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value=""></td>'
+            +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value=""></td>'
+            +'<td><span class="pricing-margin">0,00</span></td>'
+            +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
+            +'</tr>'
+          );
+          refreshProductPricingTable();
+        }
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-pricing-remove')){
+        var pricingRow=e.target.closest('.product-pricing-row');
+        if(pricingRow) pricingRow.remove();
+        if(!document.querySelector('#product-pricing-rows .product-pricing-row') && $('product-pricing-add')){
+          $('product-pricing-add').click();
+        }
+        refreshProductPricingTable();
+      }
       if(e.target && e.target.classList && e.target.classList.contains('manual-remove-line')){
         var line=e.target.closest('.manual-line');
         if(line) line.remove();
@@ -1082,6 +1200,16 @@
     });
     document.addEventListener('input',function(e){
       if(e.target && e.target.classList && e.target.classList.contains('manual-amount')) refreshManualTotal();
+      if(e.target && e.target.classList && (
+        e.target.classList.contains('product-pricing-qty') ||
+        e.target.classList.contains('product-pricing-purchase') ||
+        e.target.classList.contains('product-pricing-sale')
+      )) refreshProductPricingTable();
+    });
+    document.addEventListener('change',function(e){
+      if(e.target && e.target.classList && e.target.classList.contains('product-pricing-type')){
+        refreshProductPricingTable();
+      }
     });
     var heroFile = $('site-hero-image-file');
     if(heroFile) heroFile.addEventListener('change', function(){

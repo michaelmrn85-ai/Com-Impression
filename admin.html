@@ -96,12 +96,21 @@
     .template-card h3{margin:0;font-family:'Baloo 2',cursive;font-size:1.15rem}
     .template-card textarea{min-height:220px;font-family:inherit;line-height:1.6}
     .template-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .pricing-editor{display:grid;gap:14px}
+    .pricing-table-wrap{border:2px solid #eee0d6;border-radius:18px;overflow:hidden;background:#fffdfa}
+    .pricing-table{width:100%;border-collapse:collapse}
+    .pricing-table th{background:#fff4e8;color:var(--ink);padding:12px 10px;text-align:left;font-family:'Baloo 2',cursive;font-size:.95rem}
+    .pricing-table td{padding:10px;border-top:1px solid #f0e4dc;vertical-align:middle}
+    .pricing-table input,.pricing-table select{width:100%;padding:10px 12px;border-radius:12px}
+    .pricing-margin{font-family:'Baloo 2',cursive;font-size:1.1rem;color:var(--or)}
+    .product-meta-grid{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:12px}
+    .product-pricing-add{display:flex;justify-content:flex-start}
     .day-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
     .day-kpi{background:#fff8ef;border:2px solid #f0e4dc;border-radius:18px;padding:16px}
     .day-kpi strong{display:block;font-family:'Baloo 2',cursive;font-size:1rem;line-height:1}
     .day-kpi span{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:1.8rem;color:var(--or)}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:2px dashed var(--line);border-radius:20px}
-    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.season-list{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}}
+    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.season-list,.product-meta-grid{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:760px}}
     @media(max-width:560px){.admin-summary,.day-kpis{grid-template-columns:1fr}.page{width:min(100% - 20px,1180px)}.login-card,.dashboard,.admin-section,.box{border-width:3px;box-shadow:5px 5px 0 #151515}}
   </style>
 </head>

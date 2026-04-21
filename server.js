@@ -22,10 +22,129 @@ require('dotenv').config();
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(cors({ origin: '*' }));
+const ADMIN_PASSWORD = String(process.env.ADMIN_PWD || '').trim();
+const KNOWN_PUBLIC_ORIGINS = Array.from(new Set([
+    process.env.PUBLIC_BASE_URL,
+    process.env.SITE_BASE_URL,
+    process.env.RENDER_EXTERNAL_URL,
+    'https://com-impression.fr',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3100',
+    'http://127.0.0.1:3100'
+].filter(Boolean).map(value => String(value).replace(/\/$/, ''))));
+
+function isAllowedOrigin(origin) {
+    if (!origin || origin === 'null') return true;
+    const clean = String(origin).replace(/\/$/, '');
+    if (KNOWN_PUBLIC_ORIGINS.includes(clean)) return true;
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(clean);
+}
+
+app.use(cors({
+    origin(origin, callback) {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error('Origine non autorisee par CORS'));
+    },
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-session-token'],
+    optionsSuccessStatus: 204
+}));
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    if (String(proto).includes('https')) {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    if (
+        req.path.startsWith('/api/client') ||
+        req.path.startsWith('/api/admin') ||
+        req.path.startsWith('/api/commandes')
+    ) {
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Pragma', 'no-cache');
+    }
+    next();
+});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
+
+const RATE_LIMIT_STORE = new Map();
+function rateLimit(options) {
+    const opts = Object.assign({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'global' }, options || {});
+    return function (req, res, next) {
+        const key = opts.prefix + ':' + (req.ip || 'unknown');
+        const now = Date.now();
+        const current = RATE_LIMIT_STORE.get(key) || { count: 0, resetAt: now + opts.windowMs };
+        if (current.resetAt <= now) {
+            current.count = 0;
+            current.resetAt = now + opts.windowMs;
+        }
+        current.count += 1;
+        RATE_LIMIT_STORE.set(key, current);
+        res.setHeader('Retry-After', Math.max(1, Math.ceil((current.resetAt - now) / 1000)));
+        if (current.count > opts.max) {
+            return res.status(429).json({ success: false, error: 'Trop de tentatives. Reessayez plus tard.' });
+        }
+        next();
+    };
+}
+
+function requireAdminPasswordConfigured(res) {
+    if (ADMIN_PASSWORD) return true;
+    res.status(503).json({ success: false, error: 'Le mot de passe admin n est pas configure cote serveur.' });
+    return false;
+}
+
+function adminPasswordMatches(value) {
+    return !!ADMIN_PASSWORD && String(value || '') === ADMIN_PASSWORD;
+}
+
+function readCookies(req) {
+    const raw = String((req.headers && req.headers.cookie) || '');
+    return raw.split(';').reduce((acc, item) => {
+        const idx = item.indexOf('=');
+        if (idx <= 0) return acc;
+        const key = item.slice(0, idx).trim();
+        const value = item.slice(idx + 1).trim();
+        acc[key] = decodeURIComponent(value);
+        return acc;
+    }, {});
+}
+
+function setClientSessionCookie(req, res, token) {
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || '');
+    const secure = proto.includes('https');
+    const parts = [
+        `ci_session=${encodeURIComponent(token)}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Lax',
+        'Max-Age=2592000'
+    ];
+    if (secure) parts.push('Secure');
+    res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function clearClientSessionCookie(req, res) {
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || '');
+    const secure = proto.includes('https');
+    const parts = [
+        'ci_session=',
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Lax',
+        'Max-Age=0'
+    ];
+    if (secure) parts.push('Secure');
+    res.setHeader('Set-Cookie', parts.join('; '));
+}
 
 const upload = multer({ dest: '/tmp/', limits: { fileSize: 70 * 1024 * 1024 } });
 const BRAND_LOGO_PATH = path.join(__dirname, 'com-logo.png');
@@ -1009,8 +1128,8 @@ app.get('/api/incident', (req, res) => {
 
 app.post('/api/incident', express.json(), (req, res) => {
     const { mdp, active, title, message } = req.body || {};
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
-    if (mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
 
     try {
         const incident = sauvegarderIncident({
@@ -1032,8 +1151,8 @@ app.get('/api/site-config', (req, res) => {
 
 app.get('/api/admin/catalog', (req, res) => {
     const mdp = req.query.mdp;
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
-    if (mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
         res.json({ success: true, catalog: buildCatalogApiPayload(), overrides: lireProductOverrides() });
     } catch (e) {
@@ -1043,8 +1162,8 @@ app.get('/api/admin/catalog', (req, res) => {
 
 app.get('/api/admin/daily-summary', (req, res) => {
     const mdp = req.query.mdp;
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
-    if (mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
         const commandes = lireCommandes();
         const visits = lireVisits();
@@ -1123,9 +1242,9 @@ app.get('/api/admin/daily-summary', (req, res) => {
 });
 
 app.post('/api/admin/site-config', express.json(), (req, res) => {
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
     const body = req.body || {};
-    if (body.mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
         const config = sauvegarderSiteConfig(body);
         res.json({ success: true, config });
@@ -1136,9 +1255,9 @@ app.post('/api/admin/site-config', express.json(), (req, res) => {
 });
 
 app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res) => {
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
     const body = req.body || {};
-    if (body.mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
         const overrides = lireProductOverrides();
         const key = buildProductOverrideKey(req.params.legacyCat, req.params.productId);
@@ -1164,9 +1283,9 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
 });
 
 app.post('/api/admin/products', express.json(), (req, res) => {
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
     const body = req.body || {};
-    if (body.mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
         const legacyCat = String(body.legacyCat || '').trim();
         const title = String(body.title || '').trim();
@@ -1254,8 +1373,9 @@ app.get('/api/avis',(req,res)=>{
     res.json({success:true,avis:lireAvis().filter(a=>a.valide).reverse()});
 });
 
-app.post('/api/avis/:id/valider', express.json(), (req,res)=>{
-    if(req.body.mdp!==process.env.ADMIN_PWD) return res.status(403).json({success:false});
+app.post('/api/avis/:id/valider', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'admin-avis-approve' }), (req,res)=>{
+    if (!requireAdminPasswordConfigured(res)) return;
+    if(!adminPasswordMatches((req.body || {}).mdp)) return res.status(403).json({success:false});
     const avis=lireAvis(); const idx=avis.findIndex(a=>a.id===parseInt(req.params.id));
     if(idx<0) return res.status(404).json({success:false});
     avis[idx].valide=true; sauvegarderAvis(avis); res.json({success:true});
@@ -1264,12 +1384,14 @@ app.post('/api/avis/:id/valider', express.json(), (req,res)=>{
 // GET /api/avis/pending — tous les avis en attente (admin)
 app.get('/api/avis/pending', (req, res) => {
     const {mdp} = req.query;
-    if(mdp !== process.env.ADMIN_PWD) return res.status(403).json({success:false});
+    if (!requireAdminPasswordConfigured(res)) return;
+    if(!adminPasswordMatches(mdp)) return res.status(403).json({success:false});
     res.json({success:true, avis: lireAvis().filter(a => !a.valide)});
 });
 
-app.delete('/api/avis/:id', express.json(), (req,res)=>{
-    if(req.body.mdp!==process.env.ADMIN_PWD) return res.status(403).json({success:false});
+app.delete('/api/avis/:id', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'admin-avis-delete' }), (req,res)=>{
+    if (!requireAdminPasswordConfigured(res)) return;
+    if(!adminPasswordMatches((req.body || {}).mdp)) return res.status(403).json({success:false});
     sauvegarderAvis(lireAvis().filter(a=>a.id!==parseInt(req.params.id)));
     res.json({success:true});
 });
@@ -1290,7 +1412,6 @@ function sauvegarderTokens(d) { try { fs.writeFileSync(TOKENS_FILE, JSON.stringi
 function normaliserEmail(email) { return String(email || '').trim().toLowerCase(); }
 const CLIENT_ACTION_TOKEN_SECRET =
     process.env.CLIENT_TOKEN_SECRET ||
-    process.env.ADMIN_PWD ||
     process.env.SMTP_PASS ||
     process.env.STRIPE_SECRET_KEY ||
     'com-impression-v4-client-secret';
@@ -1421,7 +1542,7 @@ function ajouterPoints(email, montant, numCommande, prenom='', nom='') {
 
 // ── AUTH — Lien magique ────────────────────────────────────────────────────
 // POST /api/client/register — création de compte sécurisé
-app.post('/api/client/register', express.json(), async (req, res) => {
+app.post('/api/client/register', express.json(), rateLimit({ windowMs: 30 * 60 * 1000, max: 10, prefix: 'client-register' }), async (req, res) => {
     try {
         const publicBaseUrl = getPublicBaseUrl(req);
         const email = normaliserEmail(req.body.email);
@@ -1488,7 +1609,7 @@ app.post('/api/client/register', express.json(), async (req, res) => {
 });
 
 // POST /api/client/password-login — connexion email + mot de passe
-app.post('/api/client/password-login', express.json(), (req, res) => {
+app.post('/api/client/password-login', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, prefix: 'client-password-login' }), (req, res) => {
     const email = normaliserEmail(req.body.email);
     const password = String(req.body.password || '');
     const client = lireClients().find(c => c.email === email);
@@ -1499,11 +1620,12 @@ app.post('/api/client/password-login', express.json(), (req, res) => {
         return res.status(403).json({ success:false, error:'Veuillez confirmer votre compte via le mail reçu avant de vous connecter' });
     }
     const sessionToken = creerSessionClient(email);
+    setClientSessionCookie(req, res, sessionToken);
     res.json({ success:true, session_token: sessionToken, client: safeClient(client) });
 });
 
 // POST /api/client/forgot-password — demande de réinitialisation
-app.post('/api/client/forgot-password', express.json(), async (req, res) => {
+app.post('/api/client/forgot-password', express.json(), rateLimit({ windowMs: 30 * 60 * 1000, max: 6, prefix: 'client-forgot-password' }), async (req, res) => {
     const publicBaseUrl = getPublicBaseUrl(req);
     const email = normaliserEmail(req.body.email);
     if (!email || !email.includes('@')) return res.status(400).json({ success:false, error:'Email invalide' });
@@ -1533,7 +1655,7 @@ app.post('/api/client/forgot-password', express.json(), async (req, res) => {
 });
 
 // POST /api/client/reset-password — valider un nouveau mot de passe
-app.post('/api/client/reset-password', express.json(), (req, res) => {
+app.post('/api/client/reset-password', express.json(), rateLimit({ windowMs: 30 * 60 * 1000, max: 8, prefix: 'client-reset-password' }), (req, res) => {
     const token = String(req.body.token || '');
     const password = String(req.body.password || '');
     if (password.length < 8) return res.status(400).json({ success:false, error:'Mot de passe trop court' });
@@ -1555,11 +1677,12 @@ app.post('/api/client/reset-password', express.json(), (req, res) => {
     clients[idx].updated_at = new Date().toISOString();
     sauvegarderClients(clients);
     const sessionToken = creerSessionClient(email);
+    setClientSessionCookie(req, res, sessionToken);
     res.json({ success:true, session_token: sessionToken, client: safeClient(clients[idx]) });
 });
 
 // POST /api/client/login — demander un lien magique
-app.post('/api/client/login', express.json(), async (req, res) => {
+app.post('/api/client/login', express.json(), rateLimit({ windowMs: 30 * 60 * 1000, max: 6, prefix: 'client-magic-login' }), async (req, res) => {
     const publicBaseUrl = getPublicBaseUrl(req);
     const email = normaliserEmail(req.body.email);
     if (!email || !email.includes('@')) return res.status(400).json({ success: false, error: 'Email invalide' });
@@ -1652,6 +1775,7 @@ app.get('/api/client/verify', (req, res) => {
         });
 
     const sessionToken = creerSessionClient(email);
+    setClientSessionCookie(req, res, sessionToken);
     res.json({ success: true, session_token: sessionToken, client: safeClient(client) });
 });
 
@@ -1666,6 +1790,7 @@ app.get('/api/client/auth', (req, res) => {
             return res.status(403).json({ success: false, error: 'Veuillez confirmer votre compte via le mail reçu avant de vous connecter.' });
         }
         const sessionToken = creerSessionClient(signedEntry.email);
+        setClientSessionCookie(req, res, sessionToken);
         return res.json({ success: true, session_token: sessionToken, client: safeClient(client) });
     }
     const tokens = lireTokens();
@@ -1680,12 +1805,14 @@ app.get('/api/client/auth', (req, res) => {
     }
     const sessionToken = creerSessionClient(entry.email);
     sauvegarderTokens(tokens.filter(t => t.token !== token));
+    setClientSessionCookie(req, res, sessionToken);
     res.json({ success: true, session_token: sessionToken, client: safeClient(client) });
 });
 
 // Middleware auth session
 function authClient(req, res, next) {
-    const token = req.headers['x-session-token'] || req.query.session_token;
+    const cookies = readCookies(req);
+    const token = req.headers['x-session-token'] || cookies.ci_session || req.query.session_token;
     if (!token) return res.status(401).json({ success: false, error: 'Non connecté' });
     const sessions = lireTokens();
     const session  = sessions.find(t => t.token === token && t.expire > Date.now() && t.type === 'session');
@@ -1693,6 +1820,14 @@ function authClient(req, res, next) {
     req.clientEmail = session.email;
     next();
 }
+
+app.post('/api/client/logout', authClient, (req, res) => {
+    const token = req.headers['x-session-token'] || readCookies(req).ci_session || req.query.session_token;
+    const sessions = lireTokens().filter(item => !(item.type === 'session' && item.token === token));
+    sauvegarderTokens(sessions);
+    clearClientSessionCookie(req, res);
+    res.json({ success: true });
+});
 
 function safeClient(c) {
     return { id:c.id, email:c.email, prenom:c.prenom, nom:c.nom,
@@ -1726,8 +1861,8 @@ app.get('/api/client/me', authClient, (req, res) => {
 
 app.get('/api/admin/clients', (req, res) => {
     const mdp = req.query.mdp;
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
-    if (mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     const commandes = lireCommandes();
     const clients = lireClients().map(client => {
         const clientCommandes = commandes.filter(cmd => normaliserEmail(cmd.email) === normaliserEmail(client.email));
@@ -1741,8 +1876,8 @@ app.get('/api/admin/clients', (req, res) => {
 
 app.post('/api/admin/clients/:id', express.json(), (req, res) => {
     const body = req.body || {};
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
-    if (body.mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     const clients = lireClients();
     const idx = clients.findIndex(client => String(client.id) === String(req.params.id));
     if (idx < 0) return res.status(404).json({ success: false, error: 'Client introuvable' });
@@ -1759,8 +1894,8 @@ app.post('/api/admin/clients/:id', express.json(), (req, res) => {
 
 app.post('/api/admin/clients', express.json(), (req, res) => {
     const body = req.body || {};
-    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
-    if (body.mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     const email = normaliserEmail(body.email);
     if (!email || !email.includes('@')) return res.status(400).json({ success: false, error: 'Email invalide' });
     const clients = lireClients();
@@ -1838,10 +1973,11 @@ const uploadDoc = multer({
 });
 
 // POST /api/commandes/:id/document — déposer un PDF sur une commande (admin)
-app.post('/api/commandes/:id/document', uploadDoc.single('document'), async (req, res) => {
+app.post('/api/commandes/:id/document', rateLimit({ windowMs: 15 * 60 * 1000, max: 25, prefix: 'admin-order-document' }), uploadDoc.single('document'), async (req, res) => {
     const publicBaseUrl = getPublicBaseUrl(req);
     const { mdp } = req.body;
-    if (mdp !== ADMIN_PWD_SUIVI) return res.status(403).json({ success:false, error:'Non autorisé' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(403).json({ success:false, error:'Non autorisé' });
     if (!req.file) return res.status(400).json({ success:false, error:'Fichier manquant' });
 
     const commandes = lireCommandes();
@@ -1905,7 +2041,8 @@ app.get('/api/commandes/:id/document/:docId', authClient, (req, res) => {
 
 // GET /api/admin/commandes/:id/document/:docId — télécharger (admin)
 app.get('/api/admin/commandes/:id/document/:docId', (req, res) => {
-    if (req.query.mdp !== ADMIN_PWD_SUIVI) return res.status(403).send('Non autorisé');
+    if (!ADMIN_PASSWORD) return res.status(503).send('Mot de passe admin non configure');
+    if (!adminPasswordMatches(req.query.mdp)) return res.status(403).send('Non autorisé');
     const commandes = lireCommandes();
     const cmd = commandes.find(c => c.id === req.params.id || c.numero === req.params.id);
     if (!cmd) return res.status(404).send('Commande introuvable');
@@ -1927,11 +2064,12 @@ app.listen(process.env.PORT || 3000, () => console.log(`Serveur demarre sur le p
 // Chemin dynamique : /var/data si disque persistant Render, sinon /tmp
 const DATA_DIR = INCIDENT_DATA_DIR;
 const COMMANDES_FILE = DATA_DIR + '/commandes.json';
-const ADMIN_PWD_SUIVI = process.env.ADMIN_PWD || 'comimpression2025';
+const ADMIN_PWD_SUIVI = ADMIN_PASSWORD;
 
 // POST /api/admin/check — valider le mot de passe admin avant ouverture du dashboard
-app.post('/api/admin/check', express.json(), (req, res) => {
-    if ((req.body || {}).mdp !== ADMIN_PWD_SUIVI) {
+app.post('/api/admin/check', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, prefix: 'admin-check' }), (req, res) => {
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches((req.body || {}).mdp)) {
         return res.status(401).json({ success: false, error: 'Mot de passe incorrect' });
     }
     res.json({ success: true });
@@ -1976,9 +2114,10 @@ function formatDate(d) {
 }
 
 // POST /api/commandes/manuelle — créer une commande depuis l'espace admin
-app.post('/api/commandes/manuelle', upload.array('fichiers', 20), (req, res) => {
+app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'admin-manual-order' }), upload.array('fichiers', 20), (req, res) => {
     const d = req.body || {};
-    if (d.mdp !== ADMIN_PWD_SUIVI) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(d.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     if (!d.panier) return res.status(400).json({ success: false, error: 'Detail commande manquant' });
     try {
         const commandes = lireCommandes();
@@ -2064,16 +2203,21 @@ function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni
     } catch(e) { console.error('Erreur enregistrement commande:', e.message); }
 }
 
-// GET /api/commandes — liste toutes les commandes
-app.get('/api/commandes', (req, res) => {
+// GET /api/commandes — liste toutes les commandes (admin)
+app.get('/api/commandes', rateLimit({ windowMs: 15 * 60 * 1000, max: 40, prefix: 'admin-orders-list' }), (req, res) => {
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(req.query.mdp)) {
+        return res.status(401).json({ success: false, error: 'Non autorise' });
+    }
     const commandes = lireCommandes();
     res.json({ success: true, commandes: commandes.reverse() }); // plus récentes en premier
 });
 
 // POST /api/commandes/:id/statut — changer le statut + email client
-app.post('/api/commandes/:id/statut', express.json(), async (req, res) => {
+app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-status' }), async (req, res) => {
     const { statut, mdp } = req.body;
-    if (mdp !== ADMIN_PWD_SUIVI) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     const publicBaseUrl = getPublicBaseUrl(req);
 
     const commandes = lireCommandes();
@@ -2150,7 +2294,8 @@ app.post('/api/commandes/:id/statut', express.json(), async (req, res) => {
 // POST /api/commandes/:id/notes — sauvegarder notes internes
 app.post('/api/commandes/:id/notes', express.json(), (req, res) => {
     const { notes, mdp } = req.body;
-    if (mdp !== ADMIN_PWD_SUIVI) return res.status(401).json({ success: false, error: 'Non autorise' });
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
 
     const commandes = lireCommandes();
     const idx = commandes.findIndex(c => c.id === req.params.id);

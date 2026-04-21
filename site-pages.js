@@ -1590,7 +1590,7 @@
         docList.innerHTML = billingDocs.length ? billingDocs.map(function (item) {
           return '<article class="order-row">'
             + '<div class="split-line"><strong>' + esc(item.cmd.numero) + '</strong><span class="tag">' + esc(item.doc.type || "Document") + '</span></div>'
-            + '<a class="tag" href="/api/commandes/' + encodeURIComponent(item.cmd.numero) + '/document/' + encodeURIComponent(item.doc.id) + '?session_token=' + encodeURIComponent(localStorage.getItem(SESSION_KEY) || "") + '" target="_blank" rel="noopener">Ouvrir le document</a>'
+            + '<a class="tag" href="/api/commandes/' + encodeURIComponent(item.cmd.numero) + '/document/' + encodeURIComponent(item.doc.id) + '" target="_blank" rel="noopener">Ouvrir le document</a>'
           + '</article>';
         }).join("") : '<div class="empty-state">Aucun devis ou facture disponible.</div>';
       }
