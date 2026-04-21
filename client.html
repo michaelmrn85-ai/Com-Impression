@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mon compte | COM' Impression</title>
+  <meta name="description" content="Connectez-vous a votre espace client COM' Impression pour suivre vos commandes et gerer votre profil.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./site-theme.css">
+</head>
+<body data-page="client">
+  <header class="topbar">
+    <div class="nav">
+      <a class="brand" href="./com-impression.html">
+        <img class="brand-mark" src="./com-logo.png" alt="Logo COM' Impression">
+        <div class="brand-copy">
+          <strong>COM' Impression</strong>
+          <span>Impression, goodies, textile et signaletique</span>
+        </div>
+      </a>
+      <form class="search-shell" data-search-form>
+        <input type="search" placeholder="Rechercher un produit ou une gamme...">
+        <button class="btn" type="submit">Rechercher</button>
+      </form>
+      <div class="nav-actions">
+        <button class="action-btn" data-account-button type="button"><span data-account-label>Mon compte</span></button>
+        <button class="action-btn cart" data-cart-button type="button">Panier <span class="cart-count" data-cart-count>0</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="page-hero">
+      <div class="hero-card">
+        <div class="pill">Espace client</div>
+        <h1>Suivre vos commandes et gerer votre profil.</h1>
+        <p>Retrouvez vos commandes, vos documents et vos informations client dans un seul espace.</p>
+      </div>
+    </section>
+
+    <section id="client-auth-view" class="section grid-2">
+      <div class="form-card">
+        <div id="client-login-block">
+          <div class="section-head">
+            <div>
+              <div class="pill">Connexion</div>
+              <h2>Acceder a mon compte</h2>
+            </div>
+          </div>
+          <form id="login-form">
+            <div class="field">
+              <label for="login-email">Email *</label>
+              <input id="login-email" type="email" required>
+            </div>
+            <div class="field">
+              <label for="login-password">Mot de passe *</label>
+              <input id="login-password" type="password" required>
+            </div>
+            <button class="btn" type="submit">Se connecter</button>
+            <div class="status" id="login-status"></div>
+          </form>
+        </div>
+
+        <div id="client-register-block" hidden>
+          <div class="section-head">
+            <div>
+              <div class="pill">Inscription</div>
+              <h2>Creer mon compte</h2>
+            </div>
+          </div>
+          <form id="register-form">
+            <div class="field">
+              <label for="register-type-client">Vous etes *</label>
+              <select id="register-type-client" required>
+                <option>Particulier</option>
+                <option>Professionnel</option>
+                <option>Professionnel sans SIRET</option>
+                <option>Administration publique (Chorus Pro)</option>
+                <option>Association</option>
+              </select>
+            </div>
+            <div class="inline-fields">
+              <div class="field">
+                <label for="register-prenom">Prenom *</label>
+                <input id="register-prenom" type="text" required>
+              </div>
+              <div class="field">
+                <label for="register-nom">Nom *</label>
+                <input id="register-nom" type="text" required>
+              </div>
+            </div>
+            <div class="field">
+              <label for="register-email">Email *</label>
+              <input id="register-email" type="email" required>
+            </div>
+            <div class="inline-fields">
+              <div class="field">
+                <label for="register-societe">Societe / structure</label>
+                <input id="register-societe" type="text">
+              </div>
+              <div class="field">
+                <label for="register-siret">SIRET</label>
+                <input id="register-siret" type="text">
+              </div>
+            </div>
+            <div class="field">
+              <label for="register-telephone">Telephone</label>
+              <input id="register-telephone" type="tel">
+            </div>
+            <div class="inline-fields">
+              <div class="field">
+                <label for="register-password">Mot de passe *</label>
+                <input id="register-password" type="password" required>
+              </div>
+              <div class="field">
+                <label for="register-password-2">Confirmation *</label>
+                <input id="register-password-2" type="password" required>
+              </div>
+            </div>
+            <div class="field">
+              <label for="register-adresse">Adresse</label>
+              <input id="register-adresse" type="text">
+            </div>
+            <div class="inline-fields">
+              <div class="field">
+                <label for="register-cp">Code postal</label>
+                <input id="register-cp" type="text">
+              </div>
+              <div class="field">
+                <label for="register-ville">Ville</label>
+                <input id="register-ville" type="text">
+              </div>
+            </div>
+            <button class="btn" type="submit">Creer mon compte</button>
+            <button class="btn-light" id="back-login-from-register" type="button" style="margin-top:10px;">Retour a la connexion</button>
+            <div class="status" id="register-status"></div>
+          </form>
+        </div>
+
+      </div>
+
+      <div class="dashboard-card">
+        <div class="section-head">
+          <div>
+            <div class="pill">Votre espace</div>
+            <h2>Un acces simple a vos commandes</h2>
+          </div>
+        </div>
+        <p>Connectez-vous pour retrouver vos commandes, telecharger vos documents et mettre a jour vos informations en quelques clics.</p>
+        <div class="hero-actions" style="margin-top:18px;">
+          <button class="btn-light" id="open-register" type="button">Creer un compte</button>
+          <a class="btn-light" href="./produits.html">Voir les produits</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="client-dashboard-view" class="section grid-2" hidden>
+      <div class="dashboard-card">
+        <div class="section-head">
+          <div>
+            <div class="pill">Bonjour</div>
+            <h2 id="client-dashboard-name">Client</h2>
+          </div>
+          <button class="btn-light" id="logout-btn" type="button">Deconnexion</button>
+        </div>
+        <div class="summary-box" style="margin-bottom:18px;">
+          <div class="split-line">
+            <span>Points fidelite</span>
+            <strong class="total" id="client-points">0</strong>
+          </div>
+        </div>
+        <div id="client-orders" class="order-list"></div>
+      </div>
+
+      <div class="form-card">
+        <div class="section-head">
+          <div>
+            <div class="pill">Profil</div>
+            <h2>Mes informations</h2>
+          </div>
+        </div>
+        <form id="profile-form">
+          <div class="inline-fields">
+            <div class="field">
+              <label for="profile-prenom">Prenom</label>
+              <input id="profile-prenom" type="text">
+            </div>
+            <div class="field">
+              <label for="profile-nom">Nom</label>
+              <input id="profile-nom" type="text">
+            </div>
+          </div>
+          <div class="field">
+            <label for="profile-email">Email</label>
+            <input id="profile-email" type="email" disabled>
+          </div>
+          <div class="field">
+            <label for="profile-adresse">Adresse</label>
+            <input id="profile-adresse" type="text">
+          </div>
+          <div class="inline-fields">
+            <div class="field">
+              <label for="profile-cp">Code postal</label>
+              <input id="profile-cp" type="text">
+            </div>
+            <div class="field">
+              <label for="profile-ville">Ville</label>
+              <input id="profile-ville" type="text">
+            </div>
+          </div>
+          <button class="btn" type="submit">Enregistrer mes informations</button>
+          <div class="status" id="profile-status"></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="./com-logo.png" alt="Logo COM' Impression">
+          <div>
+            <strong>COM' Impression</strong>
+            <p>Vos impressions, conceptions visuelles et commandes personnalisees sont concues en Vendee, expediees depuis la Vendee et imprimees sur site.</p>
+            <div class="footer-tags">
+              <span class="footer-tag">Concu en Vendee</span>
+              <span class="footer-tag">Expedie depuis la Vendee</span>
+              <span class="footer-tag">Imprime sur site</span>
+            </div>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4>Informations</h4>
+          <a href="./mentions-legales.html">Mentions legales</a>
+          <a href="./cgv.html">CGV</a>
+          <a href="./faq.html">FAQ</a>
+          <a href="./rendez-vous.html">Prendre rendez-vous</a>
+        </div>
+        <div class="footer-col">
+          <h4>Paiement securise</h4>
+          <p>Paiement securise par carte bancaire via Stripe, avec prise en charge CB, Mastercard et Visa, ou reglement par virement bancaire selon votre commande.</p>
+        </div>
+        <div class="footer-col">
+          <h4>COM' Impression</h4>
+          <a href="./produits.html">Produits</a>
+          <a href="./panier.html">Panier</a>
+          <a href="./rendez-vous.html">Rendez-vous</a>
+        </div>
+      </div>
+      <div class="footer-payments">
+        <div class="payment-strip"><img src="./footer-paiements.png" alt="Logos Visa, Mastercard, Carte Bancaire, Virement bancaire et Stripe"></div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 COM' Impression. Tous droits reserves.</span>
+        <span>Conception, impression et expedition realisees en Vendee.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./site-pages.js"></script>
+</body>
+</html>

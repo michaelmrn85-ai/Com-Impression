@@ -1,0 +1,1555 @@
+(function () {
+  var IS_FILE_PROTOCOL = window.location.protocol === "file:";
+  var API_BASE = window.location.origin;
+  var CART_KEY = "ci_cart_v4";
+  var CART_COUNT_KEY = "ci_cart_count";
+  var SESSION_KEY = "ci_session_token";
+  var USER_NAME_KEY = "ci_user_name";
+  var STRIPE_PK = "pk_live_51Sos39FgB4FDXQyBFU0UvkiZIwi8FYFVRTelLKs40vGl8VKJRg0T9E6MClXVEUMDOYbgONTlRLUU9C1CGNLLbRqf00pO0gJPQB";
+  var catalogLoadPromise = null;
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function resolveAppUrl(target) {
+    var value = String(target || "");
+    var routeMap = {
+      "/": "./com-impression.html",
+      "/produits": "./produits.html",
+      "/produit": "./produit.html",
+      "/panier": "./panier.html",
+      "/client": "./client.html",
+      "/rendez-vous": "./rendez-vous.html",
+      "/mentions-legales": "./mentions-legales.html",
+      "/cgv": "./cgv.html",
+      "/faq": "./faq.html",
+      "/admin": "./admin.html"
+    };
+    if (!IS_FILE_PROTOCOL) return value;
+    if (routeMap[value]) return routeMap[value];
+    var parts = value.split("?");
+    if (routeMap[parts[0]]) return routeMap[parts[0]] + (parts[1] ? "?" + parts[1] : "");
+    return value;
+  }
+
+  function goTo(target) {
+    window.location.href = resolveAppUrl(target);
+  }
+
+  function rewriteInternalLinks() {
+    document.querySelectorAll("a[href^='/']").forEach(function (link) {
+      var href = link.getAttribute("href");
+      link.setAttribute("href", resolveAppUrl(href));
+    });
+  }
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char];
+    });
+  }
+
+  function euro(amount) {
+    if (typeof amount !== "number" || isNaN(amount)) return "Sur devis";
+    return amount.toFixed(2).replace(".", ",") + " EUR";
+  }
+
+  function normalizePriceLabel(label) {
+    return String(label || "").replace(/EUR/g, "EUR").replace(/des/g, "des");
+  }
+
+  function buildFallbackRef(seed) {
+    var text = String(seed || "");
+    var sum = 0;
+    for (var i = 0; i < text.length; i += 1) {
+      sum += text.charCodeAt(i) * (i + 1);
+    }
+    return "COM" + String((sum % 9999) + 1).padStart(4, "0");
+  }
+
+  function extractPaperFinishFromSelections(selections) {
+    var paper = [];
+    var finish = [];
+    Object.keys(selections || {}).forEach(function (key) {
+      if (/papier|grammage/i.test(key)) paper.push(selections[key]);
+      if (/finit|pellic|vernis|soft/i.test(key)) finish.push(selections[key]);
+    });
+    return [paper.join(" / "), finish.join(" / ")].filter(Boolean).join(" • ");
+  }
+
+  function uploadProductFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length) return Promise.resolve([]);
+    var uploads = [];
+    return files.reduce(function (chain, file) {
+      return chain.then(function () {
+        var formData = new FormData();
+        formData.append("fichier", file);
+        return fetch(API_BASE + "/api/cart-upload", {
+          method: "POST",
+          body: formData
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (json) {
+              if (!response.ok || !json.success) throw new Error(json.error || ("HTTP " + response.status));
+              return json;
+            });
+          })
+          .then(function (json) {
+            uploads.push(json.upload);
+          });
+      });
+    }, Promise.resolve()).then(function () {
+      return uploads;
+    });
+  }
+
+  function readCart() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writeCart(cart) {
+    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    localStorage.setItem(CART_COUNT_KEY, String(cart.length));
+    updateHeaderState();
+  }
+
+  function getCartTotal(cart) {
+    var total = 0;
+    var hasEstimate = false;
+    cart.forEach(function (item) {
+      if (typeof item.priceValue !== "number" || isNaN(item.priceValue)) {
+        hasEstimate = true;
+        return;
+      }
+      total += item.priceValue;
+    });
+    return {
+      label: hasEstimate ? (total > 0 ? euro(total) + " + devis" : "Sur devis") : euro(total),
+      numeric: hasEstimate ? null : total
+    };
+  }
+
+  function setStatus(el, type, message) {
+    if (!el) return;
+    el.className = "status show " + type;
+    el.textContent = message;
+  }
+
+  function clearStatus(el) {
+    if (!el) return;
+    el.className = "status";
+    el.textContent = "";
+  }
+
+  function updateHeaderState() {
+    var cart = readCart();
+    var count = String(cart.length);
+    document.querySelectorAll("[data-cart-count]").forEach(function (el) {
+      el.textContent = count;
+    });
+
+    var storedName = localStorage.getItem(USER_NAME_KEY) || "";
+    document.querySelectorAll("[data-account-label]").forEach(function (el) {
+      el.textContent = storedName || "Mon compte";
+    });
+  }
+
+  function bindShell() {
+    updateHeaderState();
+    rewriteInternalLinks();
+
+    document.querySelectorAll("[data-account-button]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        goTo("/client");
+      });
+    });
+
+    document.querySelectorAll("[data-cart-button]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        goTo("/panier");
+      });
+    });
+
+    document.querySelectorAll("[data-search-form]").forEach(function (form) {
+      var input = form.querySelector("input[type='search']");
+      var searchTimer = null;
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var query = input ? input.value.trim() : "";
+        goTo(query ? "/produits?q=" + encodeURIComponent(query) : "/produits");
+      });
+      if (input) {
+        input.addEventListener("input", function () {
+          var query = input.value.trim();
+          window.clearTimeout(searchTimer);
+          searchTimer = window.setTimeout(function () {
+            if (!query) return;
+            goTo("/produits?q=" + encodeURIComponent(query));
+          }, 220);
+        });
+      }
+    });
+  }
+
+  function flattenProducts() {
+    var gammes = (window.CI_CATALOG && window.CI_CATALOG.gammes) || [];
+    var list = [];
+    gammes.forEach(function (gamme) {
+      (gamme.products || []).forEach(function (product) {
+        list.push({
+          gammeSlug: gamme.slug,
+          gammeTitle: gamme.title,
+          gammeDescription: gamme.description,
+          gammeLegacyCat: gamme.legacyCat,
+          product: product
+        });
+      });
+    });
+    return list;
+  }
+
+  function loadCatalogFromApi() {
+    if (catalogLoadPromise) return catalogLoadPromise;
+    catalogLoadPromise = fetch(API_BASE + "/api/catalog-config")
+      .then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (json) {
+          if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+          return json;
+        });
+      })
+      .then(function (json) {
+        if (json && json.catalog && json.catalog.gammes) {
+          window.CI_CATALOG = json.catalog;
+        }
+        return window.CI_CATALOG || { gammes: [] };
+      })
+      .catch(function () {
+        return window.CI_CATALOG || { gammes: [] };
+      });
+    return catalogLoadPromise;
+  }
+
+  function findProduct(productId) {
+    var found = null;
+    flattenProducts().some(function (entry) {
+      if (entry.product.id === productId) {
+        found = entry;
+        return true;
+      }
+      return false;
+    });
+    return found;
+  }
+
+  function buildProductUrl(gammeSlug, productId) {
+    var params = [];
+    if (gammeSlug) params.push("gamme=" + encodeURIComponent(gammeSlug));
+    if (productId) params.push("produit=" + encodeURIComponent(productId));
+    return "/produit" + (params.length ? "?" + params.join("&") : "");
+  }
+
+  function getProductRef(product) {
+    if (product && product.ref) return product.ref;
+    var found = product && product.id ? findProduct(product.id) : null;
+    if (found && found.product && found.product.ref) return found.product.ref;
+    return buildFallbackRef(product && (product.id || product.productId || product.title));
+  }
+
+  function buildOrderRows(cart) {
+    return cart.map(function (item) {
+      var unitLabel = item.priceUnit != null ? euro(item.priceUnit) : (item.quantity && item.priceValue != null ? euro(item.priceValue / item.quantity) : (item.priceLabel || "Sur devis"));
+      return {
+        ref: item.ref || getProductRef(item),
+        label: item.title,
+        quantity: item.quantity,
+        finishLabel: item.paperFinish || "",
+        unitLabel: unitLabel,
+        totalLabel: item.priceValue != null ? euro(item.priceValue) : (item.priceLabel || "Sur devis"),
+        notes: item.notes || "",
+        gamme: item.gamme || "",
+        configuration: item.configuration || item.finish || ""
+      };
+    });
+  }
+
+  function addToCart(product, gamme, quantity, notes) {
+    var cart = readCart();
+    var qty = parseInt(quantity, 10);
+    if (isNaN(qty) || qty < 1) qty = 1;
+    var configuration = arguments.length > 4 ? arguments[4] : "";
+    var paperFinish = arguments.length > 5 ? arguments[5] : "";
+    var totalValue = arguments.length > 6 ? arguments[6] : null;
+    var uploads = arguments.length > 7 ? arguments[7] : [];
+    var unitValue = typeof totalValue === "number" && qty > 0 ? totalValue / qty : (typeof product.priceValue === "number" ? product.priceValue : null);
+    cart.push({
+      id: product.id + "-" + Date.now(),
+      productId: product.id,
+      ref: getProductRef(product),
+      title: product.title,
+      gamme: gamme.title,
+      quantity: qty,
+      notes: notes || "",
+      finish: paperFinish || "",
+      paperFinish: paperFinish || "",
+      configuration: configuration || "",
+      priceUnit: typeof unitValue === "number" ? unitValue : null,
+      priceValue: typeof totalValue === "number" ? totalValue : (typeof product.priceValue === "number" ? product.priceValue * qty : null),
+      priceLabel: product.priceLabel,
+      uploadTokens: (uploads || []).map(function (item) { return item.token; }),
+      uploadNames: (uploads || []).map(function (item) { return item.originalname; })
+    });
+    writeCart(cart);
+  }
+
+  function buildPanierText(cart) {
+    return buildOrderRows(cart).map(function (item) {
+      var parts = [
+        item.ref,
+        item.label,
+        "Qte: " + item.quantity,
+        item.finishLabel ? "Finition papier: " + item.finishLabel : "",
+        "Total TTC: " + item.totalLabel
+      ].filter(Boolean);
+      if (item.configuration) parts.push("Configuration: " + item.configuration);
+      if ((item.uploadNames || []).length) parts.push("Fichiers: " + item.uploadNames.join(", "));
+      if (item.notes) parts.push("Note: " + item.notes);
+      return parts.join(" - ");
+    }).join("\n");
+  }
+
+  function mountProductDetail(detail, entry) {
+    if (!detail) return;
+    if (!entry) {
+      detail.innerHTML = '<div class="empty-state">Produit introuvable.</div>';
+      return;
+    }
+    var product = entry.product;
+    var productLegacyCat = product.legacyCat || entry.gammeLegacyCat || "";
+    var selections = Object.assign({}, product.defaultSelections || {});
+
+    detail.innerHTML =
+      '<div class="panel product-detail-page">'
+        + '<div class="product-detail-header">'
+          + '<div>'
+            + '<div class="pill">' + esc(entry.gammeTitle) + '</div>'
+            + '<h1 class="product-page-title">' + esc(product.title) + '</h1>'
+            + '<p class="product-detail-summary">' + esc(product.summary) + '</p>'
+          + '</div>'
+          + '<div class="product-detail-pricebox"><div class="muted">Prix de depart</div><div class="total" id="product-price-display">' + esc(normalizePriceLabel(product.priceLabel)) + '</div></div>'
+        + '</div>'
+        + '<div class="product-detail-layout">'
+          + '<div class="product-detail-config">'
+            + '<div id="product-config-fields"></div>'
+            + '<div class="field" id="product-quantity-field"></div>'
+            + (product.hasDimensions ? '<div class="field product-dimensions-box" id="product-dimensions"><label>Dimensions</label><div class="inline-fields"><input id="product-width" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.width) || 0) + '" placeholder="Largeur cm"><input id="product-height" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.height) || 0) + '" placeholder="Hauteur cm"></div><p>Indiquez votre format en centimetres.</p></div>' : '')
+            + (product.uploadEnabled !== false ? '<div class="field product-upload-box"><label for="product-files">Fichiers</label><input id="product-files" type="file" multiple></div>' : '')
+            + '<div class="field"><label for="product-notes">Precisions</label><textarea id="product-notes" placeholder="Infos utiles, demande particuliere, delai..."></textarea></div>'
+            + '<div class="status" id="product-price-status"></div>'
+          + '</div>'
+          + '<aside class="summary-box product-side-summary">'
+            + '<div class="pill">Votre selection</div>'
+            + '<p class="muted">Choisissez vos options, puis ajoutez le produit au panier.</p>'
+            + '<div class="product-side-meta"><strong>Reference</strong><span>' + esc(getProductRef(product)) + '</span></div>'
+            + '<div class="product-side-meta"><strong>Gamme</strong><span>' + esc(entry.gammeTitle) + '</span></div>'
+            + '<div class="hero-actions product-detail-actions">'
+              + '<button class="btn" id="add-to-cart-btn" type="button">Ajouter au panier</button>'
+              + '<a class="btn-light" href="' + esc(resolveAppUrl("/panier")) + '">Voir le panier</a>'
+              + '<a class="btn-light" href="' + esc(resolveAppUrl("/rendez-vous?produit=" + encodeURIComponent(product.title))) + '">Prendre rendez-vous</a>'
+            + '</div>'
+          + '</aside>'
+        + '</div>'
+      + '</div>';
+
+    var configWrap = $("product-config-fields");
+    var quantityField = $("product-quantity-field");
+    var priceDisplay = $("product-price-display");
+    var priceStatus = $("product-price-status");
+    var currentPriceLabel = product.priceLabel;
+    var currentPriceValue = product.priceValue;
+    var currentQuantityOptions = Array.isArray(product.quantityOptions) ? product.quantityOptions.slice() : [];
+
+    if (configWrap) {
+      configWrap.className = "product-config-grid";
+      configWrap.innerHTML = (product.optionKeys || []).map(function (key) {
+        var selectId = "product-opt-" + key.replace(/[^a-z0-9]/gi, "_");
+        return '<div class="field"><label for="' + esc(selectId) + '">' + esc(key) + '</label><select data-product-option="' + esc(key) + '" id="' + esc(selectId) + '">' + (product.options[key] || []).map(function (option) {
+          var selected = selections[key] === option ? ' selected' : '';
+          return '<option value="' + esc(option) + '"' + selected + '>' + esc(option) + '</option>';
+        }).join("") + '</select></div>';
+      }).join("");
+    }
+
+    function renderQuantityField(selectedValue) {
+      if (!quantityField) return;
+      if (product.requiresQuantityInput) {
+        quantityField.innerHTML = '<label for="product-qty-input">Quantite</label><div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"><p>Entre directement la quantite souhaitee.</p></div>';
+        return;
+      }
+      if (currentQuantityOptions.length) {
+        var selected = selectedValue || String(currentQuantityOptions[0]);
+        quantityField.innerHTML = '<label>Quantite</label><div class="quantity-grid">' + currentQuantityOptions.map(function (qty) {
+          var value = String(qty);
+          return '<button type="button" class="quantity-chip' + (value === selected ? ' active' : '') + '" data-qty-choice="' + esc(value) + '">' + esc(value) + ' ex.</button>';
+        }).join("") + '</div><input id="product-qty-select" type="hidden" value="' + esc(selected) + '"><p>Choisissez simplement le lot souhaite.</p>';
+        return;
+      }
+      quantityField.innerHTML = '<label for="product-qty-input">Quantite</label><div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"></div>';
+    }
+
+    function readSelectedQuantity() {
+      var qtySelect = $("product-qty-select");
+      var qtyInput = $("product-qty-input");
+      return qtySelect ? qtySelect.value : ((qtyInput && qtyInput.value) || "1");
+    }
+
+    function refreshSelectionsFromDom() {
+      document.querySelectorAll("[data-product-option]").forEach(function (select) {
+        selections[select.getAttribute("data-product-option")] = select.value;
+      });
+    }
+
+    function requestPricing(keepQuantity) {
+      refreshSelectionsFromDom();
+      clearStatus(priceStatus);
+      var selectedQuantity = keepQuantity || readSelectedQuantity();
+      var payload = {
+        legacyCat: productLegacyCat,
+        productId: product.id,
+        selections: selections,
+        quantity: selectedQuantity,
+        width: (($("product-width") || {}).value || ""),
+        height: (($("product-height") || {}).value || "")
+      };
+      return fetch(API_BASE + "/api/catalog-pricing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          currentQuantityOptions = Array.isArray(json.quantityOptions) ? json.quantityOptions.slice() : currentQuantityOptions;
+          renderQuantityField(json.quantityValue || selectedQuantity || "");
+          currentPriceLabel = json.priceLabel || product.priceLabel;
+          currentPriceValue = typeof json.priceValue === "number" ? json.priceValue : null;
+          if (priceDisplay) priceDisplay.textContent = normalizePriceLabel(currentPriceLabel);
+          var qtySelect = $("product-qty-select");
+          var qtyInput = $("product-qty-input");
+          if (qtySelect) {
+            quantityField.querySelectorAll("[data-qty-choice]").forEach(function (button) {
+              button.addEventListener("click", function () {
+                qtySelect.value = button.getAttribute("data-qty-choice");
+                requestPricing(qtySelect.value);
+              });
+            });
+          }
+          if (qtyInput) qtyInput.oninput = function () { requestPricing(qtyInput.value); };
+          return json;
+        })
+        .catch(function (error) {
+          if (IS_FILE_PROTOCOL) {
+            clearStatus(priceStatus);
+            renderQuantityField(selectedQuantity || "");
+            if (priceDisplay) priceDisplay.textContent = normalizePriceLabel(currentPriceLabel);
+            return;
+          }
+          setStatus(priceStatus, "err", error.message || "Impossible de recalculer le prix.");
+        });
+    }
+
+    renderQuantityField(product.quantityOptions && product.quantityOptions.length ? String(product.quantityOptions[0]) : "1");
+    document.querySelectorAll("[data-product-option]").forEach(function (select) {
+      select.addEventListener("change", function () {
+        requestPricing();
+      });
+    });
+    if ($("product-width")) $("product-width").addEventListener("input", function () { requestPricing(); });
+    if ($("product-height")) $("product-height").addEventListener("input", function () { requestPricing(); });
+    requestPricing();
+
+    var addButton = $("add-to-cart-btn");
+    if (addButton) {
+      addButton.addEventListener("click", function () {
+        refreshSelectionsFromDom();
+        var selectionSummary = Object.keys(selections).map(function (key) {
+          return key + ": " + selections[key];
+        }).join(" • ");
+        var paperFinish = extractPaperFinishFromSelections(selections);
+        var productFiles = ($("product-files") || {}).files || [];
+        addButton.disabled = true;
+        addButton.textContent = productFiles.length ? "Upload en cours..." : "Ajout en cours...";
+        uploadProductFiles(productFiles)
+          .then(function (uploads) {
+            addToCart(
+              product,
+              { title: entry.gammeTitle },
+              readSelectedQuantity(),
+              $("product-notes").value.trim(),
+              selectionSummary,
+              paperFinish,
+              currentPriceValue,
+              uploads
+            );
+            if ($("product-files")) $("product-files").value = "";
+            addButton.textContent = "Ajoute au panier";
+            setTimeout(function () {
+              addButton.textContent = "Ajouter au panier";
+            }, 1400);
+          })
+          .catch(function (error) {
+            setStatus(priceStatus, "err", error.message || "Impossible de televerser les fichiers produit.");
+            addButton.textContent = "Ajouter au panier";
+          })
+          .finally(function () {
+            addButton.disabled = false;
+          });
+      });
+    }
+  }
+
+  function initProductsPage() {
+    var filters = $("gamme-filters");
+    var grid = $("products-grid");
+    var query = new URLSearchParams(window.location.search);
+    var gammes = [];
+    var activeGamme = query.get("gamme") || "";
+    var searchQuery = (query.get("q") || "").toLowerCase().trim();
+
+    function renderFilters() {
+      if (!filters) return;
+      filters.innerHTML = ['<button type="button" class="filter-btn' + (!activeGamme ? " active" : "") + '" data-gamme="">Toutes les gammes</button>'].concat(gammes.map(function (gamme) {
+        return '<button type="button" class="filter-btn' + (gamme.slug === activeGamme ? " active" : "") + '" data-gamme="' + esc(gamme.slug) + '">' + esc(gamme.title) + "</button>";
+      })).join("");
+    }
+
+    function getVisibleProducts() {
+      return flattenProducts().filter(function (entry) {
+        var sameGamme = !activeGamme || entry.gammeSlug === activeGamme;
+        var haystack = [entry.gammeTitle, entry.product.title, entry.product.summary, (entry.product.tags || []).join(" ")].join(" ").toLowerCase();
+        var sameSearch = !searchQuery || haystack.indexOf(searchQuery) !== -1;
+        return sameGamme && sameSearch;
+      });
+    }
+
+    function getActiveGamme() {
+      return gammes.find(function (gamme) {
+        return gamme.slug === activeGamme;
+      }) || null;
+    }
+
+    function renderGrid() {
+      if (!grid) return;
+      var visible = getVisibleProducts();
+      var currentGamme = getActiveGamme();
+
+      if (currentGamme && currentGamme.comingSoon && !searchQuery) {
+        grid.innerHTML = '<div class="empty-state">Cette gamme sera ajoutee prochainement au catalogue en ligne.</div>';
+        return;
+      }
+
+      if (!visible.length) {
+        grid.innerHTML = '<div class="empty-state">Aucun produit ne correspond a cette recherche.</div>';
+        return;
+      }
+
+      grid.innerHTML = visible.map(function (entry) {
+        return '<article class="card product-card">'
+          + '<div class="pill">' + esc(entry.gammeTitle) + '</div>'
+          + '<h3 class="card-title">' + esc(entry.product.title) + '</h3>'
+          + '<p>' + esc(entry.product.summary) + '</p>'
+          + '<div class="product-price">' + esc(normalizePriceLabel(entry.product.priceLabel)) + '</div>'
+          + '<footer>'
+            + '<button type="button" class="btn-light" data-open-product="' + esc(entry.product.id) + '">Voir le detail</button>'
+          + '</footer>'
+        + '</article>';
+      }).join("");
+
+      grid.querySelectorAll("[data-open-product]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          goTo(buildProductUrl(activeGamme, button.getAttribute("data-open-product")));
+        });
+      });
+    }
+
+    if (filters) {
+      filters.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-gamme]");
+        if (!button) return;
+        activeGamme = button.getAttribute("data-gamme");
+        renderFilters();
+        renderGrid();
+      });
+    }
+    loadCatalogFromApi().then(function (catalog) {
+      gammes = (catalog && catalog.gammes) || [];
+      if (!activeGamme && !searchQuery) {
+        activeGamme = gammes[0] && gammes[0].slug;
+      }
+      renderFilters();
+      renderGrid();
+    });
+  }
+
+  function initProductPage() {
+    var root = $("product-page-root");
+    if (!root) return;
+    var query = new URLSearchParams(window.location.search);
+    var productId = query.get("produit") || "";
+    var gammeSlug = query.get("gamme") || "";
+    var backLink = $("product-back-link");
+
+    loadCatalogFromApi().then(function (catalog) {
+      var gammes = (catalog && catalog.gammes) || [];
+      var entry = findProduct(productId);
+      if (!entry && gammeSlug) {
+        gammes.some(function (gamme) {
+          if (gamme.slug !== gammeSlug) return false;
+          if (!gamme.products || !gamme.products.length) return false;
+          entry = {
+            gammeSlug: gamme.slug,
+            gammeTitle: gamme.title,
+            gammeDescription: gamme.description,
+            gammeLegacyCat: gamme.legacyCat,
+            product: gamme.products[0]
+          };
+          return true;
+        });
+      }
+
+      if (backLink) {
+        backLink.setAttribute("href", resolveAppUrl("/produits" + (entry ? "?gamme=" + encodeURIComponent(entry.gammeSlug) : "")));
+      }
+
+      mountProductDetail(root, entry);
+    });
+  }
+
+  function initCartPage() {
+    var list = $("cart-items");
+    var total = $("cart-total");
+    var empty = $("cart-empty");
+    var form = $("cart-form");
+    var sendBtn = $("cart-submit");
+    var status = $("cart-status");
+    var goProducts = $("cart-go-products");
+    var validateBtn = $("cart-validate");
+    var validateStatus = $("cart-validate-status");
+    var guestFields = $("cart-guest-fields");
+    var clientSummary = $("cart-client-summary");
+    var authModal = $("checkout-auth-modal");
+    var authStatus = $("checkout-auth-status");
+    var stripeBox = $("stripe-box");
+    var stripeBtn = $("cart-pay");
+    var stripeStatus = $("stripe-status");
+    var stripeClient = null;
+    var stripeCard = null;
+    var sessionToken = localStorage.getItem(SESSION_KEY);
+    var connectedClient = null;
+    var cartValidated = false;
+
+    if (goProducts) {
+      goProducts.addEventListener("click", function () {
+        goTo("/produits");
+      });
+    }
+
+    function invalidateCheckout() {
+      cartValidated = false;
+      clearStatus(validateStatus);
+      clearStatus(status);
+      clearStatus(stripeStatus);
+      if (form) form.hidden = true;
+      if (stripeBox) stripeBox.hidden = true;
+    }
+
+    function openAuthModal() {
+      if (authModal) {
+        authModal.hidden = false;
+        authModal.removeAttribute("hidden");
+        authModal.classList.add("open");
+      }
+      clearStatus(authStatus);
+    }
+
+    function closeAuthModal() {
+      if (authModal) {
+        authModal.hidden = true;
+        authModal.setAttribute("hidden", "hidden");
+        authModal.classList.remove("open");
+      }
+      clearStatus(authStatus);
+    }
+
+    function renderClientIdentity() {
+      if (!clientSummary || !guestFields) return;
+
+      if (connectedClient) {
+        var addressBits = [connectedClient.adresse, connectedClient.cp, connectedClient.ville].filter(Boolean);
+        clientSummary.hidden = false;
+        guestFields.hidden = true;
+        clientSummary.innerHTML =
+          '<div class="pill">Client connecte</div>'
+          + '<div class="client-summary-name">' + esc([connectedClient.prenom, connectedClient.nom].filter(Boolean).join(" ").trim() || connectedClient.email || "Client") + '</div>'
+          + '<div class="muted">' + esc(connectedClient.email || "") + '</div>'
+          + (addressBits.length
+            ? '<div class="muted">' + esc(addressBits.join(" ")) + '</div>'
+            : '<div class="muted">Les coordonnees de votre compte seront utilisees pour la commande.</div>')
+          + '<div class="client-summary-link"><a href="' + esc(resolveAppUrl("/client")) + '">Modifier mes informations</a></div>';
+      } else {
+        clientSummary.hidden = true;
+        clientSummary.innerHTML = "";
+        guestFields.hidden = false;
+      }
+    }
+
+    function getCustomerDetails(targetStatus) {
+      if (connectedClient) {
+        if (!connectedClient.email) {
+          setStatus(targetStatus || validateStatus, "err", "Votre compte est incomplet. Merci de verifier vos informations client.");
+          return null;
+        }
+        return {
+          prenom: (connectedClient.prenom || "").trim(),
+          nom: (connectedClient.nom || "").trim(),
+          email: (connectedClient.email || "").trim(),
+          tel: (connectedClient.telephone || connectedClient.tel || "").trim(),
+          adresse: [connectedClient.adresse, connectedClient.cp, connectedClient.ville].filter(Boolean).join(", ")
+        };
+      }
+
+      var prenomField = $("checkout-prenom");
+      var nomField = $("checkout-nom");
+      var emailField = $("checkout-email");
+      var telField = $("checkout-tel");
+      var adresseField = $("checkout-adresse");
+      var prenom = prenomField ? prenomField.value.trim() : "";
+      var nom = nomField ? nomField.value.trim() : "";
+      var email = emailField ? emailField.value.trim() : "";
+      var tel = telField ? telField.value.trim() : "";
+      var adresse = adresseField ? adresseField.value.trim() : "";
+
+      if (!prenom || !nom || !email) {
+        setStatus(targetStatus || validateStatus, "err", "Prenom, nom et email sont obligatoires pour valider le panier.");
+        return null;
+      }
+
+      return {
+        prenom: prenom,
+        nom: nom,
+        email: email,
+        tel: tel,
+        adresse: adresse
+      };
+    }
+
+    function renderCart() {
+      var cart = readCart();
+      var totalInfo = getCartTotal(cart);
+      invalidateCheckout();
+      if (!cart.length) {
+        if (empty) empty.hidden = false;
+        if (list) list.innerHTML = "";
+        if (total) total.textContent = "0,00 EUR";
+        return;
+      }
+
+      if (empty) empty.hidden = true;
+      if (total) total.textContent = totalInfo.label;
+
+      if (list) {
+        list.innerHTML =
+          '<div class="cart-table">'
+            + '<div class="cart-table-head cart-table-row">'
+              + '<div>Reference</div>'
+              + '<div>Libelle</div>'
+              + '<div class="cart-qty">Quantite</div>'
+              + '<div class="cart-unit-cell">Finition papier</div>'
+              + '<div class="cart-unit-cell">Prix unitaire</div>'
+              + '<div class="cart-total-cell">Total TTC</div>'
+              + '<div class="cart-action">Action</div>'
+            + '</div>'
+            + '<div class="cart-table-body">'
+              + cart.map(function (item) {
+                return '<div class="cart-table-row">'
+                  + '<div class="cart-ref"><span class="cart-mobile-label">Reference</span><span class="cart-cell-value">' + esc(item.ref || getProductRef(item)) + '</span></div>'
+                  + '<div class="cart-label"><span class="cart-mobile-label">Libelle</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.gamme || "") + '</div>' + (item.configuration ? '<div class="muted">Configuration: ' + esc(item.configuration) + '</div>' : '') + ((item.uploadNames || []).length ? '<div class="muted">Fichiers: ' + esc(item.uploadNames.join(", ")) + '</div>' : '') + (item.notes ? '<div class="muted">Note: ' + esc(item.notes) + '</div>' : "") + '</div></div>'
+                  + '<div class="cart-qty"><span class="cart-mobile-label">Quantite</span><span class="cart-cell-value">' + esc(item.quantity || "-") + '</span></div>'
+                  + '<div class="cart-unit-cell"><span class="cart-mobile-label">Finition papier</span><span class="cart-cell-value">' + esc(item.paperFinish || "-") + '</span></div>'
+                  + '<div class="cart-unit-cell"><span class="cart-mobile-label">Prix unitaire</span><span class="cart-cell-value">' + esc(item.priceUnit != null ? euro(item.priceUnit) : item.priceLabel || "-") + '</span></div>'
+                  + '<div class="cart-total-cell product-price"><span class="cart-mobile-label">Total TTC</span><span class="cart-cell-value">' + esc(item.priceValue != null ? euro(item.priceValue) : item.priceLabel || "-") + '</span></div>'
+                  + '<div class="cart-action"><span class="cart-mobile-label">Action</span><span class="cart-cell-value"><button class="btn-light" type="button" data-remove-cart="' + esc(item.id) + '">Supprimer</button></span></div>'
+                + '</div>';
+              }).join("")
+            + '</div>'
+            + '<div class="cart-table-foot">'
+              + '<div class="cart-table-row">'
+                + '<div></div>'
+                + '<div><strong>Total TTC</strong></div>'
+                + '<div></div>'
+                + '<div></div>'
+                + '<div></div>'
+                + '<div class="cart-total-cell total">' + esc(totalInfo.label) + '</div>'
+                + '<div></div>'
+              + '</div>'
+            + '</div>'
+          + '</div>';
+
+        list.querySelectorAll("[data-remove-cart]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            var removed = null;
+            var cartItems = readCart().filter(function (item) {
+              if (item.id === button.getAttribute("data-remove-cart")) {
+                removed = item;
+                return false;
+              }
+              return true;
+            });
+            (removed && removed.uploadTokens || []).forEach(function (token) {
+              fetch(API_BASE + "/api/cart-upload/" + encodeURIComponent(token), { method: "DELETE" }).catch(function () {});
+            });
+            writeCart(cartItems);
+            renderCart();
+          });
+        });
+      }
+    }
+
+    function ensureStripe() {
+      if (!stripeBox || stripeBox.hidden || typeof window.Stripe !== "function") return;
+      if (!stripeClient) {
+        stripeClient = window.Stripe(STRIPE_PK);
+        var elements = stripeClient.elements();
+        stripeCard = elements.create("card", {
+          style: {
+            base: {
+              fontFamily: "Space Grotesk, sans-serif",
+              fontSize: "16px",
+              color: "#171310"
+            }
+          }
+        });
+        stripeCard.mount("#stripe-card-element");
+      }
+    }
+
+    function validateCheckoutBasics(targetStatus) {
+      clearStatus(targetStatus || status);
+      var cart = readCart();
+      if (!cart.length) {
+        setStatus(targetStatus || status, "err", "Votre panier est vide.");
+        return false;
+      }
+      if (!getCustomerDetails(targetStatus || status)) {
+        return false;
+      }
+      return true;
+    }
+
+    function confirmValidatedCheckout(targetStatus) {
+      if (!connectedClient) {
+        openAuthModal();
+        setStatus(targetStatus || validateStatus, "err", "Connectez-vous ou creez votre compte avant de valider le panier.");
+        return false;
+      }
+      if (!validateCheckoutBasics(targetStatus || validateStatus)) return false;
+      cartValidated = true;
+      if (form) form.hidden = false;
+      var totalInfo = getCartTotal(readCart());
+      if (stripeBox) stripeBox.hidden = totalInfo.numeric == null;
+      ensureStripe();
+      setStatus(targetStatus || validateStatus, "ok", "Panier valide. Vous pouvez maintenant envoyer la demande ou proceder au paiement.");
+      return true;
+    }
+
+    function submitOrder(paymentMeta) {
+      if (!getCustomerDetails(status)) return Promise.reject(new Error("Coordonnees client invalides."));
+      return fetch(API_BASE + "/api/devis", {
+        method: "POST",
+        body: buildCheckoutFormData(paymentMeta)
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function () {
+          writeCart([]);
+          form.reset();
+          ["checkout-prenom", "checkout-nom", "checkout-email", "checkout-tel", "checkout-adresse"].forEach(function (id) {
+            if (!connectedClient && $(id)) $(id).value = "";
+          });
+          var checkoutFiles = $("checkout-files");
+          if (checkoutFiles) checkoutFiles.value = "";
+          renderCart();
+          return true;
+        });
+    }
+
+    function buildCheckoutFormData(paymentMeta) {
+      var cart = readCart();
+      var customer = getCustomerDetails(status) || {};
+      var formData = new FormData();
+      formData.append("prenom", customer.prenom || "");
+      formData.append("nom", customer.nom || "");
+      formData.append("email", customer.email || "");
+      formData.append("tel", customer.tel || "");
+      formData.append("adresse", customer.adresse || "");
+      formData.append("message", $("checkout-message").value.trim());
+      formData.append("panier", buildPanierText(cart));
+      formData.append("panier_json", JSON.stringify(buildOrderRows(cart)));
+      formData.append("cart_upload_tokens", JSON.stringify(cart.reduce(function (tokens, item) {
+        return tokens.concat(item.uploadTokens || []);
+      }, [])));
+      formData.append("prix_total", getCartTotal(cart).label);
+      formData.append("source", "com-impression");
+      if (paymentMeta && paymentMeta.payment_id) formData.append("payment_id", paymentMeta.payment_id);
+      if (paymentMeta && paymentMeta.payment_status) formData.append("payment_status", paymentMeta.payment_status);
+      Array.prototype.forEach.call((($("checkout-files") || {}).files || []), function (file) {
+        formData.append("fichiers", file);
+      });
+      return formData;
+    }
+
+    if (validateBtn) {
+      validateBtn.addEventListener("click", function () {
+        confirmValidatedCheckout(validateStatus);
+      });
+    }
+
+    if ($("checkout-auth-close")) $("checkout-auth-close").addEventListener("click", closeAuthModal);
+    if ($("checkout-open-login")) $("checkout-open-login").addEventListener("click", function () {
+      if ($("checkout-login-block")) $("checkout-login-block").hidden = false;
+      if ($("checkout-register-block")) $("checkout-register-block").hidden = true;
+    });
+    if ($("checkout-open-register")) $("checkout-open-register").addEventListener("click", function () {
+      if ($("checkout-login-block")) $("checkout-login-block").hidden = true;
+      if ($("checkout-register-block")) $("checkout-register-block").hidden = false;
+    });
+    if ($("checkout-login-btn")) {
+      $("checkout-login-btn").addEventListener("click", function () {
+        clearStatus(authStatus);
+        fetch(API_BASE + "/api/client/password-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: (($("checkout-login-email") || {}).value || "").trim(),
+            password: (($("checkout-login-password") || {}).value || "")
+          })
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (json) {
+              if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+              return json;
+            });
+          })
+          .then(function (json) {
+            sessionToken = json.session_token;
+            localStorage.setItem(SESSION_KEY, json.session_token);
+            localStorage.setItem(USER_NAME_KEY, [json.client.prenom, json.client.nom].filter(Boolean).join(" ").trim() || json.client.email || "Mon compte");
+            connectedClient = json.client || null;
+            updateHeaderState();
+            renderClientIdentity();
+            closeAuthModal();
+            setStatus(validateStatus, "ok", "Connexion reussie. Tu peux valider le panier.");
+          })
+          .catch(function (error) {
+            setStatus(authStatus, "err", error.message || "Connexion impossible.");
+          });
+      });
+    }
+    if ($("checkout-register-btn")) {
+      $("checkout-register-btn").addEventListener("click", function () {
+        clearStatus(authStatus);
+        fetch(API_BASE + "/api/client/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type_client: (($("checkout-register-type") || {}).value || "").trim(),
+            prenom: (($("checkout-register-prenom") || {}).value || "").trim(),
+            nom: (($("checkout-register-nom") || {}).value || "").trim(),
+            email: (($("checkout-register-email") || {}).value || "").trim(),
+            societe: (($("checkout-register-societe") || {}).value || "").trim(),
+            siret: (($("checkout-register-siret") || {}).value || "").trim(),
+            password: (($("checkout-register-password") || {}).value || ""),
+            password2: (($("checkout-register-password2") || {}).value || ""),
+            adresse: "",
+            cp: "",
+            ville: ""
+          })
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (json) {
+              if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+              return json;
+            });
+          })
+          .then(function () {
+            setStatus(authStatus, "ok", "Compte cree. Confirmez votre email puis connectez-vous.");
+          })
+          .catch(function (error) {
+            setStatus(authStatus, "err", error.message || "Inscription impossible.");
+          });
+      });
+    }
+
+    if (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!cartValidated && !confirmValidatedCheckout(status)) {
+          return;
+        }
+        if (!validateCheckoutBasics(status)) {
+          return;
+        }
+
+        sendBtn.disabled = true;
+        sendBtn.textContent = "Envoi en cours...";
+
+        submitOrder()
+          .then(function () {
+            setStatus(status, "ok", "Votre demande a bien ete envoyee. Nous revenons vers vous rapidement.");
+          })
+          .catch(function (error) {
+            setStatus(status, "err", error.message || "Impossible d'envoyer votre demande.");
+          })
+          .finally(function () {
+            sendBtn.disabled = false;
+            sendBtn.textContent = "Envoyer ma demande";
+          });
+      });
+    }
+
+    if (stripeBtn) {
+      stripeBtn.addEventListener("click", function () {
+        if (!cartValidated && !confirmValidatedCheckout(stripeStatus)) return;
+        if (!validateCheckoutBasics(stripeStatus)) return;
+        ensureStripe();
+        if (!stripeClient || !stripeCard) {
+          setStatus(stripeStatus, "err", "Stripe n'est pas disponible pour le moment.");
+          return;
+        }
+        var totalInfo = getCartTotal(readCart());
+        if (typeof totalInfo.numeric !== "number") {
+          setStatus(stripeStatus, "err", "Le paiement CB est disponible uniquement pour les produits a tarif chiffre.");
+          return;
+        }
+        stripeBtn.disabled = true;
+        stripeBtn.textContent = "Paiement en cours...";
+        clearStatus(stripeStatus);
+
+        fetch(API_BASE + "/api/create-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: Math.round(totalInfo.numeric * 100),
+            currency: "eur",
+            description: "Commande COM' Impression"
+          })
+        })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (json) {
+              if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+              return json;
+            });
+          })
+          .then(function (json) {
+            if (!json.clientSecret) throw new Error("Client secret Stripe manquant.");
+            return stripeClient.confirmCardPayment(json.clientSecret, {
+              payment_method: { card: stripeCard }
+            });
+          })
+          .then(function (result) {
+            if (result.error) throw new Error(result.error.message || "Paiement refuse.");
+            return submitOrder({
+              payment_id: result.paymentIntent && result.paymentIntent.id,
+              payment_status: "paye"
+            });
+          })
+          .then(function () {
+            setStatus(status, "ok", "Paiement accepte et commande enregistree.");
+            setStatus(stripeStatus, "ok", "Paiement Stripe accepte.");
+          })
+          .catch(function (error) {
+            setStatus(stripeStatus, "err", error.message || "Impossible de finaliser le paiement.");
+          })
+          .finally(function () {
+            stripeBtn.disabled = false;
+            stripeBtn.textContent = "Payer par CB";
+          });
+      });
+    }
+
+    ["checkout-prenom", "checkout-nom", "checkout-email", "checkout-tel", "checkout-adresse"].forEach(function (id) {
+      var field = $(id);
+      if (field) field.addEventListener("input", invalidateCheckout);
+    });
+
+    function loadConnectedClient() {
+      renderClientIdentity();
+      if (!sessionToken) return Promise.resolve();
+
+      return fetch(API_BASE + "/api/client/me", {
+        headers: { "x-session-token": sessionToken }
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          connectedClient = json.client || null;
+          renderClientIdentity();
+        })
+        .catch(function () {
+          connectedClient = null;
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(USER_NAME_KEY);
+          updateHeaderState();
+          renderClientIdentity();
+        });
+    }
+
+    renderCart();
+    loadConnectedClient();
+  }
+
+  function initClientPage() {
+    var authView = $("client-auth-view");
+    var dashboardView = $("client-dashboard-view");
+    var loginView = $("client-login-block");
+    var registerView = $("client-register-block");
+
+    function showAuthBlock(target) {
+      [loginView, registerView].forEach(function (view) {
+        if (view) view.hidden = view !== target;
+      });
+    }
+
+    function showDashboard(client, commandes) {
+      if (authView) authView.hidden = true;
+      if (dashboardView) dashboardView.hidden = false;
+      localStorage.setItem(USER_NAME_KEY, [client.prenom, client.nom].filter(Boolean).join(" ").trim() || client.email || "Mon compte");
+      updateHeaderState();
+
+      $("client-dashboard-name").textContent = [client.prenom, client.nom].filter(Boolean).join(" ").trim() || client.email || "Client";
+      $("profile-prenom").value = client.prenom || "";
+      $("profile-nom").value = client.nom || "";
+      $("profile-email").value = client.email || "";
+      $("profile-adresse").value = client.adresse || "";
+      $("profile-cp").value = client.cp || "";
+      $("profile-ville").value = client.ville || "";
+      $("client-points").textContent = String(client.points || 0);
+
+      var list = $("client-orders");
+      if (list) {
+        if (!commandes.length) {
+          list.innerHTML = '<div class="empty-state">Aucune commande pour le moment.</div>';
+        } else {
+          list.innerHTML = commandes.map(function (cmd) {
+            var docs = (cmd.documents || []).map(function (doc) {
+              return '<a class="tag" href="/api/commandes/' + encodeURIComponent(cmd.numero) + '/document/' + encodeURIComponent(doc.id) + '?session_token=' + encodeURIComponent(localStorage.getItem(SESSION_KEY) || "") + '" target="_blank" rel="noopener">Document ' + esc(doc.type || "PDF") + "</a>";
+            }).join("");
+            return '<article class="order-row">'
+              + '<div class="split-line">'
+                + '<strong>' + esc(cmd.numero) + '</strong>'
+                + '<span class="tag">' + esc(cmd.statut || "Recue") + '</span>'
+              + '</div>'
+              + '<div class="muted">' + esc(cmd.date || "") + '</div>'
+              + '<div>' + esc(cmd.panier || "").replace(/\n/g, "<br>") + '</div>'
+              + '<div class="split-line"><strong class="product-price">' + esc(cmd.prix_total || "-") + '</strong><div class="tags">' + docs + '</div></div>'
+            + '</article>';
+          }).join("");
+        }
+      }
+    }
+
+    function loadDashboard(token) {
+      return fetch(API_BASE + "/api/client/me", {
+        headers: { "x-session-token": token }
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          showDashboard(json.client || {}, json.commandes || []);
+        })
+        .catch(function () {
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(USER_NAME_KEY);
+          updateHeaderState();
+          if (authView) authView.hidden = false;
+          if (dashboardView) dashboardView.hidden = true;
+        });
+    }
+
+    function finishLogin(payload) {
+      localStorage.setItem(SESSION_KEY, payload.session_token);
+      localStorage.setItem(USER_NAME_KEY, [payload.client.prenom, payload.client.nom].filter(Boolean).join(" ").trim() || payload.client.email || "Mon compte");
+      updateHeaderState();
+      loadDashboard(payload.session_token);
+    }
+
+    function handleJsonForm(url, body, statusEl, onSuccess) {
+      clearStatus(statusEl);
+      return fetch(API_BASE + url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          if (onSuccess) onSuccess(json);
+        })
+        .catch(function (error) {
+          setStatus(statusEl, "err", error.message || "Erreur reseau.");
+        });
+    }
+
+    $("open-register").addEventListener("click", function () {
+      showAuthBlock(registerView);
+    });
+    $("back-login-from-register").addEventListener("click", function () {
+      showAuthBlock(loginView);
+    });
+
+    $("login-form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      var statusEl = $("login-status");
+      clearStatus(statusEl);
+      handleJsonForm("/api/client/password-login", {
+        email: $("login-email").value.trim(),
+        password: $("login-password").value
+      }, statusEl, function (json) {
+        finishLogin(json);
+      });
+    });
+
+    $("register-form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      handleJsonForm("/api/client/register", {
+        type_client: $("register-type-client").value.trim(),
+        prenom: $("register-prenom").value.trim(),
+        nom: $("register-nom").value.trim(),
+        email: $("register-email").value.trim(),
+        societe: $("register-societe").value.trim(),
+        siret: $("register-siret").value.trim(),
+        telephone: $("register-telephone").value.trim(),
+        password: $("register-password").value,
+        password2: $("register-password-2").value,
+        adresse: $("register-adresse").value.trim(),
+        cp: $("register-cp").value.trim(),
+        ville: $("register-ville").value.trim()
+      }, $("register-status"), function () {
+        setStatus($("register-status"), "ok", "Compte cree. Confirmez votre email avant connexion.");
+      });
+    });
+
+    $("profile-form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      var token = localStorage.getItem(SESSION_KEY);
+      if (!token) return;
+      clearStatus($("profile-status"));
+      fetch(API_BASE + "/api/client/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-token": token
+        },
+        body: JSON.stringify({
+          prenom: $("profile-prenom").value.trim(),
+          nom: $("profile-nom").value.trim(),
+          adresse: $("profile-adresse").value.trim(),
+          cp: $("profile-cp").value.trim(),
+          ville: $("profile-ville").value.trim()
+        })
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          localStorage.setItem(USER_NAME_KEY, [json.client.prenom, json.client.nom].filter(Boolean).join(" ").trim() || json.client.email || "Mon compte");
+          updateHeaderState();
+          setStatus($("profile-status"), "ok", "Informations enregistrees.");
+          loadDashboard(token);
+        })
+        .catch(function (error) {
+          setStatus($("profile-status"), "err", error.message || "Erreur reseau.");
+        });
+    });
+
+    $("logout-btn").addEventListener("click", function () {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(USER_NAME_KEY);
+      updateHeaderState();
+      if (authView) authView.hidden = false;
+      if (dashboardView) dashboardView.hidden = true;
+      showAuthBlock(loginView);
+    });
+
+    var params = new URLSearchParams(window.location.search);
+    var magicToken = params.get("client_token");
+    var verifyToken = params.get("verify_client_token");
+    var resetToken = params.get("reset_client_token");
+    var storedToken = localStorage.getItem(SESSION_KEY);
+
+    if (resetToken) {
+      if (authView) authView.hidden = false;
+      if (dashboardView) dashboardView.hidden = true;
+      showAuthBlock(resetView);
+      $("reset-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        handleJsonForm("/api/client/reset-password", {
+          token: resetToken,
+          password: $("reset-password").value
+        }, $("reset-status"), function (json) {
+          finishLogin(json);
+          setStatus($("reset-status"), "ok", "Mot de passe mis a jour.");
+          history.replaceState({}, "", "/client");
+        });
+      }, { once: true });
+    } else if (magicToken) {
+      fetch(API_BASE + "/api/client/auth?token=" + encodeURIComponent(magicToken))
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          finishLogin(json);
+          history.replaceState({}, "", "/client");
+        })
+        .catch(function (error) {
+          setStatus($("login-status"), "err", error.message || "Lien invalide.");
+        });
+    } else if (verifyToken) {
+      fetch(API_BASE + "/api/client/verify?token=" + encodeURIComponent(verifyToken))
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          finishLogin(json);
+          history.replaceState({}, "", "/client");
+        })
+        .catch(function (error) {
+          setStatus($("login-status"), "err", error.message || "Verification impossible.");
+        });
+    } else if (storedToken) {
+      loadDashboard(storedToken);
+    } else {
+      showAuthBlock(loginView);
+    }
+  }
+
+  function initRendezVousPage() {
+    var daysWrap = $("calendar-days");
+    var slotsWrap = $("calendar-slots");
+    var form = $("rdv-form");
+    var status = $("rdv-status");
+    var selectedDay = null;
+    var selectedSlot = "";
+    var slots = ["09:00", "10:30", "14:00", "15:30", "17:00"];
+    var params = new URLSearchParams(window.location.search);
+    if ($("rdv-produit")) $("rdv-produit").value = params.get("produit") || "";
+
+    function nextDays() {
+      var result = [];
+      var cursor = new Date();
+      while (result.length < 14) {
+        cursor.setDate(cursor.getDate() + 1);
+        if (cursor.getDay() === 0) continue;
+        result.push(new Date(cursor.getTime()));
+      }
+      return result;
+    }
+
+    function renderSlots() {
+      if (!slotsWrap) return;
+      slotsWrap.innerHTML = slots.map(function (slot) {
+        return '<button type="button" class="slot-btn' + (slot === selectedSlot ? " active" : "") + '" data-slot="' + esc(slot) + '">' + esc(slot) + "</button>";
+      }).join("");
+      slotsWrap.querySelectorAll("[data-slot]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          selectedSlot = button.getAttribute("data-slot");
+          renderSlots();
+        });
+      });
+    }
+
+    function renderDays() {
+      var days = nextDays();
+      if (!daysWrap) return;
+      if (!selectedDay && days.length) selectedDay = days[0].toISOString().slice(0, 10);
+      daysWrap.innerHTML = days.map(function (day) {
+        var iso = day.toISOString().slice(0, 10);
+        var label = day.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" });
+        return '<button type="button" class="calendar-day' + (iso === selectedDay ? " active" : "") + '" data-day="' + iso + '"><strong>' + esc(label) + '</strong><small>' + esc(iso) + "</small></button>";
+      }).join("");
+      daysWrap.querySelectorAll("[data-day]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          selectedDay = button.getAttribute("data-day");
+          renderDays();
+        });
+      });
+    }
+
+    renderDays();
+    renderSlots();
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      clearStatus(status);
+
+      if (!selectedDay || !selectedSlot) {
+        setStatus(status, "err", "Choisissez une date et un creneau.");
+        return;
+      }
+
+      var fd = new FormData();
+      fd.append("prenom", $("rdv-prenom").value.trim());
+      fd.append("nom", $("rdv-nom").value.trim());
+      fd.append("email", $("rdv-email").value.trim());
+      fd.append("tel", $("rdv-tel").value.trim());
+      fd.append("message", $("rdv-message").value.trim());
+      fd.append("panier", "Rendez-vous - Date: " + selectedDay + " - Creneau: " + selectedSlot + " - Produit: " + ($("rdv-produit").value.trim() || "Projet general"));
+      fd.append("prix_total", "-");
+      fd.append("source", "com-impression");
+
+      if (!fd.get("prenom") || !fd.get("nom") || !fd.get("email")) {
+        setStatus(status, "err", "Prenom, nom et email sont obligatoires.");
+        return;
+      }
+
+      $("rdv-submit").disabled = true;
+      $("rdv-submit").textContent = "Envoi en cours...";
+
+      fetch(API_BASE + "/api/devis", {
+        method: "POST",
+        body: fd
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function () {
+          form.reset();
+          setStatus(status, "ok", "Votre demande de rendez-vous a bien ete envoyee.");
+        })
+        .catch(function (error) {
+          setStatus(status, "err", error.message || "Impossible d'envoyer votre demande.");
+        })
+        .finally(function () {
+          $("rdv-submit").disabled = false;
+          $("rdv-submit").textContent = "Envoyer ma demande de rendez-vous";
+        });
+    });
+  }
+
+  function initHomePage() {
+    fetch(API_BASE + "/api/site-config")
+      .then(function (response) { return response.json().catch(function () { return {}; }); })
+      .then(function (json) {
+        var config = json && json.config ? json.config : null;
+        if (!config) return;
+        if ($("home-brand-subtitle")) $("home-brand-subtitle").textContent = config.heroSlogan || $("home-brand-subtitle").textContent;
+        if ($("home-hero-badge")) $("home-hero-badge").textContent = config.heroBadge || config.topBanner || $("home-hero-badge").textContent;
+        if ($("home-hero-title")) {
+          $("home-hero-title").textContent = [config.heroLine1, config.heroHighlight, config.heroLine2].filter(Boolean).join(" ").trim() || $("home-hero-title").textContent;
+        }
+        if ($("home-hero-text")) $("home-hero-text").textContent = config.heroText || $("home-hero-text").textContent;
+        if ($("home-panel-title")) $("home-panel-title").textContent = config.heroPanelTitle || $("home-panel-title").textContent;
+        if ($("home-panel-text")) $("home-panel-text").textContent = config.heroPanelText || $("home-panel-text").textContent;
+        if ($("home-panel-list") && Array.isArray(config.heroPanelItems) && config.heroPanelItems.length) {
+          $("home-panel-list").innerHTML = config.heroPanelItems.map(function (item) {
+            return "<li>" + esc(item) + "</li>";
+          }).join("");
+        }
+        if ($("home-hero-image") && config.heroImage) {
+          $("home-hero-image").src = config.heroImage;
+        }
+      })
+      .catch(function () {});
+
+    var avisGrid = document.querySelector(".avis-grid");
+    if (avisGrid) {
+      fetch(API_BASE + "/api/avis")
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          var avis = Array.isArray(json.avis) ? json.avis : [];
+          if (!avis.length) return;
+          avisGrid.innerHTML = avis.slice(0, 3).map(function (avis) {
+            var stars = "★★★★★".slice(0, Math.max(1, Math.min(5, parseInt(avis.note, 10) || 5)));
+            var role = [avis.prenom || "Client", avis.ville || ""].filter(Boolean).join(" - ");
+            return '<article class="avis-card">'
+              + '<div class="avis-stars">' + esc(stars) + '</div>'
+              + '<p>« ' + esc(avis.texte || "") + ' »</p>'
+              + '<h3>' + esc(avis.prenom || "Client") + '</h3>'
+              + '<div class="avis-role">' + esc(role || "Client COM Impression") + '</div>'
+            + '</article>';
+          }).join("");
+        })
+        .catch(function () {});
+    }
+
+    document.querySelectorAll("[data-gamme-link]").forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        event.preventDefault();
+        var gamme = link.getAttribute("data-gamme-link");
+        goTo("/produits?gamme=" + encodeURIComponent(gamme));
+      });
+    });
+
+    var productsCta = $("home-go-products");
+    if (productsCta) {
+      productsCta.addEventListener("click", function () {
+        goTo("/produits");
+      });
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    bindShell();
+    var page = document.body.getAttribute("data-page");
+    if (page === "home") initHomePage();
+    if (page === "produits") initProductsPage();
+    if (page === "produit") initProductPage();
+    if (page === "panier") initCartPage();
+    if (page === "client") initClientPage();
+    if (page === "rendez-vous") initRendezVousPage();
+  });
+})();
