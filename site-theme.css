@@ -576,6 +576,11 @@ textarea {
   color: #fff;
   z-index: 60;
   box-shadow: 0 22px 44px rgba(23, 19, 16, 0.24);
+  pointer-events: auto;
+}
+
+.cookie-banner[hidden] {
+  display: none !important;
 }
 
 .cookie-banner p {
@@ -593,6 +598,10 @@ textarea {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.cookie-actions button {
+  pointer-events: auto;
 }
 
 .cookie-options {

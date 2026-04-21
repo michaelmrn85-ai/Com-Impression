@@ -836,15 +836,18 @@
     var list = $("cart-items");
     var total = $("cart-total");
     var empty = $("cart-empty");
+    var mainView = $("cart-main-view");
+    var successView = $("order-success-view");
+    var successSummary = $("order-success-summary");
     var goProducts = $("cart-go-products");
     var validateBtn = $("cart-validate");
     var validateStatus = $("cart-validate-status");
     var guestFields = $("cart-guest-fields");
     var clientSummary = $("cart-client-summary");
-    var paymentCard = $("payment-card");
     var authModal = $("checkout-auth-modal");
     var authStatus = $("checkout-auth-status");
-    var stripeBox = $("stripe-box");
+    var paymentModal = $("checkout-payment-modal");
+    var paymentTotal = $("checkout-payment-total");
     var stripeBtn = $("cart-pay");
     var stripeStatus = $("stripe-status");
     var stripeClient = null;
@@ -865,8 +868,6 @@
       appliedPromo = null;
       clearStatus(validateStatus);
       clearStatus(stripeStatus);
-      if (paymentCard) paymentCard.hidden = true;
-      if (stripeBox) stripeBox.hidden = true;
       updatePayableTotal();
     }
 
@@ -888,6 +889,7 @@
     function updatePayableTotal() {
       var payable = getPayableTotalInfo();
       if ($("cart-payable-total")) $("cart-payable-total").textContent = payable.label || "0,00 EUR";
+      if (paymentTotal) paymentTotal.textContent = payable.label || "0,00 EUR";
     }
 
     function openAuthModal() {
@@ -906,6 +908,55 @@
         authModal.classList.remove("open");
       }
       clearStatus(authStatus);
+    }
+
+    function openPaymentModal() {
+      if (paymentModal) {
+        paymentModal.hidden = false;
+        paymentModal.removeAttribute("hidden");
+        paymentModal.classList.add("open");
+      }
+      clearStatus(stripeStatus);
+      updatePayableTotal();
+      ensureStripe();
+    }
+
+    function closePaymentModal() {
+      if (paymentModal) {
+        paymentModal.hidden = true;
+        paymentModal.setAttribute("hidden", "hidden");
+        paymentModal.classList.remove("open");
+      }
+      clearStatus(stripeStatus);
+    }
+
+    function renderOrderSuccess(orderData) {
+      if (mainView) mainView.hidden = true;
+      if (successView) successView.hidden = false;
+      if (!successSummary) return;
+      var rows = (orderData && orderData.rows) || [];
+      successSummary.innerHTML =
+        '<div class="summary-box">'
+          + '<div class="split-line"><strong>Client</strong><span>' + esc(orderData.customerName || "") + '</span></div>'
+          + '<div class="split-line"><strong>Email</strong><span>' + esc(orderData.customerEmail || "") + '</span></div>'
+          + '<div class="split-line"><strong>Total regle</strong><span class="product-price">' + esc(orderData.totalLabel || "0,00 EUR") + '</span></div>'
+          + (orderData.promoCode ? '<div class="split-line"><strong>Code reduction</strong><span>' + esc(orderData.promoCode) + ' · ' + esc(String(orderData.promoDiscount || 0)) + '%</span></div>' : '')
+        + '</div>'
+        + '<div class="cart-table">'
+          + '<div class="cart-table-head cart-table-row">'
+            + '<div>Produit</div><div class="cart-file-cell">Fichier</div><div class="cart-total-cell">Total TTC</div><div></div>'
+          + '</div>'
+          + '<div class="cart-table-body">'
+            + rows.map(function (item) {
+              return '<div class="cart-table-row">'
+                + '<div class="cart-label"><div class="cart-cell-value"><strong>' + esc(item.title || "") + '</strong><div class="muted">' + esc(item.ref || "") + '</div>' + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + '</div></div>'
+                + '<div class="cart-file-cell"><span class="cart-cell-value">' + esc(((item.uploadNames || []).length ? item.uploadNames.join(", ") : "Aucun fichier")) + '</span></div>'
+                + '<div class="cart-total-cell product-price"><span class="cart-cell-value">' + esc(item.priceValue != null ? euro(item.priceValue) : item.priceLabel || "-") + '</span></div>'
+                + '<div></div>'
+              + '</div>';
+            }).join("")
+          + '</div>'
+        + '</div>';
     }
 
     function renderClientIdentity() {
@@ -1036,7 +1087,7 @@
     }
 
     function ensureStripe() {
-      if (!stripeBox || stripeBox.hidden || typeof window.Stripe !== "function") return;
+      if (!paymentModal || paymentModal.hidden || typeof window.Stripe !== "function") return;
       if (!stripeClient) {
         stripeClient = window.Stripe(STRIPE_PK);
         var elements = stripeClient.elements();
@@ -1074,16 +1125,26 @@
       }
       if (!validateCheckoutBasics(targetStatus || validateStatus)) return false;
       cartValidated = true;
-      if (paymentCard) paymentCard.hidden = false;
       var totalInfo = getPayableTotalInfo();
-      if (stripeBox) stripeBox.hidden = totalInfo.numeric == null;
-      ensureStripe();
-      setStatus(targetStatus || validateStatus, "ok", "Panier valide. Le bloc paiement est maintenant disponible.");
+      if (typeof totalInfo.numeric !== "number") {
+        setStatus(targetStatus || validateStatus, "err", "Le paiement CB est disponible uniquement pour les produits a tarif chiffre.");
+        return false;
+      }
+      openPaymentModal();
+      setStatus(targetStatus || validateStatus, "ok", "Panier valide. La fenetre de paiement est ouverte.");
       return true;
     }
 
     function submitOrder(paymentMeta) {
       if (!getCustomerDetails(validateStatus)) return Promise.reject(new Error("Coordonnees client invalides."));
+      var orderSnapshot = {
+        rows: readCart().slice(),
+        totalLabel: getPayableTotalInfo().label,
+        customerName: (connectedClient ? [connectedClient.prenom, connectedClient.nom].filter(Boolean).join(" ").trim() : [($("checkout-prenom") || {}).value, ($("checkout-nom") || {}).value].join(" ").trim()),
+        customerEmail: connectedClient ? (connectedClient.email || "") : ((($("checkout-email") || {}).value) || "").trim(),
+        promoCode: appliedPromo && appliedPromo.code,
+        promoDiscount: appliedPromo && appliedPromo.discount
+      };
       return fetch(API_BASE + "/api/devis", {
         method: "POST",
         body: buildCheckoutFormData(paymentMeta)
@@ -1102,7 +1163,9 @@
           if ($("checkout-message")) $("checkout-message").value = "";
           if ($("checkout-promo")) $("checkout-promo").value = "";
           appliedPromo = null;
+          closePaymentModal();
           renderCart();
+          renderOrderSuccess(orderSnapshot);
           return true;
         });
     }
@@ -1246,8 +1309,6 @@
               discount: Number(json.remise || 0)
             };
             updatePayableTotal();
-            if (cartValidated && paymentCard) paymentCard.hidden = false;
-            if (cartValidated && stripeBox) stripeBox.hidden = getPayableTotalInfo().numeric == null;
             setStatus(validateStatus, "ok", "Code applique : " + appliedPromo.discount + "% de remise.");
           })
           .catch(function (error) {
@@ -1255,6 +1316,8 @@
           });
       });
     }
+
+    if ($("checkout-payment-close")) $("checkout-payment-close").addEventListener("click", closePaymentModal);
 
     if (stripeBtn) {
       stripeBtn.addEventListener("click", function () {
@@ -1380,33 +1443,33 @@
       }
 
       banner.hidden = false;
-      accept.addEventListener("click", function () {
+      accept.onclick = function () {
         persistCookieChoice({
           essential: true,
           analytics: true,
           personalization: true
         });
-      });
-      essential.addEventListener("click", function () {
+      };
+      essential.onclick = function () {
         persistCookieChoice({
           essential: true,
           analytics: false,
           personalization: false
         });
-      });
-      customize.addEventListener("click", function () {
+      };
+      customize.onclick = function () {
         var isOpen = !options.hidden;
         options.hidden = isOpen;
         save.hidden = isOpen;
         customize.textContent = isOpen ? "Personnaliser" : "Fermer";
-      });
-      save.addEventListener("click", function () {
+      };
+      save.onclick = function () {
         persistCookieChoice({
           essential: true,
           analytics: !!(analytics && analytics.checked),
           personalization: !!(personalization && personalization.checked)
         });
-      });
+      };
     }
 
     function buildLoyaltyState(points) {

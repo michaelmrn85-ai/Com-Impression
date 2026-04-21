@@ -32,6 +32,20 @@
   </header>
 
   <main class="page-shell">
+    <section class="section" id="order-success-view" hidden>
+      <div class="list-card">
+        <div class="section-head">
+          <div>
+            <div class="pill">Confirmation</div>
+            <h2>Commande validee</h2>
+            <p>Retrouvez ici le recapitulatif de votre commande confirmee.</p>
+          </div>
+        </div>
+        <div class="item-list" id="order-success-summary"></div>
+      </div>
+    </section>
+
+    <div id="cart-main-view">
     <section class="section">
       <div class="list-card">
         <div class="section-head">
@@ -123,6 +137,7 @@
         </div>
       </div>
     </section>
+    </div>
   </main>
 
   <div class="auth-overlay" id="checkout-auth-modal" hidden>
@@ -196,6 +211,27 @@
         <button class="btn" id="checkout-register-btn" type="button">Creer mon compte</button>
       </div>
       <div class="status" id="checkout-auth-status"></div>
+    </div>
+  </div>
+
+  <div class="auth-overlay" id="checkout-payment-modal" hidden>
+    <div class="auth-dialog">
+      <button class="auth-close" id="checkout-payment-close" type="button">×</button>
+      <div class="pill">Paiement CB</div>
+      <h2>Regler votre commande</h2>
+      <p>Entrez vos coordonnees bancaires pour finaliser la commande.</p>
+      <div class="summary-box" style="margin:18px 0;">
+        <div class="split-line">
+          <span>Total a regler</span>
+          <strong class="total" id="checkout-payment-total">0,00 EUR</strong>
+        </div>
+      </div>
+      <div class="field">
+        <label for="stripe-card-element">Carte bancaire</label>
+        <div id="stripe-card-element"></div>
+      </div>
+      <button class="btn" id="cart-pay" type="button">Payer par CB</button>
+      <div class="status" id="stripe-status"></div>
     </div>
   </div>
 
