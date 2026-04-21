@@ -23,6 +23,7 @@
     siteConfig: null,
     catalog: [],
     clients: [],
+    dailySummary: null,
     selectedProduct: null,
     selectedClient: null
   };
@@ -671,6 +672,10 @@
       +'<div class="field"><label>Nom</label><input id="product-edit-name" value="'+esc(entryRef.product.title||'')+'"></div>'
       +'<div class="field"><label>Prix de depart</label><input id="product-edit-price" value="'+esc(entryRef.product.priceLabel||'')+'" placeholder="15,90 EUR"></div>'
       +'</div>'
+      +'<div class="site-grid">'
+      +'<div class="field"><label>Prix d achat</label><input id="product-edit-purchase" value="'+esc(entryRef.product.purchasePrice==null?'':entryRef.product.purchasePrice)+'" placeholder="8.50"></div>'
+      +'<div class="field"><label>Prix de vente</label><input id="product-edit-sale" value="'+esc(entryRef.product.salePrice==null?'':entryRef.product.salePrice)+'" placeholder="15.90"></div>'
+      +'</div>'
       +'<div class="field"><label>Description</label><textarea id="product-edit-summary">'+esc(entryRef.product.summary||'')+'</textarea></div>'
       +'<div class="site-grid">'
       +'<div class="field"><label>Lots / quantites</label><textarea id="product-edit-qty" placeholder="100,250,500">'+esc((entryRef.product.quantityOptions||[]).join(', '))+'</textarea></div>'
@@ -703,6 +708,8 @@
         title:($('product-edit-name').value||'').trim(),
         summary:($('product-edit-summary').value||'').trim(),
         priceLabel:($('product-edit-price').value||'').trim(),
+        purchasePrice:($('product-edit-purchase').value||'').trim(),
+        salePrice:($('product-edit-sale').value||'').trim(),
         quantityOptions:($('product-edit-qty').value||'').trim(),
         paperOptions:($('product-edit-paper').value||'').trim(),
         finishOptions:($('product-edit-finish').value||'').trim(),
@@ -835,6 +842,63 @@
 
   function formatAmount(value){
     return (Math.round(value*100)/100).toFixed(2).replace('.',',')+' €';
+  }
+
+  function renderDailySummary(){
+    var kpis=$('day-kpis');
+    var table=$('day-gamme-table');
+    var summary=state.dailySummary;
+    if(!kpis || !table) return;
+    if(!summary){
+      kpis.innerHTML='';
+      table.innerHTML='<div class="empty">Aucune donnée de la journée.</div>';
+      return;
+    }
+    kpis.innerHTML=''
+      +'<article class="day-kpi"><strong>Commandes du jour</strong><span>'+esc(String(summary.orders||0))+'</span></article>'
+      +'<article class="day-kpi"><strong>Total du jour</strong><span>'+esc(formatAmount(Number(summary.total||0)))+'</span></article>'
+      +'<article class="day-kpi"><strong>Marge estimee</strong><span>'+esc(formatAmount(Number(summary.margin||0)))+'</span></article>'
+      +'<article class="day-kpi"><strong>Visites aujourd hui</strong><span>'+esc(String(summary.visitsToday||0))+'</span></article>';
+    if(!(summary.byGamme||[]).length){
+      table.innerHTML='<div class="empty">Aucune commande classee aujourd hui.</div>';
+      return;
+    }
+    table.innerHTML='<table class="admin-table-mini">'
+      +'<thead><tr><th>Gamme</th><th>Commandes</th><th>Total</th><th>Marge</th></tr></thead>'
+      +'<tbody>'+(summary.byGamme||[]).map(function(row){
+        return '<tr><td>'+esc(row.gamme||'Non classee')+'</td><td>'+esc(String(row.orders||0))+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td><td>'+esc(formatAmount(Number(row.margin||0)))+'</td></tr>';
+      }).join('')+'</tbody>'
+      +'<tfoot><tr><td>Total visites site</td><td colspan="3">'+esc(String(summary.visitsTotal||0))+'</td></tr></tfoot>'
+      +'</table>';
+  }
+
+  function loadDailySummary(openAfterLoad){
+    return fetch(api('/api/admin/daily-summary?mdp='+encodeURIComponent(state.mdp)))
+      .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Fiche du jour indisponible'); return d; }); })
+      .then(function(data){
+        state.dailySummary = data.summary || null;
+        renderDailySummary();
+        if(openAfterLoad) openModal('modal-day-sheet','jour');
+      });
+  }
+
+  function renderEmailTemplates(){
+    var wrap=$('email-templates-grid');
+    if(!wrap) return;
+    var signature = "Bien cordialement,\\nMichael\\nCOM' Impression\\n07 43 69 56 41\\nmichael@com-impression.fr\\nhttps://com-impression.fr";
+    var templates = [
+      { id:'welcome', title:'Bienvenue client', text:"Bonjour [Prénom],\\n\\nBienvenue chez COM' Impression. Je suis ravi de vous compter parmi nos clients.\\n\\nVous pouvez dès maintenant découvrir nos gammes d'impression, préparer vos projets, suivre vos commandes et prendre rendez-vous directement sur le site.\\n\\nSi vous avez besoin d'un conseil ou d'un accompagnement, je reste disponible.\\n\\n"+signature },
+      { id:'devis', title:'Envoi de devis', text:"Bonjour [Prénom],\\n\\nVeuillez trouver ci-joint votre devis COM' Impression.\\n\\nJe reste à votre disposition pour l'ajuster selon vos quantités, vos finitions ou vos délais. Dès votre retour, je pourrai valider la suite du projet avec vous.\\n\\n"+signature },
+      { id:'bat', title:'Envoi du BAT', text:"Bonjour [Prénom],\\n\\nVous trouverez ci-joint votre BAT pour validation.\\n\\nMerci de me confirmer votre accord par retour de mail afin que nous puissions lancer la production. Si vous souhaitez une correction, indiquez-moi simplement les modifications à prévoir.\\n\\n"+signature },
+      { id:'relance', title:'Relance douce', text:"Bonjour [Prénom],\\n\\nJe me permets de revenir vers vous concernant votre projet / devis COM' Impression.\\n\\nSi vous souhaitez avancer, ajuster un point ou simplement être conseillé sur le bon support, je suis disponible pour vous accompagner.\\n\\n"+signature }
+    ];
+    wrap.innerHTML = templates.map(function(item){
+      return '<article class="template-card">'
+        +'<h3>'+esc(item.title)+'</h3>'
+        +'<textarea id="template-'+esc(item.id)+'">'+esc(item.text)+'</textarea>'
+        +'<div class="template-actions"><button class="btn btn-orange btn-small" type="button" data-copy-template="template-'+esc(item.id)+'">Copier</button></div>'
+      +'</article>';
+    }).join('');
   }
 
   function addManualLine(data){
@@ -971,6 +1035,8 @@
           });
           return;
         }
+        if(scope==='jour'){ loadDailySummary(true); return; }
+        if(scope==='emails'){ renderEmailTemplates(); openModal('modal-email-templates','emails'); return; }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }
         if(scope==='produits'){ loadProductsAdmin(true); return; }
@@ -989,6 +1055,16 @@
       if(e.target && e.target.id==='manual-add-line') addManualLine();
       if(e.target && e.target.id==='product-edit-save') saveProductEditor();
       if(e.target && e.target.id==='client-edit-save') saveClientEditor();
+      var copyTemplateBtn = e.target.closest ? e.target.closest('[data-copy-template]') : null;
+      if(copyTemplateBtn){
+        var field=$(copyTemplateBtn.getAttribute('data-copy-template'));
+        if(field){
+          field.select();
+          try{ document.execCommand('copy'); }catch(err){}
+          copyTemplateBtn.textContent='Copie';
+          setTimeout(function(){ copyTemplateBtn.textContent='Copier'; },1200);
+        }
+      }
       var avisBtn = e.target.closest ? e.target.closest('[data-avis-id]') : null;
       if(avisBtn){
         traiterAvis(avisBtn.getAttribute('data-avis-id'), avisBtn.getAttribute('data-avis-action'));

@@ -30,6 +30,9 @@ app.use(express.static(__dirname));
 const upload = multer({ dest: '/tmp/', limits: { fileSize: 70 * 1024 * 1024 } });
 const BRAND_LOGO_PATH = path.join(__dirname, 'com-logo.png');
 const BRAND_LOGO_CID = 'com-impression-logo';
+const BRAND_CONTACT_EMAIL = 'michael@com-impression.fr';
+const BRAND_CONTACT_PHONE = '07 43 69 56 41';
+const BRAND_SITE_URL = 'https://com-impression.fr';
 
 function createTransporter() {
     return nodemailer.createTransport({
@@ -124,6 +127,8 @@ function buildCatalogApiPayload() {
                 defaultSelections,
                 quantityOptions: override.quantityOptions && override.quantityOptions.length ? override.quantityOptions.slice() : (Array.isArray(prod.Q) ? prod.Q : []),
                 quantityPricing: override.quantityPricing && override.quantityPricing.length ? override.quantityPricing.slice() : [],
+                purchasePrice: override.purchasePrice == null || override.purchasePrice === '' ? null : Number(override.purchasePrice),
+                salePrice: override.salePrice == null || override.salePrice === '' ? (override.priceValue != null ? Number(override.priceValue) : parseEuroLabel(prod.prix)) : Number(override.salePrice),
                 requiresQuantityInput: !!(prod.prixUnit || prod.id === 'impression-doc'),
                 hasDimensions: !!(prod.dims || prod.dimsLibres),
                 dimsLibres: !!prod.dimsLibres,
@@ -170,6 +175,8 @@ function buildCatalogApiPayload() {
                     defaultSelections,
                     quantityOptions: normaliseCsvList(item.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0),
                     quantityPricing: normaliseQuantityPricing(Array.isArray(item.quantityPricing) ? item.quantityPricing : []),
+                    purchasePrice: item.purchasePrice == null || item.purchasePrice === '' ? null : Number(item.purchasePrice),
+                    salePrice: item.salePrice == null || item.salePrice === '' ? (item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : Number(item.priceValue)) : Number(item.salePrice),
                     requiresQuantityInput: !!item.requiresQuantityInput,
                     hasDimensions: !!item.hasDimensions,
                     dimsLibres: !!item.hasDimensions,
@@ -254,6 +261,20 @@ function getBrandingAttachments(extraAttachments = []) {
     return attachments;
 }
 
+function emailSignatureBlock() {
+    return `
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;background:#fff;border:1px solid #f0dfcf;border-radius:18px;">
+          <tr>
+            <td style="padding:18px 20px;font-size:13px;line-height:1.8;color:#5f5751;">
+              <strong style="display:block;color:#171310;font-size:15px;margin-bottom:6px;">Michael - COM' Impression</strong>
+              <div><strong>Email :</strong> <a href="mailto:${BRAND_CONTACT_EMAIL}" style="color:#F47B20;text-decoration:none;font-weight:700;">${BRAND_CONTACT_EMAIL}</a></div>
+              <div><strong>Telephone :</strong> <a href="tel:+33743695641" style="color:#F47B20;text-decoration:none;font-weight:700;">${BRAND_CONTACT_PHONE}</a></div>
+              <div><strong>Site :</strong> <a href="${BRAND_SITE_URL}" style="color:#F47B20;text-decoration:none;font-weight:700;">${BRAND_SITE_URL.replace('https://', '')}</a></div>
+            </td>
+          </tr>
+        </table>`;
+}
+
 function parsePanierJson(raw) {
     if (!raw) return [];
     try {
@@ -273,6 +294,37 @@ function parsePanierJson(raw) {
     } catch (error) {
         return [];
     }
+}
+
+function buildFallbackProductRef(seed) {
+    const text = String(seed || '');
+    let sum = 0;
+    for (let i = 0; i < text.length; i += 1) sum += text.charCodeAt(i) * (i + 1);
+    return 'COM' + String((sum % 9999) + 1).padStart(4, '0');
+}
+
+function deriveRowsForStats(cmd) {
+    const panierItems = parsePanierJson(cmd && cmd.panier_json);
+    if (panierItems.length) {
+        return panierItems.map(item => ({
+            ref: item.ref || '',
+            label: item.label || '',
+            gamme: item.gamme || '',
+            total: parseEuroLabel(item.totalLabel) || 0
+        }));
+    }
+    const lines = String((cmd && cmd.panier) || '').split(/\n|\|/).map(line => line.trim()).filter(Boolean);
+    return lines.map(line => {
+        const refMatch = line.match(/(COM\d{4})/i);
+        const amountMatches = line.match(/(?:\d+(?:[,.]\d{1,2})?\s*(?:€|EUR))/gi) || [];
+        const total = amountMatches.length ? parseEuroLabel(amountMatches[amountMatches.length - 1]) || 0 : 0;
+        return {
+            ref: refMatch ? refMatch[1].toUpperCase() : buildFallbackProductRef(line),
+            label: line.split('-')[0].trim(),
+            gamme: '',
+            total
+        };
+    });
 }
 
 function emailWrapper(content, couleur, nomBrand, lien, sousTitre) {
@@ -299,6 +351,7 @@ function emailWrapper(content, couleur, nomBrand, lien, sousTitre) {
             </td>
           </tr>
         </table>
+        ${emailSignatureBlock()}
       </td></tr>
       <tr><td style="background:#171310;padding:22px 34px;text-align:center;">
         <p style="margin:0;color:rgba(255,255,255,.58);font-size:12px;">
@@ -711,6 +764,7 @@ const INCIDENT_FILE = path.join(INCIDENT_DATA_DIR, 'incident.json');
 const SITE_CONFIG_FILE = path.join(INCIDENT_DATA_DIR, 'site-config.json');
 const PRODUCT_OVERRIDES_FILE = path.join(INCIDENT_DATA_DIR, 'product-overrides.json');
 const CUSTOM_PRODUCTS_FILE = path.join(INCIDENT_DATA_DIR, 'custom-products.json');
+const VISITS_FILE = path.join(INCIDENT_DATA_DIR, 'visits.json');
 const CART_UPLOADS_DIR = path.join(INCIDENT_DATA_DIR, 'cart-uploads');
 try { fs.mkdirSync(CART_UPLOADS_DIR, { recursive: true }); } catch (e) {}
 
@@ -758,6 +812,35 @@ function normaliseQuantityPricing(list) {
         quantity: parseInt(item.quantity, 10),
         total: Number(item.total)
     })).filter(item => !isNaN(item.quantity) && item.quantity > 0 && !isNaN(item.total) && item.total >= 0);
+}
+
+function lireVisits() {
+    try {
+        const data = JSON.parse(fs.readFileSync(VISITS_FILE, 'utf8'));
+        return data && typeof data === 'object' ? data : { total: 0, byDay: {}, byPath: {} };
+    } catch (e) {
+        return { total: 0, byDay: {}, byPath: {} };
+    }
+}
+
+function sauvegarderVisits(data) {
+    fs.writeFileSync(VISITS_FILE, JSON.stringify(data || { total: 0, byDay: {}, byPath: {} }, null, 2));
+}
+
+function trackVisit(req) {
+    const pathname = req.path || '/';
+    if (req.method !== 'GET') return;
+    if (pathname.startsWith('/api') || pathname.startsWith('/admin') || pathname.includes('.')) return;
+    const tracked = ['/', '/produits', '/produit', '/panier', '/client', '/rendez-vous', '/mentions-legales', '/cgv', '/faq'];
+    if (tracked.indexOf(pathname) === -1) return;
+    const visits = lireVisits();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    visits.total = Number(visits.total || 0) + 1;
+    visits.byDay = visits.byDay || {};
+    visits.byPath = visits.byPath || {};
+    visits.byDay[dayKey] = Number(visits.byDay[dayKey] || 0) + 1;
+    visits.byPath[pathname] = Number(visits.byPath[pathname] || 0) + 1;
+    sauvegarderVisits(visits);
 }
 
 function applyOptionOverrides(optionMap, override) {
@@ -869,6 +952,11 @@ function normaliserSiteConfig(raw) {
     };
 }
 
+app.use((req, res, next) => {
+    try { trackVisit(req); } catch (e) {}
+    next();
+});
+
 function lireSiteConfig() {
     try {
         if (fs.existsSync(SITE_CONFIG_FILE)) {
@@ -953,6 +1041,87 @@ app.get('/api/admin/catalog', (req, res) => {
     }
 });
 
+app.get('/api/admin/daily-summary', (req, res) => {
+    const mdp = req.query.mdp;
+    const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
+    if (mdp !== adminPwd) return res.status(401).json({ success: false, error: 'Non autorise' });
+    try {
+        const commandes = lireCommandes();
+        const visits = lireVisits();
+        const catalog = buildCatalogApiPayload();
+        const productIndex = {};
+        (catalog.gammes || []).forEach(gamme => {
+            (gamme.products || []).forEach(product => {
+                productIndex[String(product.ref || '').toUpperCase()] = {
+                    ref: String(product.ref || '').toUpperCase(),
+                    gamme: gamme.title,
+                    title: product.title,
+                    purchasePrice: product.purchasePrice == null ? null : Number(product.purchasePrice),
+                    salePrice: product.salePrice == null ? null : Number(product.salePrice)
+                };
+            });
+        });
+
+        const today = new Date().toISOString().slice(0, 10);
+        const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === today);
+        const byGamme = {};
+        let dayTotal = 0;
+        let dayMargin = 0;
+
+        todayOrders.forEach(cmd => {
+            const rows = deriveRowsForStats(cmd);
+            if (!rows.length) {
+                const amount = parseEuroLabel(cmd.prix_total) || 0;
+                dayTotal += amount;
+                byGamme['Non classee'] = byGamme['Non classee'] || { gamme: 'Non classee', total: 0, orders: 0, margin: 0 };
+                byGamme['Non classee'].total += amount;
+                byGamme['Non classee'].orders += 1;
+                return;
+            }
+            rows.forEach(row => {
+                const ref = String(row.ref || '').toUpperCase();
+                const product = productIndex[ref] || null;
+                const gamme = row.gamme || (product && product.gamme) || 'Non classee';
+                const total = Number(row.total || 0);
+                let margin = 0;
+                if (product && product.purchasePrice != null) {
+                    if (product.salePrice && product.salePrice > 0 && total > 0) {
+                        margin = total - (product.purchasePrice * (total / product.salePrice));
+                    } else {
+                        margin = total - product.purchasePrice;
+                    }
+                }
+                dayTotal += total;
+                dayMargin += margin;
+                if (!byGamme[gamme]) byGamme[gamme] = { gamme, total: 0, orders: 0, margin: 0 };
+                byGamme[gamme].total += total;
+                byGamme[gamme].orders += 1;
+                byGamme[gamme].margin += margin;
+            });
+        });
+
+        res.json({
+            success: true,
+            summary: {
+                day: today,
+                orders: todayOrders.length,
+                total: Math.round(dayTotal * 100) / 100,
+                margin: Math.round(dayMargin * 100) / 100,
+                visitsToday: Number((visits.byDay || {})[today] || 0),
+                visitsTotal: Number(visits.total || 0),
+                byGamme: Object.values(byGamme).sort((a, b) => b.total - a.total).map(item => ({
+                    gamme: item.gamme,
+                    total: Math.round(item.total * 100) / 100,
+                    orders: item.orders,
+                    margin: Math.round(item.margin * 100) / 100
+                }))
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 app.post('/api/admin/site-config', express.json(), (req, res) => {
     const adminPwd = process.env.ADMIN_PWD || 'comimpression2025';
     const body = req.body || {};
@@ -978,6 +1147,8 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             summary: String(body.summary || '').trim(),
             priceLabel: String(body.priceLabel || '').trim(),
             priceValue: body.priceValue == null || body.priceValue === '' ? null : Number(body.priceValue),
+            purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
+            salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
             quantityOptions: normaliseCsvList(body.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
@@ -1013,6 +1184,8 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             summary: String(body.summary || '').trim(),
             priceLabel: String(body.priceLabel || 'Sur devis').trim(),
             priceValue: body.priceValue == null || body.priceValue === '' ? null : Number(body.priceValue),
+            purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
+            salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
             quantityOptions: normaliseCsvList(body.quantityOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),

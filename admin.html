@@ -92,9 +92,17 @@
     .season-item input{margin-top:3px;width:auto}
     .season-item strong{display:block;font-size:.9rem}
     .season-item span{display:block;color:var(--muted);font-size:.8rem;line-height:1.35}
+    .template-card{border:2px solid #eee0d6;border-radius:20px;padding:16px;background:#fffdfa;display:grid;gap:12px}
+    .template-card h3{margin:0;font-family:'Baloo 2',cursive;font-size:1.15rem}
+    .template-card textarea{min-height:220px;font-family:inherit;line-height:1.6}
+    .template-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .day-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+    .day-kpi{background:#fff8ef;border:2px solid #f0e4dc;border-radius:18px;padding:16px}
+    .day-kpi strong{display:block;font-family:'Baloo 2',cursive;font-size:1rem;line-height:1}
+    .day-kpi span{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:1.8rem;color:var(--or)}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:2px dashed var(--line);border-radius:20px}
-    @media(max-width:900px){.admin-summary{grid-template-columns:1fr 1fr}.order,.manual-line,.season-list{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}}
-    @media(max-width:560px){.admin-summary{grid-template-columns:1fr}.page{width:min(100% - 20px,1180px)}.login-card,.dashboard,.admin-section,.box{border-width:3px;box-shadow:5px 5px 0 #151515}}
+    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.season-list{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}}
+    @media(max-width:560px){.admin-summary,.day-kpis{grid-template-columns:1fr}.page{width:min(100% - 20px,1180px)}.login-card,.dashboard,.admin-section,.box{border-width:3px;box-shadow:5px 5px 0 #151515}}
   </style>
 </head>
 <body>
@@ -133,6 +141,7 @@
         <button class="btn btn-light btn-small" id="btn-logout" type="button">Déconnexion</button>
       </div>
       <div class="admin-tabs">
+        <button class="admin-tab" data-open-scope="jour" type="button">Fiche du jour</button>
         <button class="admin-tab" data-open-scope="cours" type="button">Commandes en cours <span class="admin-tab-count" id="count-cours">0</span></button>
         <button class="admin-tab" data-open-scope="terminees" type="button">Terminees <span class="admin-tab-count" id="count-terminees">0</span></button>
         <button class="admin-tab" data-open-scope="annulees" type="button">Annulees <span class="admin-tab-count" id="count-annulees">0</span></button>
@@ -140,6 +149,7 @@
         <button class="admin-tab" data-open-scope="avis" type="button">Avis <span class="admin-tab-count" id="count-avis">0</span></button>
         <button class="admin-tab" data-open-scope="produits" type="button">Produits <span class="admin-tab-count" id="count-produits">0</span></button>
         <button class="admin-tab" data-open-scope="clients" type="button">Clients <span class="admin-tab-count" id="count-clients">0</span></button>
+        <button class="admin-tab" data-open-scope="emails" type="button">Modeles de mail</button>
         <button class="admin-tab" data-open-scope="site" type="button">Accueil et contenu</button>
       </div>
       <div class="admin-summary">
@@ -190,6 +200,34 @@
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body" id="detail-body"></div>
+    </div>
+  </section>
+
+  <section class="admin-section" id="modal-day-sheet">
+    <div class="box">
+      <div class="box-head">
+        <h2>Fiche du jour</h2>
+        <button class="btn btn-light btn-small" data-close type="button">Retour</button>
+      </div>
+      <div class="box-body">
+        <div class="day-kpis" id="day-kpis"></div>
+        <div class="panel">
+          <h3>Totaux par gamme</h3>
+          <div id="day-gamme-table"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-section" id="modal-email-templates">
+    <div class="box">
+      <div class="box-head">
+        <h2>Modeles de mail</h2>
+        <button class="btn btn-light btn-small" data-close type="button">Retour</button>
+      </div>
+      <div class="box-body">
+        <div class="site-grid" id="email-templates-grid"></div>
+      </div>
     </div>
   </section>
 
