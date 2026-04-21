@@ -812,21 +812,20 @@ function resolveCartUploads(rawTokens) {
 
 function defaultSiteConfig() {
     return {
-        topBanner: '🎨 Imprimerie en ligne – Livraison gratuite sur toute la France',
-        heroBadge: '🎨 Imprimerie en ligne – Livraison gratuite sur toute la France',
-        heroLine1: "L'impression",
-        heroHighlight: 'colorée',
-        heroLine2: 'qui fait la différence !',
-        heroSlogan: 'Saison des mariages & baptêmes — Invitations, plans de table, menus…',
-        heroText: 'Cartes de visite, flyers, affiches, bâches et bien plus — conçus en Vendée, à Montreverd (85), livrés partout en France.',
+        topBanner: '',
+        heroBadge: 'Communication visuelle qui vend mieux',
+        heroLine1: 'Vos supports,',
+        heroHighlight: 'vos gammes,',
+        heroLine2: 'votre image.',
+        heroSlogan: "Vos vraies gammes COM' Impression, reunies proprement",
+        heroText: "Retrouvez vos gammes COM' Impression pour choisir rapidement le bon support, du print professionnel aux produits personnalises.",
         heroImage: '',
-        heroPanelTitle: 'Un accueil plus complet et plus utile',
-        heroPanelText: "On garde la force du logo orange, mais on bascule vers une vraie page d'accueil de boutique: trouver, choisir, rassurer et convertir.",
+        heroPanelTitle: "COM' Impression",
+        heroPanelText: 'Un acces simple a vos gammes, votre compte et votre panier.',
         heroPanelItems: [
-            'Barre de recherche visible en haut',
-            'Bouton Mon compte avec affichage du nom si client connecte',
-            'Bouton Panier avec compteur',
-            "Les vraies gammes COM' Impression mises en avant"
+            'Recherche rapide',
+            'Compte client',
+            'Panier simple'
         ],
         productsTitle: "Tout ce qu'il faut pour",
         productsAccent: 'communiquer',

@@ -449,6 +449,7 @@
 
   function remplirSiteConfig(config){
     $('site-top-banner').value = config.topBanner || '';
+    $('site-hero-badge').value = config.heroBadge || '';
     $('site-hero-slogan').value = config.heroSlogan || '';
     $('site-hero-line1').value = config.heroLine1 || '';
     $('site-hero-highlight').value = config.heroHighlight || '';
@@ -477,7 +478,8 @@
           .then(function(incidentData){
             var incident = (incidentData && incidentData.incident) || {};
             remplirSiteConfig({
-              topBanner: state.siteConfig.heroBadge || state.siteConfig.topBanner,
+              topBanner: state.siteConfig.topBanner,
+              heroBadge: state.siteConfig.heroBadge,
               heroSlogan: state.siteConfig.heroSlogan,
               heroLine1: state.siteConfig.heroLine1,
               heroHighlight: state.siteConfig.heroHighlight,
@@ -501,7 +503,7 @@
     var payload = {
       mdp: state.mdp,
       topBanner: $('site-top-banner').value || '',
-      heroBadge: $('site-top-banner').value || '',
+      heroBadge: $('site-hero-badge').value || '',
       heroLine1: $('site-hero-line1').value || '',
       heroHighlight: $('site-hero-highlight').value || '',
       heroLine2: $('site-hero-line2').value || '',

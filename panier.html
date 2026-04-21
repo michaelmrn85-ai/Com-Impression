@@ -32,32 +32,16 @@
   </header>
 
   <main class="page-shell">
-    <section class="page-hero">
-      <div class="hero-card">
-        <div class="pill">Panier</div>
-        <h1>Verifier votre selection avant validation.</h1>
-        <p>Retrouvez ici vos produits, vos quantites et vos informations de commande avant l'envoi ou le paiement.</p>
-        <div class="hero-actions">
-          <button class="btn-light" id="cart-go-products" type="button">Ajouter des produits</button>
-          <a class="btn" href="./rendez-vous.html">Prendre rendez-vous</a>
-        </div>
-      </div>
-      <aside class="hero-aside">
-        <div class="pill" style="background:rgba(255,255,255,.1);color:#fff;">Commande</div>
-        <p>Finalisez votre panier, ajoutez vos fichiers si besoin et choisissez ensuite l'envoi de la demande ou le paiement par carte bancaire.</p>
-      </aside>
-    </section>
-
     <section class="section">
       <div class="list-card">
         <div class="section-head">
           <div>
-            <div class="pill">Recapitulatif</div>
+            <div class="pill">Panier</div>
             <h2>Votre selection</h2>
           </div>
         </div>
         <div id="cart-empty" class="empty-state" hidden>
-          Votre panier est vide. Ajoutez d'abord un produit avant d'envoyer votre demande.
+          Votre panier est vide.
         </div>
         <div class="item-list" id="cart-items"></div>
       </div>
@@ -68,12 +52,12 @@
         <div class="section-head">
           <div>
             <div class="pill">Validation</div>
-            <h2>Coordonnees de commande</h2>
+            <h2>Coordonnees</h2>
           </div>
         </div>
         <div class="summary-box" style="margin-bottom:18px;">
           <div class="split-line">
-            <span>Total estime</span>
+            <span>Total TTC</span>
             <strong class="total" id="cart-total">0,00 EUR</strong>
           </div>
         </div>
@@ -115,10 +99,6 @@
             <h2>Envoi et paiement</h2>
           </div>
         </div>
-        <div class="summary-box" style="margin-bottom:18px;">
-          <p>Validez d'abord votre panier et vos coordonnees. Une fois cette etape confirmee, vous pourrez envoyer la demande ou regler par carte bancaire.</p>
-        </div>
-
         <form id="cart-form" hidden>
           <div class="field">
             <label for="checkout-message">Message complementaire</label>
@@ -150,9 +130,9 @@
   <div class="auth-overlay" id="checkout-auth-modal" hidden>
     <div class="auth-dialog">
       <button class="auth-close" id="checkout-auth-close" type="button">×</button>
-      <div class="pill">Etape connexion</div>
-      <h2>Connexion client avant validation</h2>
-      <p>Connectez-vous ou creez votre compte avant de valider votre panier.</p>
+      <div class="pill">Compte client</div>
+      <h2>Connectez-vous pour continuer</h2>
+      <p>Connectez-vous ou creez votre compte pour valider votre panier.</p>
       <div class="auth-switches">
         <button class="btn-light" id="checkout-open-login" type="button">Connexion</button>
         <button class="btn-light" id="checkout-open-register" type="button">Inscription</button>
@@ -228,11 +208,12 @@
           <img src="./com-logo.png" alt="Logo COM' Impression">
           <div>
             <strong>COM' Impression</strong>
-            <p>Vos impressions, conceptions visuelles et commandes personnalisees sont concues en Vendee, expediees depuis la Vendee et imprimees sur site.</p>
+            <p>Les supports numeriques sont crees en Vendee (85) a Montreverd, imprimes dans le Sud-Ouest, puis livres directement chez le client.</p>
             <div class="footer-tags">
-              <span class="footer-tag">Concu en Vendee</span>
-              <span class="footer-tag">Expedie depuis la Vendee</span>
-              <span class="footer-tag">Imprime sur site</span>
+              <span class="footer-tag">Cree en Vendee (85)</span>
+              <span class="footer-tag">Montreverd</span>
+              <span class="footer-tag">Imprime dans le Sud-Ouest</span>
+              <span class="footer-tag">Livre chez le client</span>
             </div>
           </div>
         </div>

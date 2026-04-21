@@ -122,6 +122,7 @@
     }
 
     .search-shell {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -138,6 +139,47 @@
       border: 0;
       outline: none;
       color: var(--ink);
+    }
+
+    .search-suggestions {
+      position: absolute;
+      top: calc(100% + 10px);
+      left: 0;
+      right: 0;
+      display: grid;
+      gap: 6px;
+      padding: 10px;
+      border-radius: 24px;
+      background: rgba(255, 250, 245, 0.98);
+      border: 1px solid rgba(23, 19, 16, 0.08);
+      box-shadow: 0 20px 44px rgba(23, 19, 16, 0.12);
+      z-index: 40;
+    }
+
+    .search-suggestion {
+      width: 100%;
+      border: 0;
+      background: #fff;
+      color: var(--ink);
+      border-radius: 18px;
+      padding: 12px 14px;
+      text-align: left;
+      cursor: pointer;
+      display: grid;
+      gap: 3px;
+    }
+
+    .search-suggestion strong {
+      font-size: 0.98rem;
+    }
+
+    .search-suggestion span {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .search-suggestion:hover {
+      background: #fff1e5;
     }
 
     .search-btn,
@@ -221,9 +263,9 @@
 
     .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-      gap: 28px;
-      align-items: center;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+      align-items: stretch;
     }
 
     .hero-tag {
@@ -312,7 +354,7 @@
 
     .hero-panel {
       position: relative;
-      min-height: 540px;
+      min-height: 340px;
       border-radius: var(--radius-xl);
       overflow: hidden;
       background: linear-gradient(160deg, #1c1713 0%, #2b241e 100%);
@@ -355,23 +397,34 @@
     }
 
     .panel-card {
-      padding: 22px;
-      margin-bottom: 18px;
+      padding: 26px;
+      margin-bottom: 0;
+      display: grid;
+      grid-template-columns: minmax(240px, 420px) minmax(0, 1fr);
+      gap: 28px;
+      align-items: center;
     }
 
     .hero-logo {
-      width: min(100%, 390px);
-      margin: 0 auto 16px;
+      width: min(100%, 420px);
+      margin: 0 auto;
     }
 
     .panel-card h2 {
       font-family: "Sora", sans-serif;
-      font-size: 1.56rem;
+      font-size: clamp(2rem, 4vw, 3.2rem);
       line-height: 1.08;
       margin-bottom: 10px;
     }
 
+    .panel-copy {
+      display: grid;
+      gap: 14px;
+      align-content: center;
+    }
+
     .panel-card p,
+    .hero-inline-list li,
     .hero-list li,
     .section-title p,
     .gamme-card p,
@@ -398,6 +451,31 @@
     }
 
     .hero-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--orange);
+    }
+
+    .hero-inline-list {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+      margin-top: 4px;
+      padding: 0;
+    }
+
+    .hero-inline-list li {
+      padding-left: 16px;
+      position: relative;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .hero-inline-list li::before {
       content: "";
       position: absolute;
       left: 0;
@@ -807,6 +885,10 @@
         min-height: auto;
       }
 
+      .panel-card {
+        grid-template-columns: 1fr;
+      }
+
       .footer-top {
         grid-template-columns: 1fr;
       }
@@ -859,48 +941,26 @@
   <main>
     <section class="hero" id="accueil">
       <div class="hero-grid">
-        <div class="hero-copy">
-          <div class="hero-tag" id="home-hero-badge">Communication visuelle qui vend mieux</div>
-          <h1 id="home-hero-title">Vos supports, vos gammes, votre image.</h1>
-          <p id="home-hero-text">
-            Retrouvez vos gammes COM' Impression pour choisir rapidement le bon support, du print professionnel
-            aux produits personnalises, avec un acces simple au compte, au panier et a la prise de rendez-vous.
-          </p>
-          <div class="hero-cta">
-            <a class="main-btn" href="./produits.html" id="home-go-products">Voir les gammes</a>
-            <a class="alt-btn" href="./rendez-vous.html">Prendre rendez-vous</a>
-          </div>
-          <div class="hero-metrics">
-            <div class="metric">
-              <strong>5 + 1</strong>
-              <span>Univers pour repondre a tous vos besoins print et personnalises</span>
-            </div>
-            <div class="metric">
-              <strong>1 clic</strong>
-              <span>Pour acceder au compte ou au panier</span>
-            </div>
-            <div class="metric">
-              <strong>Rapide</strong>
-              <span>Recherche immediate pour aller droit au bon support</span>
-            </div>
-          </div>
-        </div>
-
         <div class="hero-panel">
           <div class="panel-card">
             <img class="hero-logo" id="home-hero-image" src="./com-logo.png" alt="COM' Impression">
-            <h2 id="home-panel-title">Un accueil plus complet et plus utile</h2>
-            <p id="home-panel-text">
-              Decouvrez rapidement les gammes, accedez a votre compte et trouvez le bon produit selon votre besoin.
-            </p>
+            <div class="panel-copy">
+              <div class="hero-tag" id="home-hero-badge">Communication visuelle qui vend mieux</div>
+              <h2 id="home-panel-title">COM' Impression</h2>
+              <p id="home-panel-text">
+                Un acces simple a vos gammes, votre compte et votre panier.
+              </p>
+              <ul class="hero-inline-list" id="home-panel-list">
+                <li>Recherche rapide</li>
+                <li>Acces direct au compte</li>
+                <li>Panier simple</li>
+              </ul>
+              <div class="hero-cta">
+                <a class="main-btn" href="./produits.html" id="home-go-products">Voir les gammes</a>
+                <a class="alt-btn" href="./rendez-vous.html">Prendre rendez-vous</a>
+              </div>
+            </div>
           </div>
-          <ul class="hero-list" id="home-panel-list">
-            <li>Barre de recherche visible en haut</li>
-            <li>Bouton Mon compte avec affichage du nom si client connecte</li>
-            <li>Bouton Panier avec compteur</li>
-            <li>Les vraies gammes COM' Impression mises en avant</li>
-            <li>Avis clients et prise de rendez-vous integres</li>
-          </ul>
         </div>
       </div>
     </section>
@@ -911,10 +971,6 @@
           <div class="hero-tag">Nos gammes</div>
           <h2>Les vraies gammes COM' Impression.</h2>
         </div>
-        <p>
-          Chaque gamme est pensee comme une porte d'entree simple pour que le client trouve vite ce qu'il veut,
-          sans devoir parcourir un menu trop charge.
-        </p>
       </div>
 
       <div class="gammes-grid" id="gammes-grid">
@@ -1000,12 +1056,8 @@
       <div class="section-title">
         <div>
           <div class="hero-tag">Avis clients</div>
-          <h2>Des retours qui rassurent avant de commander.</h2>
+          <h2>Vos avis sont precieux.</h2>
         </div>
-        <p>
-          Les avis donnent de la confiance tout de suite et montrent que COM' Impression accompagne aussi bien
-          les pros que les particuliers.
-        </p>
       </div>
 
       <div class="avis-grid">
@@ -1044,9 +1096,6 @@
           <div class="hero-tag">Prise de rendez-vous</div>
           <h2>Proposer un echange simple et rapide.</h2>
         </div>
-        <p>
-          Certains clients preferent parler de leur projet avant de choisir. Ce bloc sert a les rassurer et a declencher le contact.
-        </p>
       </div>
 
       <div class="rdv-grid">
@@ -1094,13 +1143,14 @@
           <div>
             <strong>COM' Impression</strong>
             <p>
-              Vos impressions, conceptions visuelles et commandes personnalisees sont concues en Vendee,
-              expediees depuis la Vendee et imprimees sur site pour garder un vrai niveau de suivi et de qualite.
+              Les supports numeriques sont crees en Vendee (85) a Montreverd, imprimes dans le Sud-Ouest,
+              puis livres directement chez le client.
             </p>
             <div class="footer-tags">
-              <span class="footer-tag">Concu en Vendee</span>
-              <span class="footer-tag">Expedie depuis la Vendee</span>
-              <span class="footer-tag">Imprime sur site</span>
+              <span class="footer-tag">Cree en Vendee (85)</span>
+              <span class="footer-tag">Montreverd</span>
+              <span class="footer-tag">Imprime dans le Sud-Ouest</span>
+              <span class="footer-tag">Livre chez le client</span>
             </div>
           </div>
         </div>

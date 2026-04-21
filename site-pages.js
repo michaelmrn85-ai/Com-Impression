@@ -154,6 +154,14 @@
     el.textContent = "";
   }
 
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
+
   function updateHeaderState() {
     var cart = readCart();
     var count = String(cart.length);
@@ -167,9 +175,114 @@
     });
   }
 
+  function ensureGlobalSiteUi() {
+    if ($("ci-global-site-ui")) return;
+    var style = document.createElement("style");
+    style.id = "ci-global-site-ui";
+    style.textContent =
+      ".site-announcement{background:#171310;color:#fff;padding:10px 18px;text-align:center;font-weight:700;font-size:.95rem;line-height:1.4;}" +
+      ".site-announcement[hidden]{display:none!important;}" +
+      ".site-popup-overlay{position:fixed;inset:0;background:rgba(23,19,16,.56);display:none;align-items:center;justify-content:center;padding:20px;z-index:90;}" +
+      ".site-popup-overlay.open{display:flex;}" +
+      ".site-popup-card{width:min(560px,100%);background:#fffaf5;border-radius:28px;padding:28px;box-shadow:0 28px 70px rgba(23,19,16,.28);position:relative;display:grid;gap:14px;}" +
+      ".site-popup-card h3{margin:0;font-family:'Sora',sans-serif;font-size:1.7rem;line-height:1.05;}" +
+      ".site-popup-card p{margin:0;color:#5f5751;font-size:1rem;line-height:1.65;}" +
+      ".site-popup-close{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:999px;border:0;background:#171310;color:#fff;font-size:1.6rem;cursor:pointer;}" +
+      ".site-popup-actions{display:flex;justify-content:flex-end;}" +
+      ".site-popup-actions .btn-light{width:auto;}";
+    document.head.appendChild(style);
+  }
+
+  function renderSiteAnnouncement(config) {
+    ensureGlobalSiteUi();
+    var text = (config && config.topBanner) ? String(config.topBanner).trim() : "";
+    var existing = $("site-announcement");
+    if (!text) {
+      if (existing) existing.hidden = true;
+      return;
+    }
+    if (!existing) {
+      existing = document.createElement("div");
+      existing.id = "site-announcement";
+      existing.className = "site-announcement";
+      var header = document.querySelector("header.topbar");
+      if (header && header.parentNode) {
+        header.parentNode.insertBefore(existing, header);
+      } else {
+        document.body.insertBefore(existing, document.body.firstChild);
+      }
+    }
+    existing.hidden = false;
+    existing.textContent = text;
+  }
+
+  function renderSitePopup(incident) {
+    ensureGlobalSiteUi();
+    var existing = $("site-popup-overlay");
+    if (!incident || !incident.active || !String(incident.message || "").trim()) {
+      if (existing) {
+        existing.classList.remove("open");
+        existing.setAttribute("hidden", "hidden");
+      }
+      return;
+    }
+    var popupKey = "ci_popup_seen_" + String(incident.updated_at || incident.message);
+    if (sessionStorage.getItem(popupKey)) return;
+    if (!existing) {
+      existing = document.createElement("div");
+      existing.id = "site-popup-overlay";
+      existing.className = "site-popup-overlay";
+      existing.innerHTML =
+        '<div class="site-popup-card">'
+          + '<button class="site-popup-close" type="button" aria-label="Fermer">×</button>'
+          + '<div class="pill">Information</div>'
+          + '<h3 id="site-popup-title"></h3>'
+          + '<p id="site-popup-message"></p>'
+          + '<div class="site-popup-actions"><button class="btn-light" id="site-popup-ok" type="button">J\'ai compris</button></div>'
+        + '</div>';
+      document.body.appendChild(existing);
+      existing.addEventListener("click", function (event) {
+        if (event.target === existing) {
+          existing.classList.remove("open");
+          existing.setAttribute("hidden", "hidden");
+        }
+      });
+      existing.querySelector(".site-popup-close").addEventListener("click", function () {
+        existing.classList.remove("open");
+        existing.setAttribute("hidden", "hidden");
+      });
+      existing.querySelector("#site-popup-ok").addEventListener("click", function () {
+        existing.classList.remove("open");
+        existing.setAttribute("hidden", "hidden");
+      });
+    }
+    $("site-popup-title").textContent = incident.title || "Information client";
+    $("site-popup-message").textContent = incident.message || "";
+    existing.removeAttribute("hidden");
+    existing.classList.add("open");
+    sessionStorage.setItem(popupKey, "1");
+  }
+
+  function loadGlobalSiteContent() {
+    fetch(API_BASE + "/api/site-config")
+      .then(function (response) { return response.json().catch(function () { return {}; }); })
+      .then(function (json) {
+        if (json && json.config) renderSiteAnnouncement(json.config);
+      })
+      .catch(function () {});
+
+    fetch(API_BASE + "/api/incident")
+      .then(function (response) { return response.json().catch(function () { return {}; }); })
+      .then(function (json) {
+        if (json && json.incident) renderSitePopup(json.incident);
+      })
+      .catch(function () {});
+  }
+
   function bindShell() {
     updateHeaderState();
     rewriteInternalLinks();
+    if (!IS_FILE_PROTOCOL) loadGlobalSiteContent();
 
     document.querySelectorAll("[data-account-button]").forEach(function (button) {
       button.addEventListener("click", function () {
@@ -185,22 +298,87 @@
 
     document.querySelectorAll("[data-search-form]").forEach(function (form) {
       var input = form.querySelector("input[type='search']");
-      var searchTimer = null;
-      form.addEventListener("submit", function (event) {
-        event.preventDefault();
-        var query = input ? input.value.trim() : "";
-        goTo(query ? "/produits?q=" + encodeURIComponent(query) : "/produits");
-      });
-      if (input) {
-        input.addEventListener("input", function () {
-          var query = input.value.trim();
-          window.clearTimeout(searchTimer);
-          searchTimer = window.setTimeout(function () {
-            if (!query) return;
-            goTo("/produits?q=" + encodeURIComponent(query));
-          }, 220);
+      if (!input) return;
+      var dropdown = document.createElement("div");
+      dropdown.className = "search-suggestions";
+      dropdown.hidden = true;
+      form.appendChild(dropdown);
+
+      function closeSuggestions() {
+        dropdown.hidden = true;
+        dropdown.innerHTML = "";
+      }
+
+      function openSuggestions(items) {
+        if (!items.length) {
+          closeSuggestions();
+          return;
+        }
+        dropdown.innerHTML = items.map(function (entry) {
+          return '<button class="search-suggestion" type="button" data-search-product="' + esc(entry.product.id) + '" data-search-gamme="' + esc(entry.gammeSlug) + '">'
+            + '<strong>' + esc(entry.product.title) + '</strong>'
+            + '<span>' + esc(entry.gammeTitle) + '</span>'
+          + '</button>';
+        }).join("");
+        dropdown.hidden = false;
+        dropdown.querySelectorAll("[data-search-product]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            closeSuggestions();
+            goTo(buildProductUrl(button.getAttribute("data-search-gamme"), button.getAttribute("data-search-product")));
+          });
         });
       }
+
+      function buildSuggestions(query) {
+        var normalizedQuery = normalizeSearchText(query);
+        if (!normalizedQuery || normalizedQuery.length < 2) {
+          closeSuggestions();
+          return;
+        }
+        loadCatalogFromApi().then(function () {
+          var visible = flattenProducts()
+            .map(function (entry) {
+              var title = normalizeSearchText(entry.product.title);
+              var gamme = normalizeSearchText(entry.gammeTitle);
+              var tags = normalizeSearchText((entry.product.tags || []).join(" "));
+              var words = title.split(/\s+/).filter(Boolean);
+              var score = 0;
+              if (title.indexOf(normalizedQuery) === 0) score = 5;
+              else if (words.some(function (word) { return word.indexOf(normalizedQuery) === 0; })) score = 4;
+              else if (gamme.indexOf(normalizedQuery) === 0) score = 3;
+              else if (title.indexOf(normalizedQuery) !== -1) score = 2;
+              else if (tags.indexOf(normalizedQuery) !== -1) score = 1;
+              return { entry: entry, score: score };
+            })
+            .filter(function (item) { return item.score > 0; })
+            .sort(function (a, b) {
+              if (b.score !== a.score) return b.score - a.score;
+              return String(a.entry.product.title || "").localeCompare(String(b.entry.product.title || ""), "fr");
+            })
+            .slice(0, 6)
+            .map(function (item) { return item.entry; });
+          openSuggestions(visible);
+        });
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var query = input.value.trim();
+        closeSuggestions();
+        goTo(query ? "/produits?q=" + encodeURIComponent(query) : "/produits");
+      });
+      input.addEventListener("input", function () {
+        buildSuggestions(input.value);
+      });
+      input.addEventListener("focus", function () {
+        if (input.value.trim()) buildSuggestions(input.value);
+      });
+      input.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") closeSuggestions();
+      });
+      document.addEventListener("click", function (event) {
+        if (!form.contains(event.target)) closeSuggestions();
+      });
     });
   }
 
@@ -361,9 +539,10 @@
           + '</div>'
           + '<aside class="summary-box product-side-summary">'
             + '<div class="pill">Votre selection</div>'
-            + '<p class="muted">Choisissez vos options, puis ajoutez le produit au panier.</p>'
+            + '<div class="product-side-current"><strong>' + esc(product.title) + '</strong><span>' + esc(entry.gammeTitle) + '</span></div>'
             + '<div class="product-side-meta"><strong>Reference</strong><span>' + esc(getProductRef(product)) + '</span></div>'
-            + '<div class="product-side-meta"><strong>Gamme</strong><span>' + esc(entry.gammeTitle) + '</span></div>'
+            + '<div class="product-side-meta"><strong>Fichier</strong><span id="product-upload-summary">Aucun fichier</span></div>'
+            + '<div class="product-side-meta"><strong>Total TTC</strong><span class="product-price" id="product-total-summary">' + esc(normalizePriceLabel(product.priceLabel)) + '</span></div>'
             + '<div class="hero-actions product-detail-actions">'
               + '<button class="btn" id="add-to-cart-btn" type="button">Ajouter au panier</button>'
               + '<a class="btn-light" href="' + esc(resolveAppUrl("/panier")) + '">Voir le panier</a>'
@@ -377,6 +556,8 @@
     var quantityField = $("product-quantity-field");
     var priceDisplay = $("product-price-display");
     var priceStatus = $("product-price-status");
+    var totalSummary = $("product-total-summary");
+    var uploadSummary = $("product-upload-summary");
     var currentPriceLabel = product.priceLabel;
     var currentPriceValue = product.priceValue;
     var currentQuantityOptions = Array.isArray(product.quantityOptions) ? product.quantityOptions.slice() : [];
@@ -421,6 +602,12 @@
       });
     }
 
+    function refreshUploadSummary() {
+      if (!uploadSummary) return;
+      var files = Array.prototype.slice.call((($("product-files") || {}).files) || []);
+      uploadSummary.textContent = files.length ? files.map(function (file) { return file.name; }).join(", ") : "Aucun fichier";
+    }
+
     function requestPricing(keepQuantity) {
       refreshSelectionsFromDom();
       clearStatus(priceStatus);
@@ -450,6 +637,7 @@
           currentPriceLabel = json.priceLabel || product.priceLabel;
           currentPriceValue = typeof json.priceValue === "number" ? json.priceValue : null;
           if (priceDisplay) priceDisplay.textContent = normalizePriceLabel(currentPriceLabel);
+          if (totalSummary) totalSummary.textContent = currentPriceValue != null ? euro(currentPriceValue) : normalizePriceLabel(currentPriceLabel);
           var qtySelect = $("product-qty-select");
           var qtyInput = $("product-qty-input");
           if (qtySelect) {
@@ -468,6 +656,7 @@
             clearStatus(priceStatus);
             renderQuantityField(selectedQuantity || "");
             if (priceDisplay) priceDisplay.textContent = normalizePriceLabel(currentPriceLabel);
+            if (totalSummary) totalSummary.textContent = currentPriceValue != null ? euro(currentPriceValue) : normalizePriceLabel(currentPriceLabel);
             return;
           }
           setStatus(priceStatus, "err", error.message || "Impossible de recalculer le prix.");
@@ -482,6 +671,8 @@
     });
     if ($("product-width")) $("product-width").addEventListener("input", function () { requestPricing(); });
     if ($("product-height")) $("product-height").addEventListener("input", function () { requestPricing(); });
+    if ($("product-files")) $("product-files").addEventListener("change", refreshUploadSummary);
+    refreshUploadSummary();
     requestPricing();
 
     var addButton = $("add-to-cart-btn");
@@ -777,33 +968,24 @@
         list.innerHTML =
           '<div class="cart-table">'
             + '<div class="cart-table-head cart-table-row">'
-              + '<div>Reference</div>'
-              + '<div>Libelle</div>'
-              + '<div class="cart-qty">Quantite</div>'
-              + '<div class="cart-unit-cell">Finition papier</div>'
-              + '<div class="cart-unit-cell">Prix unitaire</div>'
+              + '<div>Produit</div>'
+              + '<div class="cart-file-cell">Fichier</div>'
               + '<div class="cart-total-cell">Total TTC</div>'
               + '<div class="cart-action">Action</div>'
             + '</div>'
             + '<div class="cart-table-body">'
               + cart.map(function (item) {
                 return '<div class="cart-table-row">'
-                  + '<div class="cart-ref"><span class="cart-mobile-label">Reference</span><span class="cart-cell-value">' + esc(item.ref || getProductRef(item)) + '</span></div>'
-                  + '<div class="cart-label"><span class="cart-mobile-label">Libelle</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.gamme || "") + '</div>' + (item.configuration ? '<div class="muted">Configuration: ' + esc(item.configuration) + '</div>' : '') + ((item.uploadNames || []).length ? '<div class="muted">Fichiers: ' + esc(item.uploadNames.join(", ")) + '</div>' : '') + (item.notes ? '<div class="muted">Note: ' + esc(item.notes) + '</div>' : "") + '</div></div>'
-                  + '<div class="cart-qty"><span class="cart-mobile-label">Quantite</span><span class="cart-cell-value">' + esc(item.quantity || "-") + '</span></div>'
-                  + '<div class="cart-unit-cell"><span class="cart-mobile-label">Finition papier</span><span class="cart-cell-value">' + esc(item.paperFinish || "-") + '</span></div>'
-                  + '<div class="cart-unit-cell"><span class="cart-mobile-label">Prix unitaire</span><span class="cart-cell-value">' + esc(item.priceUnit != null ? euro(item.priceUnit) : item.priceLabel || "-") + '</span></div>'
+                  + '<div class="cart-label"><span class="cart-mobile-label">Produit</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.ref || getProductRef(item)) + '</div>' + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.paperFinish ? '<div class="muted">' + esc(item.paperFinish) + '</div>' : '') + '</div></div>'
+                  + '<div class="cart-file-cell"><span class="cart-mobile-label">Fichier</span><span class="cart-cell-value">' + esc(((item.uploadNames || []).length ? item.uploadNames.join(", ") : "Aucun fichier")) + '</span></div>'
                   + '<div class="cart-total-cell product-price"><span class="cart-mobile-label">Total TTC</span><span class="cart-cell-value">' + esc(item.priceValue != null ? euro(item.priceValue) : item.priceLabel || "-") + '</span></div>'
-                  + '<div class="cart-action"><span class="cart-mobile-label">Action</span><span class="cart-cell-value"><button class="btn-light" type="button" data-remove-cart="' + esc(item.id) + '">Supprimer</button></span></div>'
+                  + '<div class="cart-action"><span class="cart-mobile-label">Action</span><span class="cart-cell-value"><button class="cart-remove-btn" type="button" data-remove-cart="' + esc(item.id) + '" aria-label="Supprimer">×</button></span></div>'
                 + '</div>';
               }).join("")
             + '</div>'
             + '<div class="cart-table-foot">'
               + '<div class="cart-table-row">'
-                + '<div></div>'
                 + '<div><strong>Total TTC</strong></div>'
-                + '<div></div>'
-                + '<div></div>'
                 + '<div></div>'
                 + '<div class="cart-total-cell total">' + esc(totalInfo.label) + '</div>'
                 + '<div></div>'
@@ -1487,7 +1669,7 @@
         var config = json && json.config ? json.config : null;
         if (!config) return;
         if ($("home-brand-subtitle")) $("home-brand-subtitle").textContent = config.heroSlogan || $("home-brand-subtitle").textContent;
-        if ($("home-hero-badge")) $("home-hero-badge").textContent = config.heroBadge || config.topBanner || $("home-hero-badge").textContent;
+        if ($("home-hero-badge")) $("home-hero-badge").textContent = config.heroBadge || $("home-hero-badge").textContent;
         if ($("home-hero-title")) {
           $("home-hero-title").textContent = [config.heroLine1, config.heroHighlight, config.heroLine2].filter(Boolean).join(" ").trim() || $("home-hero-title").textContent;
         }
@@ -1498,6 +1680,8 @@
           $("home-panel-list").innerHTML = config.heroPanelItems.map(function (item) {
             return "<li>" + esc(item) + "</li>";
           }).join("");
+        } else if ($("home-panel-list")) {
+          $("home-panel-list").innerHTML = "";
         }
         if ($("home-hero-image") && config.heroImage) {
           $("home-hero-image").src = config.heroImage;
