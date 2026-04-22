@@ -873,16 +873,16 @@ app.delete('/api/cart-upload/:token', (req, res) => {
     }
 });
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'com-impression.html')));
+app.get('/', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'com-impression.html')); });
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/produits', (req, res) => res.sendFile(path.join(__dirname, 'produits.html')));
-app.get('/produit', (req, res) => res.sendFile(path.join(__dirname, 'produit.html')));
-app.get('/panier', (req, res) => res.sendFile(path.join(__dirname, 'panier.html')));
-app.get('/client', (req, res) => res.sendFile(path.join(__dirname, 'client.html')));
-app.get('/rendez-vous', (req, res) => res.sendFile(path.join(__dirname, 'rendez-vous.html')));
-app.get('/mentions-legales', (req, res) => res.sendFile(path.join(__dirname, 'mentions-legales.html')));
-app.get('/cgv', (req, res) => res.sendFile(path.join(__dirname, 'cgv.html')));
-app.get('/faq', (req, res) => res.sendFile(path.join(__dirname, 'faq.html')));
+app.get('/produits', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'produits.html')); });
+app.get('/produit', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'produit.html')); });
+app.get('/panier', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'panier.html')); });
+app.get('/client', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'client.html')); });
+app.get('/rendez-vous', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'rendez-vous.html')); });
+app.get('/mentions-legales', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'mentions-legales.html')); });
+app.get('/cgv', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'cgv.html')); });
+app.get('/faq', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'faq.html')); });
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/admin.js', (req, res) => res.sendFile(path.join(__dirname, 'admin.js')));
 app.get('/com-impression.js', (req, res) => res.sendFile(path.join(__dirname, 'com-impression.js')));
@@ -959,14 +959,35 @@ function sauvegarderVisits(data) {
     fs.writeFileSync(VISITS_FILE, JSON.stringify(data || { total: 0, byDay: {}, byPath: {} }, null, 2));
 }
 
+function getVisitDayKey() {
+    return new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date());
+}
+
 function trackVisit(req) {
-    const pathname = req.path || '/';
+    let pathname = req.path || '/';
+    const htmlAliases = {
+        '/com-impression.html': '/',
+        '/produits.html': '/produits',
+        '/produit.html': '/produit',
+        '/panier.html': '/panier',
+        '/client.html': '/client',
+        '/rendez-vous.html': '/rendez-vous',
+        '/mentions-legales.html': '/mentions-legales',
+        '/cgv.html': '/cgv',
+        '/faq.html': '/faq'
+    };
+    pathname = htmlAliases[pathname] || pathname;
     if (req.method !== 'GET') return;
     if (pathname.startsWith('/api') || pathname.startsWith('/admin') || pathname.includes('.')) return;
     const tracked = ['/', '/produits', '/produit', '/panier', '/client', '/rendez-vous', '/mentions-legales', '/cgv', '/faq'];
     if (tracked.indexOf(pathname) === -1) return;
     const visits = lireVisits();
-    const dayKey = new Date().toISOString().slice(0, 10);
+    const dayKey = getVisitDayKey();
     visits.total = Number(visits.total || 0) + 1;
     visits.byDay = visits.byDay || {};
     visits.byPath = visits.byPath || {};
@@ -1196,7 +1217,7 @@ app.get('/api/admin/daily-summary', (req, res) => {
 
         const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '').trim())
             ? String(req.query.date || '').trim()
-            : new Date().toISOString().slice(0, 10);
+            : getVisitDayKey();
         const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === requestedDate);
         const byGamme = {};
         let dayTotal = 0;
