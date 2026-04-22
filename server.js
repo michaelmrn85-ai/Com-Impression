@@ -762,6 +762,7 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
 app.post('/api/sumup/create-checkout', express.json(), async (req, res) => {
     try {
         if (!requireSumupConfigured(res)) return;
+        const publicBaseUrl = getPublicBaseUrl(req);
         const amount = Number(req.body.amount || 0);
         const currency = String(req.body.currency || 'EUR').toUpperCase();
         const description = String(req.body.description || "Commande COM' Impression").trim();
