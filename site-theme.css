@@ -1025,6 +1025,47 @@ textarea {
   margin: 18px 0 20px;
 }
 
+.sumup-helper {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  margin: 16px 0 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fff4ea 0%, #fffaf5 100%);
+  border: 1px solid #f0d6c0;
+}
+
+.sumup-helper strong {
+  color: var(--orange-deep);
+  font-size: 1rem;
+}
+
+.sumup-helper p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.6;
+}
+
+.sumup-helper-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sumup-helper-steps span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #ecd7c7;
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 #sumup-card-element {
   width: 100%;
   min-height: 420px;
@@ -1410,6 +1451,20 @@ body[data-page="produit"] .page-shell {
   #checkout-payment-modal p {
     font-size: 1rem;
     line-height: 1.55;
+  }
+
+  .sumup-helper {
+    padding: 14px;
+  }
+
+  .sumup-helper-steps {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sumup-helper-steps span {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   #checkout-payment-modal .split-line {
