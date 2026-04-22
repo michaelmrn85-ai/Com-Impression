@@ -1234,9 +1234,17 @@ textarea {
   justify-content: center;
 }
 
-.payment-strip img {
-  width: min(100%, 560px);
-  height: auto;
+.payment-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 22px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  letter-spacing: 0.01em;
 }
 
 body[data-page="produits"] .page-shell {
@@ -1462,8 +1470,9 @@ body[data-page="produit"] .page-shell {
     justify-content: flex-start;
   }
 
-  .payment-strip img {
-    width: min(100%, 420px);
+  .payment-badge {
+    width: 100%;
+    text-align: center;
   }
 
   .auth-dialog {

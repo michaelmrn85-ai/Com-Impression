@@ -970,6 +970,10 @@
       }
       clearStatus(sumupStatus);
       updatePayableTotal();
+      ensureSumupWidget().catch(function (error) {
+        setStatus(sumupStatus, "err", error.message || "Impossible de charger le module SumUp.");
+        resetPaymentButton();
+      });
     }
 
     function closePaymentModal() {
@@ -1183,7 +1187,6 @@
           sumupWidget = window.SumUpCard.mount({
             id: "sumup-card-element",
             checkoutId: currentSumupCheckoutId,
-            locale: "fr-FR",
             showSubmitButton: false,
             onResponse: function (type) {
               if (type === "invalid") {
