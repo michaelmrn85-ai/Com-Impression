@@ -1194,8 +1194,10 @@ app.get('/api/admin/daily-summary', (req, res) => {
             });
         });
 
-        const today = new Date().toISOString().slice(0, 10);
-        const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === today);
+        const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '').trim())
+            ? String(req.query.date || '').trim()
+            : new Date().toISOString().slice(0, 10);
+        const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === requestedDate);
         const byGamme = {};
         let dayTotal = 0;
         let dayMargin = 0;
@@ -1235,11 +1237,11 @@ app.get('/api/admin/daily-summary', (req, res) => {
         res.json({
             success: true,
             summary: {
-                day: today,
+                day: requestedDate,
                 orders: todayOrders.length,
                 total: Math.round(dayTotal * 100) / 100,
                 margin: Math.round(dayMargin * 100) / 100,
-                visitsToday: Number((visits.byDay || {})[today] || 0),
+                visitsToday: Number((visits.byDay || {})[requestedDate] || 0),
                 visitsTotal: Number(visits.total || 0),
                 byGamme: Object.values(byGamme).sort((a, b) => b.total - a.total).map(item => ({
                     gamme: item.gamme,

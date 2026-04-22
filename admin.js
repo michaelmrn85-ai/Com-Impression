@@ -25,7 +25,8 @@
     clients: [],
     dailySummary: null,
     selectedProduct: null,
-    selectedClient: null
+    selectedClient: null,
+    dailySummaryDate: ''
   };
 
   var CLIENT_TYPE_OPTIONS = [
@@ -949,10 +950,11 @@
       return;
     }
     kpis.innerHTML=''
+      +'<article class="day-kpi"><strong>Date</strong><span>'+esc(String(summary.day||''))+'</span></article>'
       +'<article class="day-kpi"><strong>Commandes du jour</strong><span>'+esc(String(summary.orders||0))+'</span></article>'
       +'<article class="day-kpi"><strong>Total du jour</strong><span>'+esc(formatAmount(Number(summary.total||0)))+'</span></article>'
       +'<article class="day-kpi"><strong>Marge estimee</strong><span>'+esc(formatAmount(Number(summary.margin||0)))+'</span></article>'
-      +'<article class="day-kpi"><strong>Visites aujourd hui</strong><span>'+esc(String(summary.visitsToday||0))+'</span></article>';
+      +'<article class="day-kpi"><strong>Visites du jour</strong><span>'+esc(String(summary.visitsToday||0))+'</span></article>';
     if(!(summary.byGamme||[]).length){
       table.innerHTML='<div class="empty">Aucune commande classee aujourd hui.</div>';
       return;
@@ -967,10 +969,18 @@
   }
 
   function loadDailySummary(openAfterLoad){
-    return fetch(api('/api/admin/daily-summary?mdp='+encodeURIComponent(state.mdp)))
+    var selectedDate=(($('day-summary-date')||{}).value || state.dailySummaryDate || '').trim();
+    state.dailySummaryDate=selectedDate;
+    var endpoint='/api/admin/daily-summary?mdp='+encodeURIComponent(state.mdp);
+    if(selectedDate) endpoint+='&date='+encodeURIComponent(selectedDate);
+    return fetch(api(endpoint))
       .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Fiche du jour indisponible'); return d; }); })
       .then(function(data){
         state.dailySummary = data.summary || null;
+        if($('day-summary-date') && data.summary && data.summary.day){
+          $('day-summary-date').value = data.summary.day;
+          state.dailySummaryDate = data.summary.day;
+        }
         renderDailySummary();
         if(openAfterLoad) openModal('modal-day-sheet','jour');
       });
@@ -1115,6 +1125,7 @@
     $('orders-search').addEventListener('input',renderOrders);
     if($('products-search')) $('products-search').addEventListener('input',renderProductsList);
     if($('clients-search')) $('clients-search').addEventListener('input',renderClientsList);
+    if($('day-summary-load')) $('day-summary-load').addEventListener('click',function(){ loadDailySummary(false); });
     $('btn-logout').addEventListener('click',function(){
       sessionStorage.removeItem('ci_admin_pwd');
       state.mdp='';

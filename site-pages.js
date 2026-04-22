@@ -189,7 +189,11 @@
       ".site-popup-card p{margin:0;color:#5f5751;font-size:1rem;line-height:1.65;}" +
       ".site-popup-close{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:999px;border:0;background:#171310;color:#fff;font-size:1.6rem;cursor:pointer;}" +
       ".site-popup-actions{display:flex;justify-content:flex-end;}" +
-      ".site-popup-actions .btn-light{width:auto;}";
+      ".site-popup-actions .btn-light{width:auto;}" +
+      ".cart-added-popup .site-popup-card{max-width:520px;}" +
+      ".cart-added-popup .site-popup-actions{justify-content:flex-start;gap:12px;flex-wrap:wrap;}" +
+      ".cart-added-popup .site-popup-item{font-weight:800;color:#171310;}" +
+      ".cart-added-popup .site-popup-meta{color:#7a6f67;font-size:.96rem;}";
     document.head.appendChild(style);
   }
 
@@ -261,6 +265,52 @@
     existing.removeAttribute("hidden");
     existing.classList.add("open");
     sessionStorage.setItem(popupKey, "1");
+  }
+
+  function showCartAddedPopup(item) {
+    ensureGlobalSiteUi();
+    var existing = $("cart-added-popup");
+    if (!existing) {
+      existing = document.createElement("div");
+      existing.id = "cart-added-popup";
+      existing.className = "site-popup-overlay cart-added-popup";
+      existing.setAttribute("hidden", "hidden");
+      existing.innerHTML =
+        '<div class="site-popup-card">'
+          + '<button class="site-popup-close" type="button" aria-label="Fermer">×</button>'
+          + '<div class="pill">Panier</div>'
+          + '<h3>Produit ajoute au panier</h3>'
+          + '<p class="site-popup-item" id="cart-added-popup-title"></p>'
+          + '<p class="site-popup-meta" id="cart-added-popup-meta"></p>'
+          + '<div class="site-popup-actions">'
+            + '<button class="btn-light" id="cart-added-continue" type="button">Continuer mes achats</button>'
+            + '<a class="btn" id="cart-added-open-cart" href="' + esc(resolveAppUrl("/panier")) + '">Voir le panier</a>'
+          + '</div>'
+        + '</div>';
+      document.body.appendChild(existing);
+      existing.addEventListener("click", function (event) {
+        if (event.target === existing) {
+          existing.classList.remove("open");
+          existing.setAttribute("hidden", "hidden");
+        }
+      });
+      existing.querySelector(".site-popup-close").addEventListener("click", function () {
+        existing.classList.remove("open");
+        existing.setAttribute("hidden", "hidden");
+      });
+      existing.querySelector("#cart-added-continue").addEventListener("click", function () {
+        existing.classList.remove("open");
+        existing.setAttribute("hidden", "hidden");
+      });
+    }
+    $("cart-added-popup-title").textContent = (item && item.title) ? item.title : "Votre produit";
+    $("cart-added-popup-meta").textContent = [
+      item && item.quantity ? ("Quantite : " + item.quantity) : "",
+      item && item.priceValue != null ? ("Total TTC : " + euro(item.priceValue)) : (item && item.priceLabel ? ("Total TTC : " + item.priceLabel) : ""),
+      item && item.uploadNames && item.uploadNames.length ? ("Fichiers : " + item.uploadNames.join(", ")) : ""
+    ].filter(Boolean).join(" • ");
+    existing.removeAttribute("hidden");
+    existing.classList.add("open");
   }
 
   function loadGlobalSiteContent() {
@@ -472,7 +522,7 @@
     var totalValue = arguments.length > 6 ? arguments[6] : null;
     var uploads = arguments.length > 7 ? arguments[7] : [];
     var unitValue = typeof totalValue === "number" && qty > 0 ? totalValue / qty : (typeof product.priceValue === "number" ? product.priceValue : null);
-    cart.push({
+    var cartItem = {
       id: product.id + "-" + Date.now(),
       productId: product.id,
       ref: getProductRef(product),
@@ -488,8 +538,10 @@
       priceLabel: product.priceLabel,
       uploadTokens: (uploads || []).map(function (item) { return item.token; }),
       uploadNames: (uploads || []).map(function (item) { return item.originalname; })
-    });
+    };
+    cart.push(cartItem);
     writeCart(cart);
+    showCartAddedPopup(cartItem);
   }
 
   function buildPanierText(cart) {
