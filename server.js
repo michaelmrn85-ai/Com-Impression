@@ -1,18 +1,6 @@
 const express    = require('express');
 const path       = require('path');
 const { execFile } = require('child_process');
-// Stripe optionnel — ne bloque pas le démarrage si package absent
-let stripeClient = null;
-try {
-    if (process.env.STRIPE_SECRET_KEY) {
-        stripeClient = require('stripe')(process.env.STRIPE_SECRET_KEY);
-        console.log('Stripe initialisé OK');
-    } else {
-        console.warn('STRIPE_SECRET_KEY non définie — paiements désactivés');
-    }
-} catch(e) {
-    console.warn('Package stripe non installé — npm install stripe requis');
-}
 const cors       = require('cors');
 const multer     = require('multer');
 const nodemailer = require('nodemailer');
@@ -27,6 +15,9 @@ const ADMIN_PASSWORD = String(
     process.env.ADMIN_PASSWORD ||
     'comimpression2025'
 ).trim();
+const SUMUP_PUBLIC_API_KEY = String(process.env.SUMUP_PUBLIC_API_KEY || '').trim();
+const SUMUP_SECRET_API_KEY = String(process.env.SUMUP_SECRET_API_KEY || '').trim();
+const SUMUP_MERCHANT_CODE = String(process.env.SUMUP_MERCHANT_CODE || '').trim();
 const KNOWN_PUBLIC_ORIGINS = Array.from(new Set([
     process.env.PUBLIC_BASE_URL,
     process.env.SITE_BASE_URL,
@@ -108,6 +99,18 @@ function requireAdminPasswordConfigured(res) {
 
 function adminPasswordMatches(value) {
     return !!ADMIN_PASSWORD && String(value || '') === ADMIN_PASSWORD;
+}
+
+function requireSumupConfigured(res) {
+    if (!SUMUP_SECRET_API_KEY) {
+        res.status(503).json({ success: false, error: 'SumUp n est pas configure cote serveur.' });
+        return false;
+    }
+    if (!SUMUP_MERCHANT_CODE) {
+        res.status(503).json({ success: false, error: 'Le merchant code SumUp est manquant cote serveur.' });
+        return false;
+    }
+    return true;
 }
 
 function readCookies(req) {
@@ -539,7 +542,7 @@ function blocPanier(panierTexte, prixTotal, couleur, d) {
               </tr>
               ${(d.payment_status==='paye') ? `<tr><td colspan="2" style="padding-top:8px;border-top:1px solid #f5dcc8;margin-top:8px;">
                 <span style="background:#22c55e;color:#fff;padding:4px 12px;border-radius:50px;font-size:12px;font-weight:700;">✅ PAYE PAR CARTE BANCAIRE</span>
-                ${d.payment_id ? `<span style="font-size:11px;color:#888;margin-left:8px;">Ref. Stripe : ${escapeHtml(d.payment_id)}</span>` : ''}
+                ${d.payment_id ? `<span style="font-size:11px;color:#888;margin-left:8px;">Ref. paiement : ${escapeHtml(d.payment_id)}</span>` : ''}
               </td></tr>` : ''}
             </table>
           </td></tr>` : ''}
@@ -565,7 +568,7 @@ function blocPanier(panierTexte, prixTotal, couleur, d) {
           </tr>
           ${(d.payment_status==='paye') ? `<tr><td colspan="2" style="padding-top:8px;border-top:1px solid #f5dcc8;margin-top:8px;">
             <span style="background:#22c55e;color:#fff;padding:4px 12px;border-radius:50px;font-size:12px;font-weight:700;">✅ PAYE PAR CARTE BANCAIRE</span>
-            ${d.payment_id ? `<span style="font-size:11px;color:#888;margin-left:8px;">Ref. Stripe : ${escapeHtml(d.payment_id)}</span>` : ''}
+            ${d.payment_id ? `<span style="font-size:11px;color:#888;margin-left:8px;">Ref. paiement : ${escapeHtml(d.payment_id)}</span>` : ''}
           </td></tr>` : ''}
         </table>
       </td></tr>` : ''}
@@ -671,7 +674,7 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
                     <td style="font-size:14px;color:#166534;font-weight:700;">✅ Paiement accepté par carte bancaire</td>
                     <td align="right" style="font-size:20px;font-weight:900;color:#166534;">${prixTotal}</td>
                   </tr>
-                  ${d.payment_id ? `<tr><td colspan="2" style="font-size:11px;color:#888;padding-top:6px;">Référence Stripe : ${d.payment_id}</td></tr>` : ''}
+                  ${d.payment_id ? `<tr><td colspan="2" style="font-size:11px;color:#888;padding-top:6px;">Référence paiement : ${d.payment_id}</td></tr>` : ''}
                 </table>
               </td></tr>
             </table>` : ''}
@@ -755,26 +758,79 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
     }
 });
 
-// POST /api/create-payment-intent — créer un paiement Stripe
-app.post('/api/create-payment-intent', express.json(), async (req, res) => {
+// POST /api/sumup/create-checkout — créer un checkout SumUp
+app.post('/api/sumup/create-checkout', express.json(), async (req, res) => {
     try {
-        const { amount, currency, description } = req.body;
-        console.log('PaymentIntent request — amount:', amount, 'currency:', currency);
-        if (!amount || amount < 50) return res.status(400).json({ error: 'Montant invalide (min 0,50 EUR), reçu: ' + amount });
-        if (!stripeClient) return res.status(503).json({ error: 'Stripe non configuré sur le serveur' });
-
-        const paymentIntent = await stripeClient.paymentIntents.create({
-            amount: Math.round(amount),
-            currency: currency || 'eur',
-            description: description || 'Impression de document — COM Impression',
-            metadata: { source: 'com-impression' }
+        if (!requireSumupConfigured(res)) return;
+        const amount = Number(req.body.amount || 0);
+        const currency = String(req.body.currency || 'EUR').toUpperCase();
+        const description = String(req.body.description || "Commande COM' Impression").trim();
+        if (!amount || amount < 0.5) {
+            return res.status(400).json({ success: false, error: 'Montant invalide (minimum 0,50 EUR).' });
+        }
+        const reference = 'CI-' + Date.now();
+        const response = await fetch('https://api.sumup.com/v0.1/checkouts', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + SUMUP_SECRET_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                checkout_reference: reference,
+                amount: Number(amount.toFixed(2)),
+                currency: currency,
+                pay_to_merchant: SUMUP_MERCHANT_CODE,
+                description: description
+            })
         });
-
-        console.log('PaymentIntent créé:', paymentIntent.id);
-        res.json({ clientSecret: paymentIntent.client_secret });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            return res.status(response.status).json({
+                success: false,
+                error: payload.message || payload.error_message || payload.error || 'Impossible de creer le checkout SumUp.'
+            });
+        }
+        res.json({
+            success: true,
+            checkoutId: payload.id,
+            checkoutReference: payload.checkout_reference || reference,
+            amount: payload.amount
+        });
     } catch (error) {
-        console.error('Erreur Stripe détaillée:', error.type, error.message);
-        res.status(500).json({ error: error.message, type: error.type });
+        console.error('Erreur SumUp create-checkout:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// GET /api/sumup/verify-checkout/:id — vérifier le statut d'un paiement SumUp
+app.get('/api/sumup/verify-checkout/:id', async (req, res) => {
+    try {
+        if (!requireSumupConfigured(res)) return;
+        const checkoutId = String(req.params.id || '').trim();
+        if (!checkoutId) return res.status(400).json({ success: false, error: 'Checkout SumUp manquant.' });
+        const response = await fetch('https://api.sumup.com/v0.1/checkouts/' + encodeURIComponent(checkoutId), {
+            headers: {
+                'Authorization': 'Bearer ' + SUMUP_SECRET_API_KEY
+            }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            return res.status(response.status).json({
+                success: false,
+                error: payload.message || payload.error_message || payload.error || 'Impossible de verifier le checkout SumUp.'
+            });
+        }
+        const status = String(payload.status || '').toUpperCase();
+        const paid = status === 'PAID' || status === 'SUCCEEDED';
+        res.json({
+            success: true,
+            paid,
+            status,
+            checkout: payload
+        });
+    } catch (error) {
+        console.error('Erreur SumUp verify-checkout:', error.message);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -1449,7 +1505,7 @@ function normaliserEmail(email) { return String(email || '').trim().toLowerCase(
 const CLIENT_ACTION_TOKEN_SECRET =
     process.env.CLIENT_TOKEN_SECRET ||
     process.env.SMTP_PASS ||
-    process.env.STRIPE_SECRET_KEY ||
+    process.env.SUMUP_SECRET_API_KEY ||
     'com-impression-v4-client-secret';
 function signerClientActionToken(type, email, ttlMs) {
     const payload = {

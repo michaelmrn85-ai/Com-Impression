@@ -5,7 +5,6 @@
   var CART_COUNT_KEY = "ci_cart_count";
   var SESSION_KEY = "ci_session_token";
   var USER_NAME_KEY = "ci_user_name";
-  var STRIPE_PK = "pk_live_51Sos39FgB4FDXQyBFU0UvkiZIwi8FYFVRTelLKs40vGl8VKJRg0T9E6MClXVEUMDOYbgONTlRLUU9C1CGNLLbRqf00pO0gJPQB";
   var catalogLoadPromise = null;
 
   function $(id) {
@@ -900,10 +899,11 @@
     var authStatus = $("checkout-auth-status");
     var paymentModal = $("checkout-payment-modal");
     var paymentTotal = $("checkout-payment-total");
-    var stripeBtn = $("cart-pay");
-    var stripeStatus = $("stripe-status");
-    var stripeClient = null;
-    var stripeCard = null;
+    var sumupBtn = $("cart-pay");
+    var sumupStatus = $("sumup-status");
+    var sumupWidget = null;
+    var currentSumupCheckoutId = "";
+    var currentSumupAmount = null;
     var sessionToken = localStorage.getItem(SESSION_KEY);
     var connectedClient = null;
     var cartValidated = false;
@@ -919,7 +919,7 @@
       cartValidated = false;
       appliedPromo = null;
       clearStatus(validateStatus);
-      clearStatus(stripeStatus);
+      clearStatus(sumupStatus);
       updatePayableTotal();
     }
 
@@ -968,11 +968,8 @@
         paymentModal.removeAttribute("hidden");
         paymentModal.classList.add("open");
       }
-      clearStatus(stripeStatus);
+      clearStatus(sumupStatus);
       updatePayableTotal();
-      window.requestAnimationFrame(function () {
-        ensureStripe();
-      });
     }
 
     function closePaymentModal() {
@@ -981,7 +978,13 @@
         paymentModal.setAttribute("hidden", "hidden");
         paymentModal.classList.remove("open");
       }
-      clearStatus(stripeStatus);
+      clearStatus(sumupStatus);
+    }
+
+    function resetPaymentButton() {
+      if (!sumupBtn) return;
+      sumupBtn.disabled = false;
+      sumupBtn.textContent = "Payer avec SumUp";
     }
 
     function renderOrderSuccess(orderData) {
@@ -1140,32 +1143,85 @@
       }
     }
 
-    function ensureStripe() {
-      if (!paymentModal || paymentModal.hidden || typeof window.Stripe !== "function") {
-        if (typeof window.Stripe !== "function") {
-          setStatus(stripeStatus, "err", "Le module de paiement Stripe ne s'est pas charge.");
-        }
-        return;
+    function ensureSumupWidget() {
+      if (!paymentModal || paymentModal.hidden || !window.SumUpCard) {
+        setStatus(sumupStatus, "err", "Le module de paiement SumUp ne s'est pas charge.");
+        return Promise.reject(new Error("SumUp indisponible."));
       }
-      if (!stripeClient) {
-        stripeClient = window.Stripe(STRIPE_PK);
-        var elements = stripeClient.elements();
-        stripeCard = elements.create("card", {
-          style: {
-            base: {
-              fontFamily: "Space Grotesk, sans-serif",
-              fontSize: "16px",
-              color: "#171310"
+      var totalInfo = getPayableTotalInfo();
+      if (typeof totalInfo.numeric !== "number") {
+        setStatus(sumupStatus, "err", "Le paiement CB est disponible uniquement pour les produits a tarif chiffre.");
+        return Promise.reject(new Error("Montant SumUp invalide."));
+      }
+      if (sumupWidget && currentSumupCheckoutId && currentSumupAmount === totalInfo.numeric) {
+        return Promise.resolve(sumupWidget);
+      }
+      var mount = paymentModal.querySelector("#sumup-card-element");
+      if (!mount) {
+        setStatus(sumupStatus, "err", "Le champ de carte bancaire est introuvable.");
+        return Promise.reject(new Error("Champ SumUp introuvable."));
+      }
+      mount.innerHTML = "";
+      return fetch(API_BASE + "/api/sumup/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: totalInfo.numeric,
+          currency: "EUR",
+          description: "Commande COM' Impression"
+        })
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok || !json.success) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          currentSumupCheckoutId = json.checkoutId || "";
+          currentSumupAmount = totalInfo.numeric;
+          sumupWidget = window.SumUpCard.mount({
+            id: "sumup-card-element",
+            checkoutId: currentSumupCheckoutId,
+            showSubmitButton: false,
+            onResponse: function (type) {
+              if (type === "invalid") {
+                setStatus(sumupStatus, "err", "Les coordonnees bancaires sont invalides.");
+                resetPaymentButton();
+                return;
+              }
+              if (type === "sent") {
+                setStatus(sumupStatus, "ok", "Paiement transmis a SumUp, verification en cours...");
+                return;
+              }
+              fetch(API_BASE + "/api/sumup/verify-checkout/" + encodeURIComponent(currentSumupCheckoutId))
+                .then(function (response) {
+                  return response.json().catch(function () { return {}; }).then(function (payload) {
+                    if (!response.ok || !payload.success) throw new Error(payload.error || ("HTTP " + response.status));
+                    return payload;
+                  });
+                })
+                .then(function (payload) {
+                  if (!payload.paid) throw new Error("Le paiement SumUp n'est pas encore valide.");
+                  return submitOrder({
+                    payment_id: currentSumupCheckoutId,
+                    payment_status: "paye"
+                  });
+                })
+                .then(function () {
+                  setStatus(validateStatus, "ok", "Paiement accepte et commande enregistree.");
+                  setStatus(sumupStatus, "ok", "Paiement SumUp accepte.");
+                })
+                .catch(function (error) {
+                  setStatus(sumupStatus, "err", error.message || "Impossible de finaliser le paiement SumUp.");
+                })
+                .finally(function () {
+                  resetPaymentButton();
+                });
             }
-          }
+          });
+          return sumupWidget;
         });
-        var stripeMount = paymentModal.querySelector("#stripe-card-element");
-        if (!stripeMount) {
-          setStatus(stripeStatus, "err", "Le champ de carte bancaire est introuvable.");
-          return;
-        }
-        stripeCard.mount(stripeMount);
-      }
     }
 
     function validateCheckoutBasics(targetStatus) {
@@ -1195,7 +1251,7 @@
         return false;
       }
       openPaymentModal();
-      setStatus(targetStatus || validateStatus, "ok", "Panier valide. La fenetre de paiement est ouverte.");
+      setStatus(targetStatus || validateStatus, "ok", "Panier valide. La fenetre de paiement SumUp est ouverte.");
       return true;
     }
 
@@ -1383,62 +1439,21 @@
 
     if ($("checkout-payment-close")) $("checkout-payment-close").addEventListener("click", closePaymentModal);
 
-    if (stripeBtn) {
-      stripeBtn.addEventListener("click", function () {
-        if (!cartValidated && !confirmValidatedCheckout(stripeStatus)) return;
-        if (!validateCheckoutBasics(stripeStatus)) return;
-        ensureStripe();
-        if (!stripeClient || !stripeCard) {
-          setStatus(stripeStatus, "err", "Stripe n'est pas disponible pour le moment.");
-          return;
-        }
-        var totalInfo = getCartTotal(readCart());
-        if (typeof totalInfo.numeric !== "number") {
-          setStatus(stripeStatus, "err", "Le paiement CB est disponible uniquement pour les produits a tarif chiffre.");
-          return;
-        }
-        stripeBtn.disabled = true;
-        stripeBtn.textContent = "Paiement en cours...";
-        clearStatus(stripeStatus);
-
-        fetch(API_BASE + "/api/create-payment-intent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: Math.round(getPayableTotalInfo().numeric * 100),
-            currency: "eur",
-            description: "Commande COM' Impression"
-          })
-        })
-          .then(function (response) {
-            return response.json().catch(function () { return {}; }).then(function (json) {
-              if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
-              return json;
-            });
-          })
-          .then(function (json) {
-            if (!json.clientSecret) throw new Error("Client secret Stripe manquant.");
-            return stripeClient.confirmCardPayment(json.clientSecret, {
-              payment_method: { card: stripeCard }
-            });
-          })
-          .then(function (result) {
-            if (result.error) throw new Error(result.error.message || "Paiement refuse.");
-            return submitOrder({
-              payment_id: result.paymentIntent && result.paymentIntent.id,
-              payment_status: "paye"
-            });
-          })
-          .then(function () {
-            setStatus(validateStatus, "ok", "Paiement accepte et commande enregistree.");
-            setStatus(stripeStatus, "ok", "Paiement Stripe accepte.");
+    if (sumupBtn) {
+      sumupBtn.addEventListener("click", function () {
+        if (!cartValidated && !confirmValidatedCheckout(sumupStatus)) return;
+        if (!validateCheckoutBasics(sumupStatus)) return;
+        sumupBtn.disabled = true;
+        sumupBtn.textContent = "Chargement SumUp...";
+        clearStatus(sumupStatus);
+        ensureSumupWidget()
+          .then(function (widget) {
+            sumupBtn.textContent = "Paiement en cours...";
+            widget.submit();
           })
           .catch(function (error) {
-            setStatus(stripeStatus, "err", error.message || "Impossible de finaliser le paiement.");
-          })
-          .finally(function () {
-            stripeBtn.disabled = false;
-            stripeBtn.textContent = "Payer par CB";
+            setStatus(sumupStatus, "err", error.message || "Impossible d'ouvrir SumUp.");
+            resetPaymentButton();
           });
       });
     }

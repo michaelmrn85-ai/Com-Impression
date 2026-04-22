@@ -205,9 +205,9 @@
   <div class="auth-overlay" id="checkout-payment-modal" hidden>
     <div class="auth-dialog">
       <button class="auth-close" id="checkout-payment-close" type="button">×</button>
-      <div class="pill">Paiement CB</div>
+      <div class="pill">Paiement SumUp</div>
       <h2>Regler votre commande</h2>
-      <p>Entrez vos coordonnees bancaires pour finaliser la commande.</p>
+      <p>Entrez vos coordonnees bancaires via SumUp pour finaliser la commande.</p>
       <div class="summary-box" style="margin:18px 0;">
         <div class="split-line">
           <span>Total a regler</span>
@@ -215,11 +215,11 @@
         </div>
       </div>
       <div class="field">
-        <label for="stripe-card-element">Carte bancaire</label>
-        <div id="stripe-card-element"></div>
+        <label for="sumup-card-element">Carte bancaire</label>
+        <div id="sumup-card-element"></div>
       </div>
-      <button class="btn" id="cart-pay" type="button">Payer par CB</button>
-      <div class="status" id="stripe-status"></div>
+      <button class="btn" id="cart-pay" type="button">Payer avec SumUp</button>
+      <div class="status" id="sumup-status"></div>
     </div>
   </div>
 
@@ -248,7 +248,7 @@
         </div>
         <div class="footer-col">
           <h4>Paiement securise</h4>
-          <p>Paiement securise par carte bancaire via Stripe, avec prise en charge CB, Mastercard et Visa, ou reglement par virement bancaire selon votre commande.</p>
+          <p>Paiement securise par carte bancaire via SumUp, avec prise en charge CB, Mastercard et Visa, ou reglement par virement bancaire selon votre commande.</p>
         </div>
         <div class="footer-col">
           <h4>COM' Impression</h4>
@@ -258,7 +258,7 @@
         </div>
       </div>
       <div class="footer-payments">
-        <div class="payment-strip"><img src="./footer-paiements.png" alt="Logos Visa, Mastercard, Carte Bancaire, Virement bancaire et Stripe"></div>
+        <div class="payment-strip"><img src="./footer-paiements.png" alt="Logos Visa, Mastercard, Carte Bancaire et Virement bancaire"></div>
       </div>
       <div class="footer-bottom">
         <span>© 2026 COM' Impression. Tous droits reserves.</span>
@@ -267,7 +267,7 @@
     </div>
   </footer>
 
-  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js"></script>
   <script src="./catalog-data.js"></script>
   <script src="./site-pages.js"></script>
 </body>
