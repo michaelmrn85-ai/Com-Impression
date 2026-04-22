@@ -261,6 +261,8 @@ function buildCatalogApiPayload() {
                 minDimensionsCm: prod.dimsLibres ? { width: 50, height: 50 } : null,
                 unit: prod.unite || '',
                 uploadEnabled: override.uploadEnabled !== false,
+                image: override.image || '',
+                imageUrl: getProductImageUrl(override.image || ''),
                 legacyFlags: {
                     prixSpecial: !!prod.prixSpecial,
                     prixUnit: !!prod.prixUnit
@@ -309,6 +311,8 @@ function buildCatalogApiPayload() {
                     minDimensionsCm: item.hasDimensions ? { width: Number(item.minWidth) || 1, height: Number(item.minHeight) || 1 } : null,
                     unit: item.unit || '',
                     uploadEnabled: item.uploadEnabled !== false,
+                    image: item.image || '',
+                    imageUrl: getProductImageUrl(item.image || ''),
                     legacyFlags: {
                         prixSpecial: false,
                         prixUnit: !!item.requiresQuantityInput
@@ -952,6 +956,13 @@ app.get('/mentions-legales', (req, res) => { try { trackVisit(req); } catch(e) {
 app.get('/cgv', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'cgv.html')); });
 app.get('/faq', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'faq.html')); });
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/media/products/:filename', (req, res) => {
+    const filename = path.basename(String(req.params.filename || ''));
+    if (!filename) return res.status(404).end();
+    const filePath = path.join(PRODUCT_IMAGES_DIR, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).end();
+    res.sendFile(filePath);
+});
 app.get('/admin.js', (req, res) => res.sendFile(path.join(__dirname, 'admin.js')));
 app.get('/com-impression.js', (req, res) => res.sendFile(path.join(__dirname, 'com-impression.js')));
 
@@ -966,7 +977,9 @@ const PRODUCT_OVERRIDES_FILE = path.join(INCIDENT_DATA_DIR, 'product-overrides.j
 const CUSTOM_PRODUCTS_FILE = path.join(INCIDENT_DATA_DIR, 'custom-products.json');
 const VISITS_FILE = path.join(INCIDENT_DATA_DIR, 'visits.json');
 const CART_UPLOADS_DIR = path.join(INCIDENT_DATA_DIR, 'cart-uploads');
+const PRODUCT_IMAGES_DIR = path.join(INCIDENT_DATA_DIR, 'product-images');
 try { fs.mkdirSync(CART_UPLOADS_DIR, { recursive: true }); } catch (e) {}
+try { fs.mkdirSync(PRODUCT_IMAGES_DIR, { recursive: true }); } catch (e) {}
 
 function buildProductRef(index) {
     return 'COM' + String(index).padStart(4, '0');
@@ -1012,6 +1025,25 @@ function normaliseQuantityPricing(list) {
         quantity: parseInt(item.quantity, 10),
         total: Number(item.total)
     })).filter(item => !isNaN(item.quantity) && item.quantity > 0 && !isNaN(item.total) && item.total >= 0);
+}
+
+function getProductImageUrl(filename) {
+    const clean = String(filename || '').trim();
+    if (!clean) return '';
+    return '/media/products/' + encodeURIComponent(clean);
+}
+
+function storeUploadedFile(tempPath, finalPath) {
+    try {
+        fs.renameSync(tempPath, finalPath);
+    } catch (error) {
+        if (error && error.code === 'EXDEV') {
+            fs.copyFileSync(tempPath, finalPath);
+            fs.unlinkSync(tempPath);
+            return;
+        }
+        throw error;
+    }
 }
 
 function lireVisits() {
@@ -1372,6 +1404,7 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             priceValue: body.priceValue == null || body.priceValue === '' ? null : Number(body.priceValue),
             purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
             salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
+            image: String(body.image || '').trim(),
             quantityOptions: normaliseCsvList(body.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
@@ -1409,6 +1442,7 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             priceValue: body.priceValue == null || body.priceValue === '' ? null : Number(body.priceValue),
             purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
             salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
+            image: String(body.image || '').trim(),
             quantityOptions: normaliseCsvList(body.quantityOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
@@ -1425,6 +1459,24 @@ app.post('/api/admin/products', express.json(), (req, res) => {
         sauvegarderCustomProducts(customProducts);
         res.json({ success: true, product });
     } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/admin/product-image', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-product-image' }), upload.single('image'), (req, res) => {
+    try {
+        const mdp = String((req.body && req.body.mdp) || '');
+        if (!requireAdminPasswordConfigured(res)) return;
+        if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+        if (!req.file) return res.status(400).json({ success: false, error: 'Image produit manquante.' });
+        const ext = (path.extname(req.file.originalname || '') || '.png').toLowerCase();
+        const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.png';
+        const filename = 'product-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + safeExt;
+        const finalPath = path.join(PRODUCT_IMAGES_DIR, filename);
+        storeUploadedFile(req.file.path, finalPath);
+        res.json({ success: true, image: filename, imageUrl: getProductImageUrl(filename) });
+    } catch (e) {
+        console.error('Erreur upload image produit:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });

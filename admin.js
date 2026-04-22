@@ -624,9 +624,10 @@
       return;
     }
     list.innerHTML=items.map(function(entry){
+      var imageUrl = entry.product.imageUrl || '';
       return '<div class="order">'
         +'<div><div class="num">'+esc(entry.product.ref||'--')+'</div><div class="muted">'+esc(entry.gammeTitle||'')+'</div></div>'
-        +'<div><strong>'+esc(entry.product.title||'Produit')+'</strong><div class="muted">'+esc(entry.product.summary||'')+'</div></div>'
+        +'<div><strong>'+esc(entry.product.title||'Produit')+'</strong><div class="muted">'+esc(entry.product.summary||'')+'</div>'+(imageUrl?'<div class="muted"><a href="'+esc(imageUrl)+'" target="_blank">Voir l image</a></div>':'')+'</div>'
         +'<div><span class="badge b-rec">'+esc(entry.product.priceLabel||'Sur devis')+'</span><div class="muted">'+esc((entry.product.quantityOptions||[]).join(', ')||'Lots libres')+'</div></div>'
         +'<button class="btn btn-orange btn-small" data-edit-product="'+esc(entry.legacyCat)+'::'+esc(entry.product.id)+'" type="button">Modifier</button>'
         +'</div>';
@@ -650,6 +651,8 @@
         title:'',
         priceLabel:'',
         summary:'',
+        image:'',
+        imageUrl:'',
         quantityOptions:[],
         options:{},
         quantityPricing:[],
@@ -677,6 +680,10 @@
       +'<div class="field"><label>Description</label><textarea id="product-edit-summary">'+esc(entryRef.product.summary||'')+'</textarea></div>'
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'</div>'
+      +'<div class="site-grid">'
+      +'<div class="field"><label>Photo produit</label><input id="product-edit-image-file" type="file" accept=".jpg,.jpeg,.png,.webp"><input id="product-edit-image" type="hidden" value="'+esc(entryRef.product.image||'')+'"><div class="muted" id="product-edit-image-name">'+esc(entryRef.product.image||'Aucune image')+'</div></div>'
+      +'<div class="field"><label>Apercu</label><div id="product-edit-image-preview" style="min-height:160px;border:1px solid #eee3d9;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+(entryRef.product.imageUrl?'<img src="'+esc(entryRef.product.imageUrl)+'" alt="Apercu produit" style="width:100%;height:160px;object-fit:cover;display:block;">':'<span class="muted">Aucune image</span>')+'</div></div>'
+      +'</div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Lots / unitaire</label>'+renderProductPricingEditor(pricingRows)+'</div>'
       +'<div class="site-grid">'
@@ -686,7 +693,30 @@
       +'<button class="btn btn-orange" id="product-edit-save" type="button">'+(entryRef.isNew?'Creer le produit':'Enregistrer le produit')+'</button>'
       +'<div class="status" id="product-edit-status"></div>';
     refreshProductPricingTable();
+    bindProductImageUpload();
     openModal('modal-product-edit','produits');
+  }
+
+  function bindProductImageUpload(){
+    var input=$('product-edit-image-file');
+    if(!input) return;
+    input.addEventListener('change',function(){
+      var file=input.files && input.files[0];
+      if(!file) return;
+      var fd=new FormData();
+      fd.append('mdp',state.mdp);
+      fd.append('image',file,file.name);
+      setStatus('product-edit-status','ok','Upload image en cours...');
+      fetch(api('/api/admin/product-image'),{ method:'POST', body:fd })
+        .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Upload image impossible'); return d; }); })
+        .then(function(data){
+          if($('product-edit-image')) $('product-edit-image').value = data.image || '';
+          if($('product-edit-image-name')) $('product-edit-image-name').textContent = data.image || file.name;
+          if($('product-edit-image-preview')) $('product-edit-image-preview').innerHTML = data.imageUrl ? '<img src="'+esc(data.imageUrl)+'" alt="Apercu produit" style="width:100%;height:160px;object-fit:cover;display:block;">' : '<span class="muted">Aucune image</span>';
+          setStatus('product-edit-status','ok','Image produit chargee.');
+        })
+        .catch(function(err){ setStatus('product-edit-status','err',err.message||'Erreur upload image.'); });
+    });
   }
 
   function saveProductEditor(){
@@ -707,6 +737,7 @@
         legacyCat:($('product-edit-gamme').value||entry.legacyCat||'').trim(),
         title:($('product-edit-name').value||'').trim(),
         summary:($('product-edit-summary').value||'').trim(),
+        image:($('product-edit-image').value||'').trim(),
         priceLabel:saleLabel,
         purchasePrice:(firstRow.purchasePrice||'').trim(),
         salePrice:(firstRow.salePrice||'').trim(),

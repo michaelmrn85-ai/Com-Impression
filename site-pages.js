@@ -579,6 +579,7 @@
           + '</div>'
           + '<div class="product-detail-pricebox"><div class="muted">Prix de depart</div><div class="total" id="product-price-display">' + esc(normalizePriceLabel(product.priceLabel)) + '</div></div>'
         + '</div>'
+        + renderProductHeroMedia(entry)
         + '<div class="product-detail-layout">'
           + '<div class="product-detail-config">'
             + '<div id="product-config-fields"></div>'
@@ -813,6 +814,7 @@
 
       grid.innerHTML = visible.map(function (entry) {
         return '<article class="card product-card">'
+          + (entry.product.imageUrl ? '<div class="product-card-media"><img src="' + esc(entry.product.imageUrl) + '" alt="' + esc(entry.product.title) + '"></div>' : '')
           + '<div class="pill">' + esc(entry.gammeTitle) + '</div>'
           + '<h3 class="card-title">' + esc(entry.product.title) + '</h3>'
           + '<p>' + esc(entry.product.summary) + '</p>'
@@ -881,6 +883,14 @@
 
       mountProductDetail(root, entry);
     });
+  }
+
+  function renderProductHeroMedia(entry) {
+    if (!entry || !entry.product) return '';
+    if (entry.product.imageUrl) {
+      return '<div class="product-hero-media"><img src="' + esc(entry.product.imageUrl) + '" alt="' + esc(entry.product.title || 'Produit') + '"></div>';
+    }
+    return '';
   }
 
   function initCartPage() {
