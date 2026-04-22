@@ -939,13 +939,14 @@
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th>Largeur</th><th>Hauteur</th><th>Finition</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th>Largeur</th><th>Hauteur</th><th>Finition</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge %</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
+        var isDimensions = row.type === 'dimensions';
         return '<tr class="product-pricing-row">'
           +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Unitaire</option><option value="dimensions" '+(row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></td>'
-          +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"></td>'
-          +'<td><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"></td>'
-          +'<td><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"></td>'
+          +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></td>'
+          +'<td><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'" style="display:'+(isDimensions?'block':'none')+';"></td>'
+          +'<td><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'" style="display:'+(isDimensions?'block':'none')+';"></td>'
           +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value="'+esc(row.finish||'')+'"></td>'
           +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
           +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
@@ -967,8 +968,15 @@
       var widthInput = row.querySelector('.product-pricing-width');
       var heightInput = row.querySelector('.product-pricing-height');
       var marginValue = sale - purchase;
+      var marginRate = purchase > 0 ? (((sale / purchase) - 1) * 100) : 0;
       var marginCell = row.querySelector('.pricing-margin');
-      if(marginCell) marginCell.textContent = formatPlainNumber(marginValue);
+      if(marginCell){
+        if(purchase > 0 && sale > 0){
+          marginCell.innerHTML = formatPlainNumber(marginRate) + ' %<div class="muted">+' + formatPlainNumber(marginValue) + ' EUR</div>';
+        } else {
+          marginCell.textContent = '0,00 %';
+        }
+      }
       if(type === 'unitaire' && qtyInput && !(qtyInput.value||'').trim()){
         qtyInput.value = '1';
       }
@@ -978,10 +986,27 @@
           qtyInput.disabled = true;
           qtyInput.placeholder = 'Auto';
         }
-        if(widthInput) widthInput.disabled = false;
-        if(heightInput) heightInput.disabled = false;
+        if(widthInput){
+          widthInput.disabled = false;
+          widthInput.style.display = 'block';
+        }
+        if(heightInput){
+          heightInput.disabled = false;
+          heightInput.style.display = 'block';
+        }
       } else if(qtyInput){
         qtyInput.disabled = false;
+        qtyInput.placeholder = '100';
+        if(widthInput){
+          widthInput.value = '';
+          widthInput.disabled = true;
+          widthInput.style.display = 'none';
+        }
+        if(heightInput){
+          heightInput.value = '';
+          heightInput.disabled = true;
+          heightInput.style.display = 'none';
+        }
       }
     });
   }
