@@ -769,25 +769,36 @@ app.post('/api/sumup/create-checkout', express.json(), async (req, res) => {
             return res.status(400).json({ success: false, error: 'Montant invalide (minimum 0,50 EUR).' });
         }
         const reference = 'CI-' + Date.now();
+        const checkoutBody = {
+            checkout_reference: reference,
+            amount: Number(amount.toFixed(2)),
+            currency,
+            merchant_code: SUMUP_MERCHANT_CODE,
+            description: description.slice(0, 120),
+            return_url: `${publicBaseUrl}/panier?sumup_return=1`
+        };
         const response = await fetch('https://api.sumup.com/v0.1/checkouts', {
             method: 'POST',
             headers: {
                 'Authorization': 'Bearer ' + SUMUP_SECRET_API_KEY,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                checkout_reference: reference,
-                amount: Number(amount.toFixed(2)),
-                currency: currency,
-                pay_to_merchant: SUMUP_MERCHANT_CODE,
-                description: description
-            })
+            body: JSON.stringify(checkoutBody)
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
+            console.error('Erreur SumUp create-checkout payload:', checkoutBody);
+            console.error('Erreur SumUp create-checkout response:', payload);
             return res.status(response.status).json({
                 success: false,
-                error: payload.message || payload.error_message || payload.error || 'Impossible de creer le checkout SumUp.'
+                error:
+                    payload.message ||
+                    payload.error_message ||
+                    payload.error ||
+                    payload.errors?.[0]?.message ||
+                    payload.errors?.[0]?.error_message ||
+                    JSON.stringify(payload.errors || payload) ||
+                    'Impossible de creer le checkout SumUp.'
             });
         }
         res.json({
