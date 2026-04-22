@@ -880,8 +880,27 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         let numeric = parseEuroLabel(priceLabel);
         if (override.quantityPricing && override.quantityPricing.length) {
             const parsedQty = parseInt(quantityValue, 10);
+            const parsedWidth = Number(width);
+            const parsedHeight = Number(height);
             const tiers = normaliseQuantityPricing(override.quantityPricing);
-            const chosen = tiers.find(item => item.quantity === parsedQty) || tiers.find(item => item.quantity >= parsedQty) || tiers[tiers.length - 1];
+            let chosen = null;
+            if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
+                const dimensionalTiers = tiers.filter(item => item.type === 'dimensions');
+                if (dimensionalTiers.length) {
+                    chosen = dimensionalTiers.find(item => item.width === parsedWidth && item.height === parsedHeight);
+                    if (!chosen) {
+                        chosen = dimensionalTiers.slice().sort((a, b) => {
+                            const deltaA = Math.abs((a.width * a.height) - (parsedWidth * parsedHeight));
+                            const deltaB = Math.abs((b.width * b.height) - (parsedWidth * parsedHeight));
+                            return deltaA - deltaB;
+                        })[0];
+                    }
+                }
+            }
+            if (!chosen) {
+                const quantityTiers = tiers.filter(item => item.type !== 'dimensions');
+                chosen = quantityTiers.find(item => item.quantity === parsedQty) || quantityTiers.find(item => item.quantity >= parsedQty) || quantityTiers[quantityTiers.length - 1];
+            }
             if (chosen) {
                 numeric = chosen.total;
                 priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
@@ -1021,10 +1040,28 @@ function normaliseCsvList(value) {
 
 function normaliseQuantityPricing(list) {
     if (!Array.isArray(list)) return [];
-    return list.map(item => ({
-        quantity: parseInt(item.quantity, 10),
-        total: Number(item.total)
-    })).filter(item => !isNaN(item.quantity) && item.quantity > 0 && !isNaN(item.total) && item.total >= 0);
+    return list.map(item => {
+        const type = String(item.type || '').trim().toLowerCase() || 'lot';
+        const quantity = parseInt(item.quantity, 10);
+        const width = Number(item.width);
+        const height = Number(item.height);
+        const total = Number(item.total);
+        const finish = String(item.finish || '').trim();
+        return {
+            type,
+            quantity,
+            width,
+            height,
+            finish,
+            total
+        };
+    }).filter(item => {
+        if (isNaN(item.total) || item.total < 0) return false;
+        if (item.type === 'dimensions') {
+            return !isNaN(item.width) && item.width > 0 && !isNaN(item.height) && item.height > 0;
+        }
+        return !isNaN(item.quantity) && item.quantity > 0;
+    });
 }
 
 function getProductImageUrl(filename) {

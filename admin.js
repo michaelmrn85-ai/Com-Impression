@@ -722,11 +722,22 @@
   function saveProductEditor(){
     var entry=state.selectedProduct; if(!entry) return;
     var pricingRows = getProductPricingRows();
-    var pricing=pricingRows.filter(function(row){ return row.quantity && row.salePrice; }).map(function(row){
-      return { quantity:row.quantity, total:row.salePrice };
+    var pricing=pricingRows.filter(function(row){
+      if(!row.salePrice) return false;
+      if(row.type === 'dimensions') return row.width && row.height;
+      return row.quantity;
+    }).map(function(row){
+      return {
+        type:row.type,
+        quantity:row.quantity,
+        width:row.width,
+        height:row.height,
+        finish:row.finish,
+        total:row.salePrice
+      };
     });
     var firstRow = pricingRows[0] || {};
-    var quantityOptions = pricingRows.map(function(row){ return row.quantity; }).filter(Boolean).join(',');
+    var quantityOptions = pricingRows.filter(function(row){ return row.type !== 'dimensions'; }).map(function(row){ return row.quantity; }).filter(Boolean).join(',');
     var saleLabel = firstRow.salePrice ? formatPriceValue(firstRow.salePrice) : ((entry.product||{}).priceLabel||'Sur devis');
     var endpoint = entry.isNew ? '/api/admin/products' : ('/api/admin/products/'+encodeURIComponent(entry.legacyCat)+'/'+encodeURIComponent(entry.product.id));
     fetch(api(endpoint),{
@@ -746,7 +757,7 @@
         finishOptions:($('product-edit-finish').value||'').trim(),
         quantityPricing:pricing,
         uploadEnabled:!!(($('product-edit-upload')||{}).checked),
-        hasDimensions:!!(($('product-edit-dimensions')||{}).checked)
+        hasDimensions:!!(($('product-edit-dimensions')||{}).checked) || pricingRows.some(function(row){ return row.type === 'dimensions'; })
       })
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Sauvegarde impossible'); return d; }); })
@@ -900,8 +911,11 @@
     if(product && Array.isArray(product.quantityPricing) && product.quantityPricing.length){
       rows = product.quantityPricing.map(function(row){
         return {
-          type:'lot',
-          quantity:String(row.quantity||'').trim(),
+          type:row.type === 'dimensions' ? 'dimensions' : (row.type === 'unitaire' ? 'unitaire' : 'lot'),
+          quantity:row.quantity == null ? '' : String(row.quantity).trim(),
+          width:row.width == null ? '' : String(row.width).trim(),
+          height:row.height == null ? '' : String(row.height).trim(),
+          finish:row.finish == null ? '' : String(row.finish).trim(),
           purchasePrice:product.purchasePrice == null ? '' : String(product.purchasePrice),
           salePrice:row.total == null ? '' : String(row.total)
         };
@@ -910,23 +924,29 @@
       rows = [{
         type:'unitaire',
         quantity:(product.quantityOptions && product.quantityOptions[0]) ? String(product.quantityOptions[0]) : '1',
+        width:'',
+        height:'',
+        finish:'',
         purchasePrice:product.purchasePrice == null ? '' : String(product.purchasePrice),
         salePrice:product.salePrice == null ? '' : String(product.salePrice)
       }];
     }
     if(!rows.length){
-      rows = [{ type:'lot', quantity:'100', purchasePrice:'', salePrice:'' }];
+      rows = [{ type:'lot', quantity:'100', width:'', height:'', finish:'', purchasePrice:'', salePrice:'' }];
     }
     return rows;
   }
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th>Largeur</th><th>Hauteur</th><th>Finition</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
         return '<tr class="product-pricing-row">'
-          +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Unitaire</option></select></td>'
+          +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Unitaire</option><option value="dimensions" '+(row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></td>'
           +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"></td>'
+          +'<td><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"></td>'
+          +'<td><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"></td>'
+          +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value="'+esc(row.finish||'')+'"></td>'
           +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
           +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
           +'<td><span class="pricing-margin">0,00</span></td>'
@@ -934,21 +954,34 @@
         +'</tr>';
       }).join('')
       +'</tbody></table></div>'
-      +'<div class="product-pricing-add"><button class="btn btn-light btn-small" id="product-pricing-add" type="button">+ Ajouter un lot ou unitaire</button></div>'
+      +'<div class="product-pricing-add"><button class="btn btn-light btn-small" id="product-pricing-add" type="button">+ Ajouter un lot, unitaire ou dimensions</button></div>'
     +'</div>';
   }
 
   function refreshProductPricingTable(){
     document.querySelectorAll('#product-pricing-rows .product-pricing-row').forEach(function(row){
-      var qty = parseAmount((row.querySelector('.product-pricing-qty')||{}).value || '1') || 1;
       var purchase = parseAmount((row.querySelector('.product-pricing-purchase')||{}).value);
       var sale = parseAmount((row.querySelector('.product-pricing-sale')||{}).value);
       var type = ((row.querySelector('.product-pricing-type')||{}).value || 'lot');
-      var marginValue = type === 'unitaire' ? (sale - purchase) : (sale - purchase);
+      var qtyInput = row.querySelector('.product-pricing-qty');
+      var widthInput = row.querySelector('.product-pricing-width');
+      var heightInput = row.querySelector('.product-pricing-height');
+      var marginValue = sale - purchase;
       var marginCell = row.querySelector('.pricing-margin');
       if(marginCell) marginCell.textContent = formatPlainNumber(marginValue);
-      if(type === 'unitaire' && !((row.querySelector('.product-pricing-qty')||{}).value||'').trim()){
-        row.querySelector('.product-pricing-qty').value = '1';
+      if(type === 'unitaire' && qtyInput && !(qtyInput.value||'').trim()){
+        qtyInput.value = '1';
+      }
+      if(type === 'dimensions'){
+        if(qtyInput){
+          qtyInput.value = '';
+          qtyInput.disabled = true;
+          qtyInput.placeholder = 'Auto';
+        }
+        if(widthInput) widthInput.disabled = false;
+        if(heightInput) heightInput.disabled = false;
+      } else if(qtyInput){
+        qtyInput.disabled = false;
       }
     });
   }
@@ -958,11 +991,14 @@
       return {
         type:((row.querySelector('.product-pricing-type')||{}).value || 'lot').trim(),
         quantity:((row.querySelector('.product-pricing-qty')||{}).value || '').trim(),
+        width:((row.querySelector('.product-pricing-width')||{}).value || '').trim(),
+        height:((row.querySelector('.product-pricing-height')||{}).value || '').trim(),
+        finish:((row.querySelector('.product-pricing-finish')||{}).value || '').trim(),
         purchasePrice:((row.querySelector('.product-pricing-purchase')||{}).value || '').trim(),
         salePrice:((row.querySelector('.product-pricing-sale')||{}).value || '').trim()
       };
     }).filter(function(row){
-      return row.quantity || row.purchasePrice || row.salePrice;
+      return row.quantity || row.width || row.height || row.finish || row.purchasePrice || row.salePrice;
     });
   }
 
@@ -1214,8 +1250,11 @@
         if(rowsWrap){
           rowsWrap.insertAdjacentHTML('beforeend',
             '<tr class="product-pricing-row">'
-            +'<td><select class="product-pricing-type"><option value="lot" selected>Lot</option><option value="unitaire">Unitaire</option></select></td>'
+            +'<td><select class="product-pricing-type"><option value="lot" selected>Lot</option><option value="unitaire">Unitaire</option><option value="dimensions">Dimensions</option></select></td>'
             +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
+            +'<td><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value=""></td>'
+            +'<td><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value=""></td>'
+            +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value=""></td>'
             +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value=""></td>'
             +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value=""></td>'
             +'<td><span class="pricing-margin">0,00</span></td>'
@@ -1244,6 +1283,8 @@
       if(e.target && e.target.classList && e.target.classList.contains('manual-amount')) refreshManualTotal();
       if(e.target && e.target.classList && (
         e.target.classList.contains('product-pricing-qty') ||
+        e.target.classList.contains('product-pricing-width') ||
+        e.target.classList.contains('product-pricing-height') ||
         e.target.classList.contains('product-pricing-purchase') ||
         e.target.classList.contains('product-pricing-sale')
       )) refreshProductPricingTable();
