@@ -22,7 +22,11 @@ require('dotenv').config();
 
 const app = express();
 app.set('trust proxy', 1);
-const ADMIN_PASSWORD = String(process.env.ADMIN_PWD || '').trim();
+const ADMIN_PASSWORD = String(
+    process.env.ADMIN_PWD ||
+    process.env.ADMIN_PASSWORD ||
+    'comimpression2025'
+).trim();
 const KNOWN_PUBLIC_ORIGINS = Array.from(new Set([
     process.env.PUBLIC_BASE_URL,
     process.env.SITE_BASE_URL,
@@ -835,7 +839,16 @@ app.post('/api/cart-upload', upload.single('fichier'), (req, res) => {
         const token = CRYPTO.randomBytes(10).toString('hex');
         const ext = path.extname(req.file.originalname || '') || '';
         const finalPath = path.join(CART_UPLOADS_DIR, token + ext);
-        fs.renameSync(req.file.path, finalPath);
+        try {
+            fs.renameSync(req.file.path, finalPath);
+        } catch (moveError) {
+            if (moveError && moveError.code === 'EXDEV') {
+                fs.copyFileSync(req.file.path, finalPath);
+                fs.unlinkSync(req.file.path);
+            } else {
+                throw moveError;
+            }
+        }
         const meta = {
             token,
             originalname: req.file.originalname || ('fichier' + ext),
