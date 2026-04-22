@@ -1007,11 +1007,34 @@ textarea {
 .auth-dialog {
   position: relative;
   width: min(100%, 760px);
+  max-height: min(92vh, 980px);
+  overflow: auto;
   padding: 28px;
   border-radius: 28px;
   background: #fff8f1;
   border: 1px solid #eed8c7;
   box-shadow: 0 30px 80px rgba(23, 19, 16, 0.18);
+}
+
+#checkout-payment-modal .auth-dialog {
+  width: min(100%, 1040px);
+  padding: 30px;
+}
+
+#checkout-payment-modal .summary-box {
+  margin: 18px 0 20px;
+}
+
+#sumup-card-element {
+  width: 100%;
+  min-height: 420px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #fff;
+}
+
+#checkout-payment-modal .btn {
+  margin-top: 18px;
 }
 
 .auth-close {
@@ -1343,6 +1366,57 @@ body[data-page="produit"] .page-shell {
 
   .product-side-summary {
     position: static;
+  }
+
+  .auth-overlay {
+    padding: 10px;
+    align-items: flex-start;
+    overflow: auto;
+  }
+
+  .auth-dialog {
+    width: 100%;
+    max-height: none;
+    min-height: calc(100vh - 20px);
+    border-radius: 24px;
+    padding: 20px 16px 18px;
+  }
+
+  #checkout-payment-modal .auth-dialog {
+    width: 100%;
+    min-height: calc(100vh - 20px);
+    padding: 20px 14px 18px;
+  }
+
+  #checkout-payment-modal .auth-close {
+    top: 10px;
+    right: 10px;
+  }
+
+  #checkout-payment-modal h2 {
+    margin-right: 56px;
+    font-size: 2rem;
+    line-height: 1.05;
+  }
+
+  #checkout-payment-modal p {
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  #checkout-payment-modal .split-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #checkout-payment-modal .split-line .total {
+    font-size: 1.9rem;
+  }
+
+  #sumup-card-element {
+    min-height: 500px;
+    border-radius: 20px;
   }
 
   .cart-table-row {

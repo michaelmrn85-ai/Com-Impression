@@ -1183,6 +1183,7 @@
           sumupWidget = window.SumUpCard.mount({
             id: "sumup-card-element",
             checkoutId: currentSumupCheckoutId,
+            locale: "fr-FR",
             showSubmitButton: false,
             onResponse: function (type) {
               if (type === "invalid") {
