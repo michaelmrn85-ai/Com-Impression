@@ -2651,10 +2651,10 @@ function buildManualDocumentMeta(type) {
 }
 
 function rebuildManualPdfForCommand(cmd) {
-    if (!cmd || !Array.isArray(cmd.documents)) return;
+    if (!cmd || !Array.isArray(cmd.documents)) return null;
     const docType = buildManualDocumentMeta(cmd.type_document || 'commande');
     const doc = cmd.documents.find(item => String(item.fichier || '').indexOf(docType.key + path.sep) === 0 || String(item.type || '') === docType.label);
-    if (!doc || !doc.fichier) return;
+    if (!doc || !doc.fichier) return null;
     const pdfPath = path.join(DOCS_DIR, doc.fichier);
     try { fs.mkdirSync(path.dirname(pdfPath), { recursive: true }); } catch(e) {}
     const pdfBuffer = buildSimplePdfBuffer({
@@ -2675,6 +2675,35 @@ function rebuildManualPdfForCommand(cmd) {
     });
     fs.writeFileSync(pdfPath, pdfBuffer);
     doc.date = new Date().toLocaleDateString('fr-FR');
+    return { path: pdfPath, name: doc.nom || `${docType.label}-${cmd.numero || cmd.id}.pdf`, label: docType.label };
+}
+
+async function notifyManualDocumentUpdated(cmd, pdfInfo) {
+    if (!cmd || !cmd.email || !pdfInfo || !pdfInfo.path || !fs.existsSync(pdfInfo.path)) return false;
+    try {
+        const transporter = createTransporter();
+        const label = pdfInfo.label || (cmd.type_document_label || 'Document');
+        await transporter.sendMail({
+            from: `"COM' Impression" <${process.env.SMTP_USER}>`,
+            to: cmd.email,
+            subject: `${label} modifié — ${cmd.numero || cmd.id}`,
+            html: emailTemplate({
+                title: `${label} modifié`,
+                subtitle: `Votre ${label.toLowerCase()} COM' Impression a ete mis a jour.`,
+                body: `
+                    <p>Bonjour ${escapeHtml(cmd.prenom || cmd.nom || 'Client')},</p>
+                    <p>Vous trouverez en piece jointe la version mise a jour de votre ${escapeHtml(label.toLowerCase())}.</p>
+                    <p>Reference : <strong>${escapeHtml(cmd.numero || cmd.id || '')}</strong></p>
+                    ${emailSignatureBlock()}
+                `
+            }),
+            attachments: getBrandingAttachments([{ filename: pdfInfo.name, path: pdfInfo.path }])
+        });
+        return true;
+    } catch (e) {
+        console.warn('Email document modifie non envoye:', e.message);
+        return false;
+    }
 }
 
 // POST /api/commandes/manuelle — créer une commande depuis l'espace admin
@@ -2891,7 +2920,7 @@ app.delete('/api/commandes/:id', express.json(), rateLimit({ windowMs: 15 * 60 *
 });
 
 // POST /api/commandes/:id/modifier-admin — modifier les infos principales
-app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-edit' }), (req, res) => {
+app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-edit' }), async (req, res) => {
     const body = req.body || {};
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
@@ -2907,9 +2936,10 @@ app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ window
     commandes[idx].type_document = docType.key;
     commandes[idx].type_document_label = docType.label;
     commandes[idx].updated_at = new Date().toISOString();
-    rebuildManualPdfForCommand(commandes[idx]);
+    const pdfInfo = rebuildManualPdfForCommand(commandes[idx]);
     sauvegarderCommandes(commandes);
-    res.json({ success: true, commande: commandes[idx] });
+    const mailSent = await notifyManualDocumentUpdated(commandes[idx], pdfInfo);
+    res.json({ success: true, commande: commandes[idx], mailSent });
 });
 
 // POST /api/commandes/:id/rdv-admin — modifier un rendez-vous client
@@ -2939,7 +2969,7 @@ app.post('/api/commandes/:id/rdv-admin', express.json(), rateLimit({ windowMs: 1
 });
 
 // POST /api/commandes/:id/lignes-admin — modifier les produits d un devis/commande
-app.post('/api/commandes/:id/lignes-admin', express.json({ limit: '1mb' }), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-lines-edit' }), (req, res) => {
+app.post('/api/commandes/:id/lignes-admin', express.json({ limit: '1mb' }), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-lines-edit' }), async (req, res) => {
     const body = req.body || {};
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
@@ -2971,9 +3001,10 @@ app.post('/api/commandes/:id/lignes-admin', express.json({ limit: '1mb' }), rate
     }).join('\n');
     if (total > 0) commandes[idx].prix_total = total.toFixed(2).replace('.', ',') + ' €';
     commandes[idx].updated_at = new Date().toISOString();
-    rebuildManualPdfForCommand(commandes[idx]);
+    const pdfInfo = rebuildManualPdfForCommand(commandes[idx]);
     sauvegarderCommandes(commandes);
-    res.json({ success: true, commande: commandes[idx] });
+    const mailSent = await notifyManualDocumentUpdated(commandes[idx], pdfInfo);
+    res.json({ success: true, commande: commandes[idx], mailSent });
 });
 
 // POST /api/commandes/:id/statut — changer le statut + email client
