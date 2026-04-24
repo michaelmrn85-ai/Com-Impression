@@ -1363,6 +1363,16 @@ function defaultSiteConfig() {
             "Email de contact : michael@com-impression.fr",
             "Cette page doit encore etre completee avec les informations legales finales avant publication officielle."
         ].join('\n\n'),
+        faqContent: [
+            "Quels fichiers envoyer ?",
+            "PDF HD, visuels ou documents de travail selon votre commande.",
+            "",
+            "Comment demander un conseil ?",
+            "Depuis la page rendez-vous ou via le panier avec vos precisions.",
+            "",
+            "Ou sont realises les travaux ?",
+            "Conception en Vendee, expedition depuis la Vendee et impression sur site."
+        ].join('\n'),
         updated_at: ''
     };
 }
@@ -1399,6 +1409,7 @@ function normaliserSiteConfig(raw) {
         seasonalProductIds: ids.length ? ids : base.seasonalProductIds.slice(),
         cgvContent: (raw && raw.cgvContent) || base.cgvContent,
         legalContent: (raw && raw.legalContent) || base.legalContent,
+        faqContent: (raw && raw.faqContent) || base.faqContent,
         updated_at: (raw && raw.updated_at) || ''
     };
 }

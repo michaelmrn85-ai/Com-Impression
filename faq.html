@@ -22,14 +22,28 @@
     </section>
     <section class="section">
       <div class="list-card">
-        <p><strong>Quels fichiers envoyer ?</strong></p>
-        <p>PDF HD, visuels ou documents de travail selon votre commande.</p>
-        <p><strong>Comment demander un conseil ?</strong></p>
-        <p>Depuis la page rendez-vous ou via le panier avec vos precisions.</p>
-        <p><strong>Ou sont realises les travaux ?</strong></p>
-        <p>Conception en Vendee, expedition depuis la Vendee et impression sur site.</p>
+        <div id="legal-faq-content" style="white-space:pre-line;line-height:1.8;">
+Quels fichiers envoyer ?
+PDF HD, visuels ou documents de travail selon votre commande.
+
+Comment demander un conseil ?
+Depuis la page rendez-vous ou via le panier avec vos precisions.
+
+Ou sont realises les travaux ?
+Conception en Vendee, expedition depuis la Vendee et impression sur site.
+        </div>
       </div>
     </section>
   </main>
+  <script>
+    fetch('/api/site-config')
+      .then(function(response){ return response.json(); })
+      .then(function(data){
+        var content = data && data.config && data.config.faqContent;
+        var target = document.getElementById('legal-faq-content');
+        if(target && content) target.textContent = content;
+      })
+      .catch(function(){});
+  </script>
 </body>
 </html>

@@ -801,6 +801,7 @@
     $('site-products-subtitle').value = config.productsSubtitle || '';
     renderSiteProductOptions(config.seasonalProductIds || []);
     $('site-popup-message').value = config.message || config.popupMessage || '';
+    if($('site-faq-content')) $('site-faq-content').value = config.faqContent || '';
     if($('site-cgv-content')) $('site-cgv-content').value = config.cgvContent || '';
     if($('site-legal-content')) $('site-legal-content').value = config.legalContent || '';
   }
@@ -831,6 +832,7 @@
               productsAccent: state.siteConfig.productsAccent,
               productsSubtitle: state.siteConfig.productsSubtitle,
               seasonalProductIds: state.siteConfig.seasonalProductIds || [],
+              faqContent: state.siteConfig.faqContent || '',
               cgvContent: state.siteConfig.cgvContent || '',
               legalContent: state.siteConfig.legalContent || '',
               message: incident.message || ''
@@ -917,6 +919,7 @@
       productsAccent: $('site-products-accent').value || '',
       productsSubtitle: $('site-products-subtitle').value || '',
       seasonalProductIds: getSelectedSiteProductIds(),
+      faqContent: (($('site-faq-content')||{}).value || ''),
       cgvContent: (($('site-cgv-content')||{}).value || ''),
       legalContent: (($('site-legal-content')||{}).value || '')
     };
