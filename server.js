@@ -1373,7 +1373,7 @@ app.get('/api/admin/daily-summary', (req, res) => {
         const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '').trim())
             ? String(req.query.date || '').trim()
             : getVisitDayKey();
-        const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === requestedDate);
+        const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === requestedDate && cmd.statut !== 'Annulee');
         const byGamme = {};
         let dayTotal = 0;
         let dayMargin = 0;
@@ -2361,29 +2361,110 @@ function wrapPdfText(value, maxChars) {
 
 function buildSimplePdfBuffer(definition) {
     const commands = [];
-    let y = 800;
-    function line(text, options) {
-        const opts = Object.assign({ x: 48, size: 11, font: 'F1', gap: 16 }, options || {});
-        commands.push(`BT /${opts.font} ${opts.size} Tf 1 0 0 1 ${opts.x} ${y} Tm (${escapePdfText(text)}) Tj ET`);
-        y -= opts.gap;
+    const pageW = 595;
+    const dark = [0.09, 0.07, 0.06];
+    const orange = [0.96, 0.48, 0.13];
+    const pale = [1, 0.97, 0.93];
+    const lineColor = [0.93, 0.86, 0.80];
+
+    function color(values, op) {
+        return `${values.map(v => Number(v).toFixed(3)).join(' ')} ${op}`;
     }
-    line("COM' Impression", { font: 'F2', size: 20, gap: 28 });
-    line(definition.title || 'Document', { font: 'F2', size: 18, gap: 24 });
-    line(`Numero : ${definition.numero || '--'}`, { size: 12, gap: 18 });
-    line(`Date : ${definition.date || formatDate(new Date())}`, { size: 12, gap: 18 });
-    y -= 6;
-    line('Client', { font: 'F2', size: 13, gap: 18 });
-    (definition.clientLines || []).forEach(text => line(text, { size: 11, gap: 16 }));
-    y -= 6;
-    line('Produits', { font: 'F2', size: 13, gap: 18 });
-    (definition.productLines || []).forEach(text => {
-        wrapPdfText(text, 88).forEach(chunk => line(chunk, { size: 11, gap: 16 }));
+    function rect(x, y, w, h, fill, stroke) {
+        if (fill) commands.push(`${color(fill, 'rg')} ${x} ${y} ${w} ${h} re f`);
+        if (stroke) commands.push(`${color(stroke, 'RG')} ${x} ${y} ${w} ${h} re S`);
+    }
+    function text(value, x, y, options) {
+        const opts = Object.assign({ size: 10, font: 'F1', color: dark }, options || {});
+        commands.push(`${color(opts.color, 'rg')} BT /${opts.font} ${opts.size} Tf 1 0 0 1 ${x} ${y} Tm (${escapePdfText(value)}) Tj ET`);
+    }
+    function money(value) {
+        if (typeof value === 'number' && !isNaN(value)) return value.toFixed(2).replace('.', ',') + ' EUR';
+        const numeric = parseEuroLabel(value);
+        if (numeric == null) return String(value || '--').replace(/€/g, 'EUR');
+        return numeric.toFixed(2).replace('.', ',') + ' EUR';
+    }
+    function qtyNumber(value) {
+        const match = String(value || '').match(/\d+(?:[,.]\d+)?/);
+        return match ? Number(match[0].replace(',', '.')) : 1;
+    }
+    function docNumber() {
+        const prefix = definition.docKey === 'facture' ? 'F' : (definition.docKey === 'devis' ? 'D' : 'C');
+        return `${prefix}-${String(definition.numero || '').replace(/^CI-/, '')}`;
+    }
+    function rowText(row) {
+        const options = (row.optionsLibres || []).map(option => `${option.nom || 'Option'} : ${option.valeur || '--'}`).join(', ');
+        return [row.produit || 'Produit', options, row.fichier ? `Fichier : ${row.fichier}` : ''].filter(Boolean).join(' - ');
+    }
+
+    rect(0, 760, pageW, 82, orange);
+    text("COM' Impression", 42, 805, { font: 'F2', size: 24, color: [1, 1, 1] });
+    text('Communication visuelle & impression', 42, 786, { size: 10, color: [1, 1, 1] });
+    text(definition.title || 'Document', 410, 805, { font: 'F2', size: 24, color: [1, 1, 1] });
+    text(docNumber(), 410, 786, { font: 'F2', size: 12, color: [1, 1, 1] });
+
+    rect(40, 690, 245, 52, pale, lineColor);
+    text(`Numero de ${String(definition.title || 'document').toLowerCase()}  ${docNumber()}`, 54, 724, { font: 'F2', size: 10 });
+    text(`Date d'emission  ${definition.date || formatDate(new Date())}`, 54, 708, { size: 10 });
+    if (definition.deliveryDate) text(`Livraison souhaitee  ${definition.deliveryDate}`, 54, 692, { size: 10 });
+
+    rect(310, 668, 245, 74, null, lineColor);
+    text(process.env.INVOICE_COMPANY_NAME || 'EI - Moreno Michael', 324, 724, { font: 'F2', size: 11 });
+    text(process.env.INVOICE_ADDRESS_1 || '78 AVENUE des Champs Elysees, Bureau 326', 324, 708, { size: 9 });
+    text(process.env.INVOICE_ADDRESS_2 || '75008 Paris, FR', 324, 694, { size: 9 });
+    text(process.env.ADMIN_EMAIL || BRAND_CONTACT_EMAIL, 324, 680, { size: 9 });
+    text(process.env.INVOICE_SIRET || '80143116400053', 324, 666, { size: 9 });
+
+    rect(40, 570, 515, 78, null, lineColor);
+    text('Client', 54, 626, { font: 'F2', size: 12, color: orange });
+    (definition.clientLines || []).slice(0, 5).forEach((line, index) => {
+        text(line, 54, 609 - (index * 14), { size: 9 });
     });
-    y -= 6;
-    if (definition.total) line(`Total TTC : ${definition.total}`, { font: 'F2', size: 13, gap: 18 });
-    if (definition.deliveryDate) line(`Livraison souhaitee : ${definition.deliveryDate}`, { size: 11, gap: 16 });
-    y -= 12;
-    line('COM\' Impression — michael@com-impression.fr — 07 43 69 56 41', { size: 10, gap: 14 });
+
+    let y = 528;
+    rect(40, y, 515, 28, pale, lineColor);
+    text('Description', 54, y + 10, { font: 'F2', size: 9 });
+    text('Qte', 318, y + 10, { font: 'F2', size: 9 });
+    text('Prix unitaire', 365, y + 10, { font: 'F2', size: 9 });
+    text('TVA', 455, y + 10, { font: 'F2', size: 9 });
+    text('Total HT', 500, y + 10, { font: 'F2', size: 9 });
+    y -= 24;
+    (definition.productRows || []).forEach(row => {
+        const qty = qtyNumber(row.qte);
+        const total = parseEuroLabel(row.montant) || 0;
+        const unit = qty > 0 && total > 0 ? total / qty : total;
+        const chunks = wrapPdfText(rowText(row), 48);
+        const rowH = Math.max(26, chunks.length * 11 + 12);
+        rect(40, y - rowH + 16, 515, rowH, null, lineColor);
+        chunks.forEach((chunk, index) => text(chunk, 54, y - (index * 11), { size: 8.5 }));
+        text(String(row.qte || '1'), 318, y, { size: 8.5 });
+        text(unit ? money(unit) : '--', 365, y, { size: 8.5 });
+        text('0 %', 455, y, { size: 8.5 });
+        text(row.montant ? money(row.montant) : '--', 500, y, { size: 8.5 });
+        y -= rowH;
+    });
+
+    const totalValue = money(definition.total || '--');
+    rect(355, y - 72, 200, 64, pale, lineColor);
+    text('Total HT', 370, y - 26, { font: 'F2', size: 10 });
+    text(totalValue, 485, y - 26, { font: 'F2', size: 10 });
+    text('Montant total de la TVA', 370, y - 44, { size: 9 });
+    text('0,00 EUR', 485, y - 44, { size: 9 });
+    text('Total TTC', 370, y - 62, { font: 'F2', size: 12, color: orange });
+    text(totalValue, 485, y - 62, { font: 'F2', size: 12, color: orange });
+
+    y -= 112;
+    text('TVA non applicable - article 293 B du CGI', 40, y, { size: 9 });
+    text('Pas d escompte accorde pour paiement anticipe.', 40, y - 14, { size: 8 });
+    text('En cas de retard de paiement, penalites au taux legal et indemnite forfaitaire de recouvrement de 40 EUR.', 40, y - 28, { size: 8 });
+
+    rect(40, 70, 515, 68, pale, lineColor);
+    text('Details du paiement', 54, 118, { font: 'F2', size: 11, color: orange });
+    text(`Nom du beneficiaire  ${process.env.INVOICE_COMPANY_NAME || 'EI - Moreno Michael'}`, 54, 101, { size: 8.5 });
+    text(`BIC  ${process.env.INVOICE_BIC || 'QNTOFRP1XXX'}`, 54, 87, { size: 8.5 });
+    text(`IBAN  ${process.env.INVOICE_IBAN || 'FR7616958000014360415617762'}`, 190, 87, { size: 8.5 });
+    text(`Reference  ${definition.numero || docNumber()}`, 54, 73, { size: 8.5 });
+    text(`${definition.title || 'Document'} ${docNumber()} - 1/1`, 445, 36, { size: 8, color: [0.45, 0.45, 0.45] });
 
     const stream = commands.join('\n');
     const objects = [
@@ -2467,6 +2548,7 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
         const pdfPath = path.join(pdfDir, pdfFileName);
         const pdfBuffer = buildSimplePdfBuffer({
             title: docType.label,
+            docKey: docType.key,
             numero,
             date: formatDate(new Date()),
             clientLines: [
@@ -2476,6 +2558,7 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
                 d.type_client ? `Profil : ${d.type_client}` : '',
                 d.siret ? `SIRET / structure : ${d.siret}` : ''
             ].filter(Boolean),
+            productRows: lignes,
             productLines: lignes.map(row => {
                 const optionText = (row.optionsLibres || []).map(option => {
                     return `${option.nom || 'Option'} : ${option.valeur || '--'}`;
@@ -2573,6 +2656,42 @@ app.get('/api/commandes', rateLimit({ windowMs: 15 * 60 * 1000, max: 40, prefix:
     }
     const commandes = lireCommandes();
     res.json({ success: true, commandes: commandes.reverse() }); // plus récentes en premier
+});
+
+// DELETE /api/commandes/:id — supprimer de l admin sans passer en Annulee
+app.delete('/api/commandes/:id', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-delete' }), (req, res) => {
+    const { mdp } = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+
+    const commandes = lireCommandes();
+    const idx = commandes.findIndex(c => String(c.id) === String(req.params.id) || String(c.numero) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Commande introuvable' });
+
+    const deleted = commandes.splice(idx, 1)[0];
+    sauvegarderCommandes(commandes);
+    res.json({ success: true, commande: deleted });
+});
+
+// POST /api/commandes/:id/modifier-admin — modifier les infos principales
+app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-edit' }), (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+
+    const commandes = lireCommandes();
+    const idx = commandes.findIndex(c => String(c.id) === String(req.params.id) || String(c.numero) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Commande introuvable' });
+
+    const docType = buildManualDocumentMeta(body.type_document || commandes[idx].type_document || 'commande');
+    ['prenom', 'nom', 'email', 'tel', 'siret', 'prix_total', 'date_livraison'].forEach(key => {
+        if (body[key] !== undefined) commandes[idx][key] = String(body[key] || '').trim();
+    });
+    commandes[idx].type_document = docType.key;
+    commandes[idx].type_document_label = docType.label;
+    commandes[idx].updated_at = new Date().toISOString();
+    sauvegarderCommandes(commandes);
+    res.json({ success: true, commande: commandes[idx] });
 });
 
 // POST /api/commandes/:id/statut — changer le statut + email client

@@ -221,11 +221,14 @@
     }
     list.innerHTML=orders.map(function(cmd){
       var fullName=((cmd.prenom||'')+' '+(cmd.nom||'')).trim()||'Client';
+      var canCancel = !isCancelled(cmd);
       return '<div class="order">'
         +'<div><div class="num">'+esc(cmd.numero||cmd.id)+'</div><div class="muted">'+esc(cmd.date||'')+'</div></div>'
         +'<div><strong>'+esc(fullName)+'</strong><div class="muted">'+esc(cmd.email||'')+'</div></div>'
         +'<div><span class="badge '+badgeClass(cmd.statut)+'">'+esc(STATUT_LABELS[cmd.statut]||cmd.statut||'Statut')+'</span><div class="muted">'+esc(cmd.prix_total||'--')+'</div></div>'
-        +'<button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+        +'<div class="order-actions"><button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+        +(canCancel ? '<button class="btn-icon" data-delete-command="'+esc(cmd.id||cmd.numero)+'" type="button" title="Supprimer de l admin">×</button>' : '')
+        +'</div>'
         +'</div>';
     }).join('');
   }
@@ -302,7 +305,9 @@
         +'<div><div class="num">'+esc(info.date)+' à '+esc(info.slot)+'</div><div class="muted">'+esc(cmd.numero||cmd.id||'')+'</div></div>'
         +'<div><strong>'+esc(fullName)+'</strong><div class="muted">'+esc(cmd.email||'')+'</div></div>'
         +'<div><span class="badge b-bat">Rendez-vous</span><div class="muted">'+esc(info.product)+'</div></div>'
-        +'<button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+        +'<div class="order-actions"><button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+        +(!isCancelled(cmd) ? '<button class="btn-icon" data-delete-command="'+esc(cmd.id||cmd.numero)+'" type="button" title="Supprimer de l admin">×</button>' : '')
+        +'</div>'
         +'</div>';
     }).join('');
   }
@@ -349,6 +354,13 @@
     var statutOptions=STATUTS.map(function(st){
       return '<option value="'+esc(st)+'" '+(cmd.statut===st?'selected':'')+'>'+esc(STATUT_LABELS[st])+'</option>';
     }).join('');
+    var typeOptions=[
+      { value:'devis', label:'Devis' },
+      { value:'commande', label:'Commande' },
+      { value:'facture', label:'Facture' }
+    ].map(function(item){
+      return '<option value="'+item.value+'" '+((cmd.type_document||'commande')===item.value?'selected':'')+'>'+item.label+'</option>';
+    }).join('');
     var docs=(cmd.documents||[]).map(function(doc){
       var href=api('/api/admin/commandes/'+encodeURIComponent(cmd.id||cmd.numero)+'/document/'+encodeURIComponent(doc.id)+'?mdp='+encodeURIComponent(state.mdp));
       return '<a class="btn btn-light btn-small" href="'+href+'" target="_blank">📄 '+esc(doc.type||'Document')+'</a>';
@@ -376,6 +388,23 @@
       +'<div><span>Profil</span><strong>'+esc(cmd.type_client||'Particulier')+'</strong></div>'
       +'<div><span>SIRET</span><strong>'+esc(cmd.siret||'--')+'</strong></div>'
       +'</div></section>'
+      +'<section class="panel"><h3>Modifier</h3>'
+      +'<div class="site-grid">'
+      +'<div class="field"><label>Prénom</label><input id="edit-prenom" value="'+esc(cmd.prenom||'')+'"></div>'
+      +'<div class="field"><label>Nom</label><input id="edit-nom" value="'+esc(cmd.nom||'')+'"></div>'
+      +'<div class="field"><label>Email</label><input id="edit-email" value="'+esc(cmd.email||'')+'"></div>'
+      +'<div class="field"><label>Téléphone</label><input id="edit-tel" value="'+esc(cmd.tel||'')+'"></div>'
+      +'</div>'
+      +'<div class="site-grid">'
+      +'<div class="field"><label>Type</label><select id="edit-type-document">'+typeOptions+'</select></div>'
+      +'<div class="field"><label>Total TTC</label><input id="edit-prix-total" value="'+esc(cmd.prix_total||'')+'"></div>'
+      +'</div>'
+      +'<div class="site-grid">'
+      +'<div class="field"><label>Date livraison</label><input id="edit-date-livraison" type="date" value="'+esc(cmd.date_livraison||'')+'"></div>'
+      +'<div class="field"><label>SIRET / structure</label><input id="edit-siret" value="'+esc(cmd.siret||'')+'"></div>'
+      +'</div>'
+      +'<button class="btn btn-orange btn-small" id="save-command-edit" type="button">Enregistrer les modifications</button>'
+      +'</section>'
       +'<section class="panel"><h3>Traitement</h3>'
       +'<div class="field"><label>Statut</label><select id="detail-statut">'+statutOptions+'</select></div>'
       +'<button class="btn btn-orange btn-small" id="save-statut" type="button">Mettre à jour le statut</button>'
@@ -403,6 +432,54 @@
       return loadCommandes();
     })
     .catch(function(err){ setStatus('detail-status','err',err.message||'Erreur statut.'); });
+  }
+
+  function deleteCommand(id){
+    if(!id) return;
+    if(!window.confirm('Supprimer cette commande/devis de l admin ?')) return;
+    fetch(api('/api/commandes/'+encodeURIComponent(id)),{
+      method:'DELETE',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mdp:state.mdp})
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Suppression impossible'); return d; }); })
+    .then(function(){
+      return loadCommandes();
+    })
+    .then(function(){
+      if($('modal-orders') && $('modal-orders').classList.contains('open')) renderOrders();
+      if($('modal-rdv') && $('modal-rdv').classList.contains('open')) renderAppointments();
+      if(state.activeSection==='modal-detail') closeModal($('modal-detail'));
+    })
+    .catch(function(err){
+      alert(err.message || 'Suppression impossible.');
+    });
+  }
+
+  function saveCommandEdit(){
+    var cmd=state.selected; if(!cmd) return;
+    fetch(api('/api/commandes/'+encodeURIComponent(cmd.id||cmd.numero)+'/modifier-admin'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        mdp:state.mdp,
+        prenom:($('edit-prenom')||{}).value||'',
+        nom:($('edit-nom')||{}).value||'',
+        email:($('edit-email')||{}).value||'',
+        tel:($('edit-tel')||{}).value||'',
+        siret:($('edit-siret')||{}).value||'',
+        type_document:($('edit-type-document')||{}).value||'commande',
+        prix_total:($('edit-prix-total')||{}).value||'',
+        date_livraison:($('edit-date-livraison')||{}).value||''
+      })
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Modification impossible'); return d; }); })
+    .then(function(data){
+      if(data.commande) Object.assign(cmd,data.commande);
+      setStatus('detail-status','ok','Modifications enregistrées.');
+      return loadCommandes();
+    })
+    .catch(function(err){ setStatus('detail-status','err',err.message||'Erreur modification.'); });
   }
 
   function saveNotes(){
@@ -1389,7 +1466,10 @@
       if(close){ closeModal(close); return; }
       var detail=e.target.closest('[data-detail]');
       if(detail) openDetail(detail.getAttribute('data-detail'));
+      var deleteBtn=e.target.closest ? e.target.closest('[data-delete-command]') : null;
+      if(deleteBtn){ deleteCommand(deleteBtn.getAttribute('data-delete-command')); return; }
       if(e.target && e.target.id==='save-statut') saveStatut();
+      if(e.target && e.target.id==='save-command-edit') saveCommandEdit();
       if(e.target && e.target.id==='save-notes') saveNotes();
       if(e.target && e.target.id==='upload-doc') uploadDocument();
       if(e.target && e.target.id==='manual-add-line') addManualLine();
