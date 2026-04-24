@@ -2153,6 +2153,16 @@ app.post('/api/client/code-promo', authClient, express.json(), (req, res) => {
 // ── DOCUMENTS CLIENT (dépôt admin) ──────────────────────────────────────────
 const DOCS_DIR = path.join(INCIDENT_DATA_DIR, 'documents');
 if (!fs.existsSync(DOCS_DIR)) { try { fs.mkdirSync(DOCS_DIR, { recursive:true }); } catch(e){} }
+const MANUAL_DOC_DIRS = {
+    devis: path.join(DOCS_DIR, 'devis'),
+    commande: path.join(DOCS_DIR, 'commande'),
+    facture: path.join(DOCS_DIR, 'facture')
+};
+Object.values(MANUAL_DOC_DIRS).forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        try { fs.mkdirSync(dir, { recursive:true }); } catch (e) {}
+    }
+});
 
 const uploadDoc = multer({
     storage: multer.diskStorage({
@@ -2306,6 +2316,85 @@ function formatDate(d) {
     return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 
+function escapePdfText(value) {
+    return String(value || '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function wrapPdfText(value, maxChars) {
+    const words = String(value || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let current = '';
+    words.forEach(word => {
+        const next = current ? `${current} ${word}` : word;
+        if (next.length > maxChars && current) {
+            lines.push(current);
+            current = word;
+        } else {
+            current = next;
+        }
+    });
+    if (current) lines.push(current);
+    return lines.length ? lines : [''];
+}
+
+function buildSimplePdfBuffer(definition) {
+    const commands = [];
+    let y = 800;
+    function line(text, options) {
+        const opts = Object.assign({ x: 48, size: 11, font: 'F1', gap: 16 }, options || {});
+        commands.push(`BT /${opts.font} ${opts.size} Tf 1 0 0 1 ${opts.x} ${y} Tm (${escapePdfText(text)}) Tj ET`);
+        y -= opts.gap;
+    }
+    line("COM' Impression", { font: 'F2', size: 20, gap: 28 });
+    line(definition.title || 'Document', { font: 'F2', size: 18, gap: 24 });
+    line(`Numero : ${definition.numero || '--'}`, { size: 12, gap: 18 });
+    line(`Date : ${definition.date || formatDate(new Date())}`, { size: 12, gap: 18 });
+    y -= 6;
+    line('Client', { font: 'F2', size: 13, gap: 18 });
+    (definition.clientLines || []).forEach(text => line(text, { size: 11, gap: 16 }));
+    y -= 6;
+    line('Produits', { font: 'F2', size: 13, gap: 18 });
+    (definition.productLines || []).forEach(text => {
+        wrapPdfText(text, 88).forEach(chunk => line(chunk, { size: 11, gap: 16 }));
+    });
+    y -= 6;
+    if (definition.total) line(`Total TTC : ${definition.total}`, { font: 'F2', size: 13, gap: 18 });
+    if (definition.deliveryDate) line(`Livraison souhaitee : ${definition.deliveryDate}`, { size: 11, gap: 16 });
+    y -= 12;
+    line('COM\' Impression — michael@com-impression.fr — 07 43 69 56 41', { size: 10, gap: 14 });
+
+    const stream = commands.join('\n');
+    const objects = [
+        '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+        '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+        '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >> endobj',
+        `4 0 obj << /Length ${Buffer.byteLength(stream, 'utf8')} >> stream\n${stream}\nendstream\nendobj`,
+        '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+        '6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj'
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+    objects.forEach(obj => {
+        offsets.push(Buffer.byteLength(pdf, 'utf8'));
+        pdf += `${obj}\n`;
+    });
+    const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+    pdf += `xref\n0 ${objects.length + 1}\n`;
+    pdf += '0000000000 65535 f \n';
+    for (let i = 1; i < offsets.length; i += 1) {
+        pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+    }
+    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return Buffer.from(pdf, 'utf8');
+}
+
+function buildManualDocumentMeta(type) {
+    const clean = String(type || 'commande').trim().toLowerCase();
+    if (clean === 'devis') return { key: 'devis', label: 'Devis' };
+    if (clean === 'facture') return { key: 'facture', label: 'Facture' };
+    return { key: 'commande', label: 'Commande' };
+}
+
 // POST /api/commandes/manuelle — créer une commande depuis l'espace admin
 app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'admin-manual-order' }), upload.array('fichiers', 20), (req, res) => {
     const d = req.body || {};
@@ -2315,8 +2404,23 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
     try {
         const commandes = lireCommandes();
         const numero = genererNumero();
+        const docType = buildManualDocumentMeta(d.doc_type);
         let lignes = [];
         try { lignes = JSON.parse(d.lignes || '[]'); } catch(e) { lignes = []; }
+        lignes = (Array.isArray(lignes) ? lignes : []).map(row => {
+            const cleanRow = row && typeof row === 'object' ? row : {};
+            const optionsLibres = Array.isArray(cleanRow.optionsLibres) ? cleanRow.optionsLibres : [];
+            return {
+                produit: String(cleanRow.produit || ''),
+                qte: String(cleanRow.qte || ''),
+                montant: String(cleanRow.montant || ''),
+                fichier: String(cleanRow.fichier || ''),
+                optionsLibres: optionsLibres.map(option => ({
+                    nom: String((option && option.nom) || ''),
+                    valeur: String((option && option.valeur) || '')
+                })).filter(option => option.nom.trim() || option.valeur.trim())
+            };
+        });
         const files = req.files || [];
         const documents = files.map((f, index) => {
             const safe = f.originalname.replace(/[^a-zA-Z0-9._-]/g,'_');
@@ -2333,10 +2437,50 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
                 notif: false
             };
         });
+        const pdfName = `${docType.label}-${numero}.pdf`;
+        const pdfStored = path.join(docType.key, `${numero}_${Date.now()}_${docType.key}.pdf`);
+        const pdfPath = path.join(DOCS_DIR, pdfStored);
+        const pdfBuffer = buildSimplePdfBuffer({
+            title: docType.label,
+            numero,
+            date: formatDate(new Date()),
+            clientLines: [
+                `${d.prenom || ''} ${d.nom || ''}`.trim() || 'Client',
+                d.email || '--',
+                d.tel || '--',
+                d.type_client ? `Profil : ${d.type_client}` : '',
+                d.siret ? `SIRET / structure : ${d.siret}` : ''
+            ].filter(Boolean),
+            productLines: lignes.map(row => {
+                const optionText = (row.optionsLibres || []).map(option => {
+                    return `${option.nom || 'Option'} : ${option.valeur || '--'}`;
+                }).join(' | ');
+                return [
+                    row.produit || 'Produit',
+                    row.qte ? `Qté : ${row.qte}` : '',
+                    row.montant ? `Montant : ${row.montant}` : '',
+                    row.fichier ? `Fichier : ${row.fichier}` : '',
+                    optionText ? `Options : ${optionText}` : ''
+                ].filter(Boolean).join(' — ');
+            }),
+            total: d.prix_total || '--',
+            deliveryDate: d.date_livraison || ''
+        });
+        fs.writeFileSync(pdfPath, pdfBuffer);
+        documents.unshift({
+            id: Date.now() - 1,
+            nom: pdfName,
+            fichier: pdfStored,
+            type: docType.label,
+            date: new Date().toLocaleDateString('fr-FR'),
+            notif: false
+        });
         const cmd = {
             id:          numero,
             numero,
             date:        formatDate(new Date()),
+            type_document: docType.key,
+            type_document_label: docType.label,
             prenom:      d.prenom || '',
             nom:         d.nom || '',
             email:       d.email || '',
@@ -2357,7 +2501,7 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
         };
         commandes.push(cmd);
         sauvegarderCommandes(commandes);
-        res.json({ success: true, numero: cmd.numero, commande: cmd });
+        res.json({ success: true, numero: cmd.numero, commande: cmd, typeLabel: docType.label, docName: pdfName });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
     }

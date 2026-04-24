@@ -264,11 +264,16 @@
   function renderPanierTable(cmd){
     if(Array.isArray(cmd.lignes) && cmd.lignes.length){
       return '<div style="overflow:auto;"><table class="admin-table-mini">'
-        +'<thead><tr><th>Produit</th><th>Fichier</th><th>Qté</th><th>Montant TTC</th></tr></thead>'
+        +'<thead><tr><th>Produit</th><th>Options</th><th>Fichier</th><th>Qté</th><th>Montant TTC</th></tr></thead>'
         +'<tbody>'+cmd.lignes.map(function(row){
-          return '<tr><td>'+esc(row.produit||'--')+'</td><td>'+esc(row.fichier||'--')+'</td><td>'+esc(row.qte||'--')+'</td><td>'+esc(row.montant||'--')+'</td></tr>';
+          var options = Array.isArray(row.optionsLibres) && row.optionsLibres.length
+            ? row.optionsLibres.map(function(option){
+              return esc((option.nom || 'Option') + ' : ' + (option.valeur || '--'));
+            }).join('<br>')
+            : '--';
+          return '<tr><td>'+esc(row.produit||'--')+'</td><td>'+options+'</td><td>'+esc(row.fichier||'--')+'</td><td>'+esc(row.qte||'--')+'</td><td>'+esc(row.montant||'--')+'</td></tr>';
         }).join('')+'</tbody>'
-        +'<tfoot><tr><td colspan="3">Montant TTC</td><td>'+esc(cmd.prix_total||'--')+'</td></tr></tfoot>'
+        +'<tfoot><tr><td colspan="4">Montant TTC</td><td>'+esc(cmd.prix_total||'--')+'</td></tr></tfoot>'
         +'</table></div>';
     }
     var lines=String(cmd.panier||'').split(/\n|\|/).map(function(l){return l.trim();}).filter(Boolean);
@@ -685,7 +690,7 @@
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'</div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
-      +'<div class="field"><label>Lots / unitaire</label>'+renderProductPricingEditor(pricingRows)+'</div>'
+      +'<div class="field"><label>Tarification / dimensions</label>'+renderProductPricingEditor(pricingRows)+'</div>'
       +'<div class="site-grid">'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-upload" type="checkbox" style="width:auto;" '+(entryRef.product.uploadEnabled!==false?'checked':'')+'> Upload actif sur la fiche produit</label>'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-dimensions" type="checkbox" style="width:auto;" '+(entryRef.product.hasDimensions?'checked':'')+'> Produit avec dimensions libres</label>'
@@ -945,8 +950,8 @@
         return '<tr class="product-pricing-row">'
           +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Unitaire</option><option value="dimensions" '+(row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></td>'
           +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></td>'
-          +'<td><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'" style="display:'+(isDimensions?'block':'none')+';"></td>'
-          +'<td><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'" style="display:'+(isDimensions?'block':'none')+';"></td>'
+          +'<td class="product-pricing-width-cell" style="display:'+(isDimensions?'table-cell':'none')+';"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"></td>'
+          +'<td class="product-pricing-height-cell" style="display:'+(isDimensions?'table-cell':'none')+';"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"></td>'
           +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value="'+esc(row.finish||'')+'"></td>'
           +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
           +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
@@ -967,6 +972,8 @@
       var qtyInput = row.querySelector('.product-pricing-qty');
       var widthInput = row.querySelector('.product-pricing-width');
       var heightInput = row.querySelector('.product-pricing-height');
+      var widthCell = row.querySelector('.product-pricing-width-cell');
+      var heightCell = row.querySelector('.product-pricing-height-cell');
       var marginValue = sale - purchase;
       var marginRate = purchase > 0 ? (((sale / purchase) - 1) * 100) : 0;
       var marginCell = row.querySelector('.pricing-margin');
@@ -988,11 +995,15 @@
         }
         if(widthInput){
           widthInput.disabled = false;
-          widthInput.style.display = 'block';
+        }
+        if(widthCell){
+          widthCell.style.display = 'table-cell';
         }
         if(heightInput){
           heightInput.disabled = false;
-          heightInput.style.display = 'block';
+        }
+        if(heightCell){
+          heightCell.style.display = 'table-cell';
         }
       } else if(qtyInput){
         qtyInput.disabled = false;
@@ -1000,12 +1011,16 @@
         if(widthInput){
           widthInput.value = '';
           widthInput.disabled = true;
-          widthInput.style.display = 'none';
+        }
+        if(widthCell){
+          widthCell.style.display = 'none';
         }
         if(heightInput){
           heightInput.value = '';
           heightInput.disabled = true;
-          heightInput.style.display = 'none';
+        }
+        if(heightCell){
+          heightCell.style.display = 'none';
         }
       }
     });
@@ -1101,13 +1116,31 @@
     var wrap=$('manual-lines'); if(!wrap) return;
     var row=document.createElement('div');
     row.className='manual-line';
+    var options = Array.isArray(data && data.optionsLibres) ? data.optionsLibres : [];
     row.innerHTML=
       '<div class="field"><label>Produit</label><input class="manual-product" placeholder="Cartes de visite" value="'+esc(data&&data.produit||'')+'"></div>'
       +'<div class="field"><label>Upload fichier</label><input class="manual-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.ai,.eps,.svg,.zip"></div>'
       +'<div class="field"><label>Qté</label><input class="manual-qty" placeholder="250 ex." value="'+esc(data&&data.qte||'')+'"></div>'
       +'<div class="field"><label>Montant TTC</label><input class="manual-amount" placeholder="35,90 €" value="'+esc(data&&data.montant||'')+'"></div>'
-      +'<button class="btn-icon manual-remove-line" type="button" title="Supprimer la ligne">×</button>';
+      +'<button class="btn-icon manual-remove-line" type="button" title="Supprimer la ligne">×</button>'
+      +'<div class="manual-line-options">'
+        +'<div class="manual-line-options-head"><strong>Options libres</strong><button class="btn btn-light btn-small manual-add-option" type="button">+ Ajouter une option</button></div>'
+        +'<div class="manual-options-list"></div>'
+      +'</div>';
     wrap.appendChild(row);
+    options.forEach(function(option){ addManualOption(row, option); });
+  }
+
+  function addManualOption(line, data){
+    var list=line && line.querySelector ? line.querySelector('.manual-options-list') : null;
+    if(!list) return;
+    var option=document.createElement('div');
+    option.className='manual-option-row';
+    option.innerHTML=
+      '<div class="field"><label>Nom option</label><input class="manual-option-name" placeholder="Nom libre" value="'+esc(data&&data.nom||'')+'"></div>'
+      +'<div class="field"><label>Valeur option</label><input class="manual-option-value" placeholder="Valeur libre" value="'+esc(data&&data.valeur||'')+'"></div>'
+      +'<button class="btn-icon manual-remove-option" type="button" title="Supprimer l option">×</button>';
+    list.appendChild(option);
   }
 
   function refreshManualTotal(){
@@ -1122,32 +1155,48 @@
     return Array.prototype.slice.call(document.querySelectorAll('#manual-lines .manual-line')).map(function(row){
       var fileInput=row.querySelector('.manual-file');
       var file=fileInput && fileInput.files ? fileInput.files[0] : null;
+      var optionsLibres=Array.prototype.slice.call(row.querySelectorAll('.manual-option-row')).map(function(optionRow){
+        return {
+          nom:(optionRow.querySelector('.manual-option-name')||{}).value||'',
+          valeur:(optionRow.querySelector('.manual-option-value')||{}).value||''
+        };
+      }).filter(function(option){
+        return option.nom.trim() || option.valeur.trim();
+      });
       return {
         produit:(row.querySelector('.manual-product')||{}).value||'',
         qte:(row.querySelector('.manual-qty')||{}).value||'',
         montant:(row.querySelector('.manual-amount')||{}).value||'',
+        optionsLibres:optionsLibres,
         file:file,
         fileName:file ? file.name : ''
       };
     }).filter(function(row){
-      return row.produit.trim() || row.qte.trim() || row.montant.trim() || row.file;
+      return row.produit.trim() || row.qte.trim() || row.montant.trim() || row.optionsLibres.length || row.file;
     });
   }
 
   function buildManualPanier(rows){
     return rows.map(function(row){
+      var optionsText = row.optionsLibres && row.optionsLibres.length
+        ? ' — Options: ' + row.optionsLibres.map(function(option){
+          return (option.nom.trim() || 'Option') + ': ' + (option.valeur.trim() || '--');
+        }).join(', ')
+        : '';
       return (row.produit.trim()||'Produit')
         +' — fichier: '+(row.fileName||'--')
         +' — Qté: '+(row.qte.trim()||'--')
-        +' — Prix: '+(row.montant.trim()||'--');
+        +' — Prix: '+(row.montant.trim()||'--')
+        +optionsText;
     }).join('\n');
   }
 
   function resetManualForm(){
-    ['manual-prenom','manual-nom','manual-email','manual-tel','manual-type-client','manual-siret','manual-total','manual-livraison'].forEach(function(id){
+    ['manual-prenom','manual-nom','manual-email','manual-tel','manual-type-client','manual-siret','manual-total','manual-livraison','manual-doc-type'].forEach(function(id){
       var el=$(id); if(el) el.value='';
     });
     var type=$('manual-type-client'); if(type) type.value='Particulier';
+    var docType=$('manual-doc-type'); if(docType) docType.value='commande';
     var lines=$('manual-lines'); if(lines) lines.innerHTML='';
     addManualLine();
     clearStatus('manual-status');
@@ -1166,11 +1215,12 @@
     fd.append('tel',($('manual-tel').value||'').trim());
     fd.append('type_client',($('manual-type-client').value||'Particulier').trim());
     fd.append('siret',($('manual-siret').value||'').trim());
+    fd.append('doc_type',($('manual-doc-type').value||'commande').trim());
     fd.append('panier',buildManualPanier(rows));
     fd.append('prix_total',($('manual-total').value||'').trim()||formatAmount(rows.reduce(function(sum,row){return sum+parseAmount(row.montant);},0)));
     fd.append('date_livraison',($('manual-livraison').value||'').trim());
     fd.append('lignes',JSON.stringify(rows.map(function(row){
-      return {produit:row.produit,qte:row.qte,montant:row.montant,fichier:row.fileName};
+      return {produit:row.produit,qte:row.qte,montant:row.montant,fichier:row.fileName,optionsLibres:row.optionsLibres};
     })));
     fd.append('mdp',state.mdp);
     rows.forEach(function(row){
@@ -1178,7 +1228,7 @@
     });
     var btn=$('manual-create');
     btn.disabled=true;
-    btn.textContent='Création...';
+    btn.textContent='Generation...';
     clearStatus('manual-status');
     fetch(api('/api/commandes/manuelle'),{
       method:'POST',
@@ -1186,13 +1236,13 @@
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Création impossible'); return d; }); })
     .then(function(data){
-      setStatus('manual-status','ok','Commande créée : '+(data.numero||'OK'));
+      setStatus('manual-status','ok',((data.typeLabel||'Document')+' créé : '+(data.numero||'OK')+(data.docName ? ' — PDF : '+data.docName : '')));
       return loadCommandes();
     })
     .catch(function(err){ setStatus('manual-status','err',err.message||'Erreur création commande.'); })
     .finally(function(){
       btn.disabled=false;
-      btn.textContent='Créer la commande';
+      btn.textContent='Valider et générer le PDF';
     });
   }
 
@@ -1250,6 +1300,10 @@
       if(e.target && e.target.id==='save-notes') saveNotes();
       if(e.target && e.target.id==='upload-doc') uploadDocument();
       if(e.target && e.target.id==='manual-add-line') addManualLine();
+      if(e.target && e.target.classList && e.target.classList.contains('manual-add-option')){
+        var optionLine=e.target.closest('.manual-line');
+        if(optionLine) addManualOption(optionLine);
+      }
       if(e.target && e.target.id==='product-edit-save') saveProductEditor();
       if(e.target && e.target.id==='client-edit-save') saveClientEditor();
       var copyTemplateBtn = e.target.closest ? e.target.closest('[data-copy-template]') : null;
@@ -1277,8 +1331,8 @@
             '<tr class="product-pricing-row">'
             +'<td><select class="product-pricing-type"><option value="lot" selected>Lot</option><option value="unitaire">Unitaire</option><option value="dimensions">Dimensions</option></select></td>'
             +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
-            +'<td><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value=""></td>'
-            +'<td><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value=""></td>'
+            +'<td class="product-pricing-width-cell" style="display:none;"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value=""></td>'
+            +'<td class="product-pricing-height-cell" style="display:none;"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value=""></td>'
             +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value=""></td>'
             +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value=""></td>'
             +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value=""></td>'
@@ -1302,6 +1356,10 @@
         if(line) line.remove();
         if(!document.querySelector('#manual-lines .manual-line')) addManualLine();
         refreshManualTotal();
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('manual-remove-option')){
+        var option=e.target.closest('.manual-option-row');
+        if(option) option.remove();
       }
     });
     document.addEventListener('input',function(e){
