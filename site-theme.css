@@ -742,7 +742,8 @@ textarea {
   line-height: 1.25;
 }
 
-.quantity-grid {
+.quantity-grid,
+.quantity-mode-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;

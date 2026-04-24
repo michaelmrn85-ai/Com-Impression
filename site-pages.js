@@ -111,13 +111,51 @@
     var paperInfo = splitPaperAndWeight(paperRaw);
     var rows = [
       { label: "Reference produit", value: getProductRef(product) },
-      { label: "Libelle", value: product.title || "" },
       { label: "Type de papier", value: paperInfo.paper || paperRaw || "-" },
       { label: "Grammage", value: paperInfo.weight || "-" }
     ];
     return '<div class="product-fixed-info">' + rows.map(function (row) {
       return '<div class="product-fixed-row"><strong>' + esc(row.label) + '</strong><span>' + esc(row.value) + '</span></div>';
     }).join("") + '</div>';
+  }
+
+  function uniqueValues(list) {
+    var values = [];
+    (list || []).forEach(function (value) {
+      var text = String(value || "").trim();
+      if (text && values.indexOf(text) === -1) values.push(text);
+    });
+    return values;
+  }
+
+  function getProductPricingRows(product) {
+    return Array.isArray(product && product.quantityPricing) ? product.quantityPricing : [];
+  }
+
+  function getProductQuantityModes(product) {
+    var rows = getProductPricingRows(product);
+    var modes = [];
+    if (rows.some(function (row) { return row.type === "lot"; })) modes.push("lot");
+    if (rows.some(function (row) { return row.type === "unitaire"; }) || product.requiresQuantityInput) modes.push("unitaire");
+    if (rows.some(function (row) { return row.type === "dimensions"; }) || product.hasDimensions) modes.push("dimensions");
+    if (!modes.length) modes.push(product.requiresQuantityInput ? "unitaire" : "lot");
+    return modes;
+  }
+
+  function matchesSelectedSide(row, selections) {
+    var side = String((row && row.finish) || "").trim().toLowerCase();
+    if (!side) return true;
+    return Object.values(selections || {}).some(function (value) {
+      return String(value || "").trim().toLowerCase() === side;
+    });
+  }
+
+  function getLotQuantityOptions(product, selections) {
+    return uniqueValues(getProductPricingRows(product).filter(function (row) {
+      return row.type === "lot" && matchesSelectedSide(row, selections);
+    }).map(function (row) {
+      return row.quantity;
+    }));
   }
 
   function uploadProductFiles(fileList) {
@@ -618,6 +656,7 @@
         finishLabel: item.paperFinish || "",
         unitLabel: unitLabel,
         totalLabel: item.priceValue != null ? euro(item.priceValue) : (item.priceLabel || "Sur devis"),
+        purchaseValue: item.purchaseValue == null ? null : item.purchaseValue,
         notes: item.notes || "",
         gamme: item.gamme || "",
         deliveryDate: item.deliveryDate || "",
@@ -634,6 +673,7 @@
     var paperFinish = arguments.length > 5 ? arguments[5] : "";
     var totalValue = arguments.length > 6 ? arguments[6] : null;
     var uploads = arguments.length > 7 ? arguments[7] : [];
+    var purchaseValue = arguments.length > 8 ? arguments[8] : null;
     var unitValue = typeof totalValue === "number" && qty > 0 ? totalValue / qty : (typeof product.priceValue === "number" ? product.priceValue : null);
     var cartItem = {
       id: product.id + "-" + Date.now(),
@@ -649,6 +689,7 @@
       configuration: configuration || "",
       priceUnit: typeof unitValue === "number" ? unitValue : null,
       priceValue: typeof totalValue === "number" ? totalValue : (typeof product.priceValue === "number" ? product.priceValue * qty : null),
+      purchaseValue: typeof purchaseValue === "number" ? purchaseValue : null,
       priceLabel: product.priceLabel,
       uploadTokens: (uploads || []).map(function (item) { return item.token; }),
       uploadNames: (uploads || []).map(function (item) { return item.originalname; })
@@ -730,7 +771,10 @@
     var uploadSummary = $("product-upload-summary");
     var currentPriceLabel = product.priceLabel;
     var currentPriceValue = product.priceValue;
+    var currentPurchaseValue = null;
     var currentQuantityOptions = Array.isArray(product.quantityOptions) ? product.quantityOptions.slice() : [];
+    var quantityModes = getProductQuantityModes(product);
+    var selectedQuantityMode = quantityModes[0] || "lot";
 
     if (configWrap) {
       configWrap.className = "product-config-grid";
@@ -745,19 +789,30 @@
 
     function renderQuantityField(selectedValue) {
       if (!quantityField) return;
-      if (product.requiresQuantityInput) {
-        quantityField.innerHTML = '<label for="product-qty-input">Quantite</label><div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"><p>Entre directement la quantite souhaitee.</p></div>';
+      var modeHtml = quantityModes.length > 1
+        ? '<div class="quantity-mode-grid">' + quantityModes.map(function (mode) {
+            var label = mode === "unitaire" ? "Unitaire" : (mode === "dimensions" ? "Dimensions" : "Quantite lot");
+            return '<button type="button" class="quantity-chip' + (mode === selectedQuantityMode ? ' active' : '') + '" data-qty-mode="' + esc(mode) + '">' + esc(label) + '</button>';
+          }).join("") + '</div>'
+        : '';
+      if (selectedQuantityMode === "unitaire") {
+        quantityField.innerHTML = '<label for="product-qty-input">Quantite</label>' + modeHtml + '<div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"><p>Entre directement la quantite souhaitee.</p></div>';
         return;
       }
+      if (selectedQuantityMode === "dimensions") {
+        quantityField.innerHTML = '<label>Quantite</label>' + modeHtml + '<p>Le prix depend des dimensions indiquees.</p>';
+        return;
+      }
+      currentQuantityOptions = getLotQuantityOptions(product, selections);
       if (currentQuantityOptions.length) {
         var selected = selectedValue || String(currentQuantityOptions[0]);
-        quantityField.innerHTML = '<label>Quantite</label><div class="quantity-grid">' + currentQuantityOptions.map(function (qty) {
+        quantityField.innerHTML = '<label>Quantite</label>' + modeHtml + '<div class="quantity-grid">' + currentQuantityOptions.map(function (qty) {
           var value = String(qty);
           return '<button type="button" class="quantity-chip' + (value === selected ? ' active' : '') + '" data-qty-choice="' + esc(value) + '">' + esc(value) + ' ex.</button>';
-        }).join("") + '</div><input id="product-qty-select" type="hidden" value="' + esc(selected) + '"><p>Choisissez simplement le lot souhaite.</p>';
+        }).join("") + '</div><input id="product-qty-select" type="hidden" value="' + esc(selected) + '"><p>Choisissez la quantite imposee par le fournisseur.</p>';
         return;
       }
-      quantityField.innerHTML = '<label for="product-qty-input">Quantite</label><div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"></div>';
+      quantityField.innerHTML = '<label for="product-qty-input">Quantite</label>' + modeHtml + '<div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"></div>';
     }
 
     function readSelectedQuantity() {
@@ -786,6 +841,7 @@
         legacyCat: productLegacyCat,
         productId: product.id,
         selections: selections,
+        quantityMode: selectedQuantityMode,
         quantity: selectedQuantity,
         width: (($("product-width") || {}).value || ""),
         height: (($("product-height") || {}).value || "")
@@ -806,6 +862,7 @@
           renderQuantityField(json.quantityValue || selectedQuantity || "");
           currentPriceLabel = json.priceLabel || product.priceLabel;
           currentPriceValue = typeof json.priceValue === "number" ? json.priceValue : null;
+          currentPurchaseValue = typeof json.purchaseValue === "number" ? json.purchaseValue : null;
           if (priceDisplay) priceDisplay.textContent = normalizePriceLabel(currentPriceLabel);
           if (totalSummary) totalSummary.textContent = currentPriceValue != null ? euro(currentPriceValue) : normalizePriceLabel(currentPriceLabel);
           var qtySelect = $("product-qty-select");
@@ -819,6 +876,13 @@
             });
           }
           if (qtyInput) qtyInput.oninput = function () { requestPricing(qtyInput.value); };
+          quantityField.querySelectorAll("[data-qty-mode]").forEach(function (button) {
+            button.addEventListener("click", function () {
+              selectedQuantityMode = button.getAttribute("data-qty-mode") || selectedQuantityMode;
+              renderQuantityField(selectedQuantityMode === "unitaire" ? "1" : "");
+              requestPricing(readSelectedQuantity());
+            });
+          });
           return json;
         })
         .catch(function (error) {
@@ -833,9 +897,10 @@
         });
     }
 
-    renderQuantityField(product.requiresQuantityInput ? "1" : (product.quantityOptions && product.quantityOptions.length ? String(product.quantityOptions[0]) : "1"));
+    renderQuantityField(selectedQuantityMode === "unitaire" ? "1" : (product.quantityOptions && product.quantityOptions.length ? String(product.quantityOptions[0]) : "1"));
     document.querySelectorAll("[data-product-option]").forEach(function (select) {
       select.addEventListener("change", function () {
+        currentQuantityOptions = getLotQuantityOptions(product, selections);
         requestPricing();
       });
     });
@@ -866,7 +931,8 @@
               selectionSummary,
               paperFinish,
               currentPriceValue,
-              uploads
+              uploads,
+              currentPurchaseValue
             );
             if ($("product-files")) $("product-files").value = "";
             addButton.textContent = "Ajoute au panier";

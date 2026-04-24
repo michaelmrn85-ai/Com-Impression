@@ -978,7 +978,7 @@
       return '<div class="order">'
         +'<div><div class="num">'+esc(entry.product.ref||'--')+'</div><div class="muted">'+esc(entry.gammeTitle||'')+'</div></div>'
         +'<div><strong>'+esc(entry.product.title||'Produit')+'</strong><div class="muted">'+esc(entry.product.summary||'')+'</div>'+(imageUrl?'<div class="muted"><a href="'+esc(imageUrl)+'" target="_blank">Voir l image</a></div>':'')+'</div>'
-        +'<div><span class="badge b-rec">'+esc(entry.product.priceLabel||'Sur devis')+'</span><div class="muted">'+esc((entry.product.quantityOptions||[]).join(', ')||'Lots libres')+'</div></div>'
+        +'<div><span class="badge b-rec">'+esc(entry.product.priceLabel||'Sur devis')+'</span><div class="muted">'+esc((entry.product.quantityOptions||[]).join(', ')||'Quantites libres')+'</div></div>'
         +'<button class="btn btn-orange btn-small" data-edit-product="'+esc(entry.legacyCat)+'::'+esc(entry.product.id)+'" type="button">Modifier</button>'
         +'</div>';
     }).join('');
@@ -1318,7 +1318,7 @@
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Prix d achat TTC</th><th>Prix de vente TTC</th><th>Coef.</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Prix d achat TTC</th><th>Prix de vente TTC</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
         var isDimensions = row.type === 'dimensions';
         var optionsHtml = (Array.isArray(row.optionsLibres) ? row.optionsLibres : []).map(function(option){
@@ -1329,7 +1329,7 @@
           +'</div>';
         }).join('');
         return '<tr class="product-pricing-row">'
-          +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Unitaire</option><option value="dimensions" '+(row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></td>'
+          +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Quantite lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Quantite unitaire</option><option value="dimensions" '+(row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></td>'
           +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></td>'
           +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"'+(isDimensions?'':' disabled')+'></td>'
           +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"'+(isDimensions?'':' disabled')+'></td>'
@@ -1366,19 +1366,13 @@
       var heightInput = row.querySelector('.product-pricing-height');
       var widthCell = row.querySelector('.product-pricing-width-cell');
       var heightCell = row.querySelector('.product-pricing-height-cell');
-      var targetSale = purchase > 0 ? Math.round((purchase * 1.6) * 100) / 100 : 0;
-      if(purchase > 0 && saleInput && !(saleInput.value||'').trim()){
-        sale = targetSale;
-        saleInput.value = formatPlainNumber(targetSale);
-      }
-      var marginValue = sale - purchase;
-      var marginCoef = purchase > 0 && sale > 0 ? (sale / purchase) : 0;
+      var marginFactor = purchase > 0 && sale > 0 ? (sale / purchase) : 0;
       var marginCell = row.querySelector('.pricing-margin');
       if(marginCell){
         if(purchase > 0 && sale > 0){
-          marginCell.innerHTML = 'x' + formatPlainNumber(marginCoef) + '<div class="muted">cible x1,60 : ' + formatPlainNumber(targetSale) + ' EUR</div>';
+          marginCell.innerHTML = formatPlainNumber(purchase) + ' x ' + formatPlainNumber(marginFactor) + '<div class="muted">= ' + formatPlainNumber(sale) + ' EUR</div>';
         } else {
-          marginCell.textContent = 'x0,00';
+          marginCell.textContent = '0,00 x';
         }
       }
       if(type === 'unitaire' && qtyInput && !(qtyInput.value||'').trim()){
@@ -1772,7 +1766,7 @@
         if(rowsWrap){
           rowsWrap.insertAdjacentHTML('beforeend',
             '<tr class="product-pricing-row">'
-            +'<td><select class="product-pricing-type"><option value="lot" selected>Lot</option><option value="unitaire">Unitaire</option><option value="dimensions">Dimensions</option></select></td>'
+            +'<td><select class="product-pricing-type"><option value="lot" selected>Quantite lot</option><option value="unitaire">Quantite unitaire</option><option value="dimensions">Dimensions</option></select></td>'
             +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
             +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="" disabled></td>'
             +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="" disabled></td>'

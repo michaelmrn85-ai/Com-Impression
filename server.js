@@ -437,6 +437,7 @@ function parsePanierJson(raw) {
             finishLabel: escapeHtml(item.finishLabel || ''),
             unitLabel: escapeHtml(item.unitLabel || ''),
             totalLabel: escapeHtml(item.totalLabel || item.total || ''),
+            purchaseValue: item.purchaseValue == null || item.purchaseValue === '' ? null : Number(item.purchaseValue),
             configuration: escapeHtml(item.configuration || ''),
             notes: escapeHtml(item.notes || ''),
             gamme: escapeHtml(item.gamme || '')
@@ -460,7 +461,8 @@ function deriveRowsForStats(cmd) {
             ref: item.ref || '',
             label: item.label || '',
             gamme: item.gamme || '',
-            total: parseEuroLabel(item.totalLabel) || 0
+            total: parseEuroLabel(item.totalLabel) || 0,
+            purchaseValue: item.purchaseValue == null || isNaN(Number(item.purchaseValue)) ? null : Number(item.purchaseValue)
         }));
     }
     const lines = String((cmd && cmd.panier) || '').split(/\n|\|/).map(line => line.trim()).filter(Boolean);
@@ -885,6 +887,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         const legacyCat = String(body.legacyCat || '');
         const productId = String(body.productId || '');
         const sels = body.selections && typeof body.selections === 'object' ? body.selections : {};
+        const quantityMode = String(body.quantityMode || '').trim().toLowerCase();
         const quantity = body.quantity == null ? '' : String(body.quantity);
         const width = body.width == null ? '' : String(body.width);
         const height = body.height == null ? '' : String(body.height);
@@ -902,12 +905,20 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         const quantityValue = quantity || (quantityOptions[0] != null ? String(quantityOptions[0]) : '');
         let priceLabel = resolved ? resolved.ctx.calcPrix(resolved.prod, sels, quantityValue, width, height) : String(customProduct.priceLabel || 'Sur devis');
         let numeric = parseEuroLabel(priceLabel);
+        let purchaseValue = null;
+        let responseQuantityOptions = quantityOptions;
         if (productData.quantityPricing && productData.quantityPricing.length) {
             const selectedOptionValues = Object.values(sels).map(value => String(value || '').trim().toLowerCase());
             const parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
             const tiers = normaliseQuantityPricing(productData.quantityPricing);
+            const lotTiersForOption = tiers.filter(item => {
+                if (item.type !== 'lot') return false;
+                if (!item.finish) return true;
+                return selectedOptionValues.includes(String(item.finish).trim().toLowerCase());
+            });
+            if (lotTiersForOption.length) responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
             let chosen = null;
             if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
                 const dimensionalTiers = tiers.filter(item => item.type === 'dimensions');
@@ -924,17 +935,24 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             if (!chosen) {
                 let quantityTiers = tiers.filter(item => item.type !== 'dimensions');
+                if (quantityMode === 'lot' || quantityMode === 'unitaire') {
+                    quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
+                }
                 const optionTiers = quantityTiers.filter(item => item.finish && selectedOptionValues.includes(String(item.finish).trim().toLowerCase()));
                 if (optionTiers.length) quantityTiers = optionTiers;
-                const unitTiers = quantityTiers.filter(item => item.type === 'unitaire');
-                if (unitTiers.length) {
+                const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
+                if (quantityMode === 'lot') {
+                    chosen = quantityTiers.find(item => item.quantity === parsedQty) || null;
+                } else if (unitTiers.length) {
                     chosen = unitTiers[0];
                 } else {
                     chosen = quantityTiers.find(item => item.quantity === parsedQty) || quantityTiers.find(item => item.quantity >= parsedQty) || quantityTiers[quantityTiers.length - 1];
                 }
             }
             if (chosen) {
-                numeric = chosen.type === 'unitaire' ? chosen.total * (isNaN(parsedQty) || parsedQty < 1 ? 1 : parsedQty) : chosen.total;
+                const safeQty = isNaN(parsedQty) || parsedQty < 1 ? 1 : parsedQty;
+                numeric = chosen.type === 'unitaire' ? chosen.total * safeQty : chosen.total;
+                purchaseValue = chosen.purchasePrice == null ? null : (chosen.type === 'unitaire' ? chosen.purchasePrice * safeQty : chosen.purchasePrice);
                 priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
                 if (chosen.type === 'unitaire') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
             }
@@ -944,9 +962,10 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         }
         res.json({
             success: true,
-            quantityOptions,
+            quantityOptions: responseQuantityOptions,
             priceLabel: String(priceLabel || 'Sur devis').replace(/€/g, 'EUR'),
             priceValue: numeric,
+            purchaseValue,
             quantityValue,
             width,
             height
@@ -1464,7 +1483,9 @@ app.get('/api/admin/daily-summary', (req, res) => {
                 const gamme = row.gamme || (product && product.gamme) || 'Non classee';
                 const total = Number(row.total || 0);
                 let margin = 0;
-                if (product && product.purchasePrice != null) {
+                if (row.purchaseValue != null && !isNaN(Number(row.purchaseValue))) {
+                    margin = total - Number(row.purchaseValue);
+                } else if (product && product.purchasePrice != null) {
                     if (product.salePrice && product.salePrice > 0 && total > 0) {
                         margin = total - (product.purchasePrice * (total / product.salePrice));
                     } else {
