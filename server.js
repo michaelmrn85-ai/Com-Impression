@@ -262,7 +262,7 @@ function buildCatalogApiPayload() {
                 options: options,
                 optionKeys: optionKeyList,
                 defaultSelections,
-                quantityOptions: override.quantityOptions && override.quantityOptions.length ? override.quantityOptions.slice() : (Array.isArray(prod.Q) ? prod.Q : []),
+                quantityOptions: uniquePositiveNumbers(override.quantityOptions && override.quantityOptions.length ? override.quantityOptions : (Array.isArray(prod.Q) ? prod.Q : [])),
                 quantityPricing,
                 purchasePrice: override.purchasePrice == null || override.purchasePrice === '' ? null : Number(override.purchasePrice),
                 salePrice: override.salePrice == null || override.salePrice === '' ? (override.priceValue != null ? Number(override.priceValue) : parseEuroLabel(prod.prix)) : Number(override.salePrice),
@@ -320,7 +320,7 @@ function buildCatalogApiPayload() {
                     options,
                     optionKeys,
                     defaultSelections,
-                    quantityOptions: normaliseCsvList(item.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0),
+                    quantityOptions: uniquePositiveNumbers(normaliseCsvList(item.quantityOptions)),
                     quantityPricing,
                     purchasePrice: item.purchasePrice == null || item.purchasePrice === '' ? null : Number(item.purchasePrice),
                     salePrice: item.salePrice == null || item.salePrice === '' ? (item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : Number(item.priceValue)) : Number(item.salePrice),
@@ -897,7 +897,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         const productData = resolved ? override : customProduct;
 
         const quantityOptions = productData.quantityOptions && productData.quantityOptions.length
-            ? normaliseCsvList(productData.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0)
+            ? uniquePositiveNumbers(productData.quantityOptions)
             : (resolved ? resolveQuantityOptions(resolved.ctx, resolved.prod, sels) : []);
         const quantityValue = quantity || (quantityOptions[0] != null ? String(quantityOptions[0]) : '');
         let priceLabel = resolved ? resolved.ctx.calcPrix(resolved.prod, sels, quantityValue, width, height) : String(customProduct.priceLabel || 'Sur devis');
@@ -1064,6 +1064,15 @@ function sauvegarderCustomProducts(data) {
 function normaliseCsvList(value) {
     if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean);
     return String(value || '').split('\n').join(',').split(',').map(item => item.trim()).filter(Boolean);
+}
+
+function uniquePositiveNumbers(list) {
+    const values = [];
+    normaliseCsvList(list).forEach(value => {
+        const number = parseInt(value, 10);
+        if (!isNaN(number) && number > 0 && !values.includes(number)) values.push(number);
+    });
+    return values;
 }
 
 function normaliseQuantityPricing(list) {
@@ -1555,7 +1564,7 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
             salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
             image: String(body.image || '').trim(),
-            quantityOptions: normaliseCsvList(body.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0),
+            quantityOptions: uniquePositiveNumbers(body.quantityOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
             freeOptions: normaliseFreeOptions(body.freeOptions),
@@ -1597,7 +1606,7 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
             salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
             image: String(body.image || '').trim(),
-            quantityOptions: normaliseCsvList(body.quantityOptions),
+            quantityOptions: uniquePositiveNumbers(body.quantityOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
             freeOptions: normaliseFreeOptions(body.freeOptions),

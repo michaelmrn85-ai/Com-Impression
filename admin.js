@@ -1318,7 +1318,7 @@
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge %</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Prix d achat TTC</th><th>Prix de vente TTC</th><th>Coef.</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
         var isDimensions = row.type === 'dimensions';
         var optionsHtml = (Array.isArray(row.optionsLibres) ? row.optionsLibres : []).map(function(option){
@@ -1358,21 +1358,27 @@
     });
     document.querySelectorAll('#product-pricing-rows .product-pricing-row').forEach(function(row){
       var purchase = parseAmount((row.querySelector('.product-pricing-purchase')||{}).value);
-      var sale = parseAmount((row.querySelector('.product-pricing-sale')||{}).value);
+      var saleInput = row.querySelector('.product-pricing-sale');
+      var sale = parseAmount((saleInput||{}).value);
       var type = ((row.querySelector('.product-pricing-type')||{}).value || 'lot');
       var qtyInput = row.querySelector('.product-pricing-qty');
       var widthInput = row.querySelector('.product-pricing-width');
       var heightInput = row.querySelector('.product-pricing-height');
       var widthCell = row.querySelector('.product-pricing-width-cell');
       var heightCell = row.querySelector('.product-pricing-height-cell');
+      var targetSale = purchase > 0 ? Math.round((purchase * 1.6) * 100) / 100 : 0;
+      if(purchase > 0 && saleInput && !(saleInput.value||'').trim()){
+        sale = targetSale;
+        saleInput.value = formatPlainNumber(targetSale);
+      }
       var marginValue = sale - purchase;
-      var marginRate = sale > 0 ? ((marginValue / sale) * 100) : 0;
+      var marginCoef = purchase > 0 && sale > 0 ? (sale / purchase) : 0;
       var marginCell = row.querySelector('.pricing-margin');
       if(marginCell){
         if(purchase > 0 && sale > 0){
-          marginCell.innerHTML = formatPlainNumber(marginRate) + ' %<div class="muted">+' + formatPlainNumber(marginValue) + ' EUR</div>';
+          marginCell.innerHTML = 'x' + formatPlainNumber(marginCoef) + '<div class="muted">cible x1,60 : ' + formatPlainNumber(targetSale) + ' EUR</div>';
         } else {
-          marginCell.textContent = '0,00 %';
+          marginCell.textContent = 'x0,00';
         }
       }
       if(type === 'unitaire' && qtyInput && !(qtyInput.value||'').trim()){

@@ -83,6 +83,43 @@
     return [paper.join(" / "), finish.join(" / ")].filter(Boolean).join(" • ");
   }
 
+  function getOptionFirstValue(product, matcher) {
+    var options = (product && product.options) || {};
+    var keys = Object.keys(options);
+    for (var i = 0; i < keys.length; i += 1) {
+      if (matcher(keys[i])) return (options[keys[i]] || [])[0] || "";
+    }
+    return "";
+  }
+
+  function splitPaperAndWeight(value) {
+    var text = String(value || "").trim();
+    var weightMatch = text.match(/\b\d+\s*g\b/i);
+    var weight = weightMatch ? weightMatch[0].replace(/\s+/g, "") : "";
+    var paper = weight ? text.replace(weightMatch[0], "").replace(/^[\s,-]+|[\s,-]+$/g, "") : text;
+    return { paper: paper, weight: weight };
+  }
+
+  function isClientConfigKey(key) {
+    if (/recto|verso/i.test(key)) return true;
+    if (/papier|grammage|impression|finit|pellic|vernis|soft/i.test(key)) return false;
+    return true;
+  }
+
+  function renderFixedProductInfo(product) {
+    var paperRaw = getOptionFirstValue(product, function (key) { return /papier|grammage/i.test(key); });
+    var paperInfo = splitPaperAndWeight(paperRaw);
+    var rows = [
+      { label: "Reference produit", value: getProductRef(product) },
+      { label: "Libelle", value: product.title || "" },
+      { label: "Type de papier", value: paperInfo.paper || paperRaw || "-" },
+      { label: "Grammage", value: paperInfo.weight || "-" }
+    ];
+    return '<div class="product-fixed-info">' + rows.map(function (row) {
+      return '<div class="product-fixed-row"><strong>' + esc(row.label) + '</strong><span>' + esc(row.value) + '</span></div>';
+    }).join("") + '</div>';
+  }
+
   function uploadProductFiles(fileList) {
     var files = Array.prototype.slice.call(fileList || []);
     if (!files.length) return Promise.resolve([]);
@@ -601,6 +638,7 @@
         + renderProductHeroMedia(entry)
         + '<div class="product-detail-layout">'
           + '<div class="product-detail-config">'
+            + renderFixedProductInfo(product)
             + '<div id="product-config-fields"></div>'
             + '<div class="field" id="product-quantity-field"></div>'
             + (product.hasDimensions ? '<div class="field product-dimensions-box" id="product-dimensions"><label>Dimensions</label><div class="inline-fields"><input id="product-width" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.width) || 0) + '" placeholder="Largeur cm"><input id="product-height" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.height) || 0) + '" placeholder="Hauteur cm"></div><p>Indiquez votre format en centimetres.</p></div>' : '')
@@ -636,7 +674,7 @@
 
     if (configWrap) {
       configWrap.className = "product-config-grid";
-      configWrap.innerHTML = (product.optionKeys || []).map(function (key) {
+      configWrap.innerHTML = (product.optionKeys || []).filter(isClientConfigKey).map(function (key) {
         var selectId = "product-opt-" + key.replace(/[^a-z0-9]/gi, "_");
         return '<div class="field"><label for="' + esc(selectId) + '">' + esc(key) + '</label><select data-product-option="' + esc(key) + '" id="' + esc(selectId) + '">' + (product.options[key] || []).map(function (option) {
           var selected = selections[key] === option ? ' selected' : '';
