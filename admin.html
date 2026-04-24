@@ -306,13 +306,13 @@
       <div class="box-body">
         <div class="site-grid">
           <div class="panel">
-            <h3>Partie haute</h3>
-            <div class="field"><label>Banniere au-dessus du logo</label><input id="site-top-banner" placeholder="Ex : Livraison offerte des 150 EUR"></div>
-            <div class="field"><label>Badge au-dessus du titre</label><input id="site-hero-badge" placeholder="Ex : Communication visuelle qui vend mieux"></div>
-            <div class="field"><label>Sous-titre</label><input id="site-hero-slogan" placeholder="Ex : Vos vraies gammes COM' Impression"></div>
+            <h3>1. Bandeau tout en haut</h3>
+            <div class="field"><label>Message du bandeau</label><input id="site-top-banner" placeholder="Ex : Livraison offerte des 150 EUR"></div>
           </div>
           <div class="panel">
-            <h3>Bannière orange</h3>
+            <h3>2. Grand bandeau d’accueil</h3>
+            <div class="field"><label>Badge au-dessus du titre</label><input id="site-hero-badge" placeholder="Ex : Communication visuelle qui vend mieux"></div>
+            <div class="field"><label>Sous-titre</label><input id="site-hero-slogan" placeholder="Ex : Vos vraies gammes COM' Impression"></div>
             <div class="field"><label>Ligne 1</label><input id="site-hero-line1" placeholder="Ex : L'impression"></div>
             <div class="field"><label>Mot mis en avant</label><input id="site-hero-highlight" placeholder="Ex : colorée"></div>
             <div class="field"><label>Ligne 2</label><input id="site-hero-line2" placeholder="Ex : qui fait la différence !"></div>
@@ -330,13 +330,13 @@
             </div>
           </div>
           <div class="panel">
-            <h3>Bloc accueil avec logo</h3>
+            <h3>3. Bloc sous le bandeau</h3>
             <div class="field"><label>Titre du bloc</label><input id="site-panel-title" placeholder="Ex : Un accueil plus complet et plus utile"></div>
             <div class="field"><label>Texte du bloc</label><textarea id="site-panel-text" placeholder="Texte de presentation du bloc accueil"></textarea></div>
-            <div class="field"><label>Liste a puces (une ligne par point)</label><textarea id="site-panel-items" placeholder="Barre de recherche visible en haut&#10;Bouton Mon compte avec affichage du nom"></textarea></div>
+            <div class="field" style="display:none;"><label>Liste interne</label><textarea id="site-panel-items"></textarea></div>
           </div>
           <div class="panel">
-            <h3>Produits saisonniers</h3>
+            <h3>4. Produits mis en avant</h3>
             <div class="field"><label>Titre section</label><input id="site-products-title" placeholder="Ex : Tout ce qu'il faut pour"></div>
             <div class="field"><label>Mot accent</label><input id="site-products-accent" placeholder="Ex : communiquer"></div>
             <div class="field"><label>Sous-titre section</label><textarea id="site-products-subtitle" placeholder="Texte d'introduction de la section"></textarea></div>
@@ -347,9 +347,19 @@
             <p class="muted">Choisis les produits à afficher dans la zone saisonnière. Tu n’as plus besoin d’écrire les IDs à la main.</p>
           </div>
           <div class="panel">
-            <h3>Message client</h3>
+            <h3>5. Message client</h3>
             <div class="field"><label>Popup incident / information</label><textarea id="site-popup-message" placeholder="Message visible par les clients"></textarea></div>
             <p class="muted">La sauvegarde publie directement les réglages sur le site public.</p>
+          </div>
+          <div class="panel">
+            <h3>6. Codes réduction</h3>
+            <div class="site-grid">
+              <div class="field"><label>Code</label><input id="promo-code" placeholder="Ex : PRINT10"></div>
+              <div class="field"><label>Remise %</label><input id="promo-discount" inputmode="decimal" placeholder="10"></div>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="promo-permanent" type="checkbox" checked style="width:auto;"> Code permanent</label>
+            <button class="btn btn-orange btn-small" id="promo-create" type="button">Créer le code</button>
+            <div class="list" id="promo-list" style="margin-top:12px;"></div>
           </div>
         </div>
         <button class="btn btn-orange" id="site-save" type="button">Publier sur le site</button>

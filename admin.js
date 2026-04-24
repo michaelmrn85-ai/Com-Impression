@@ -21,6 +21,7 @@
     selected: null,
     avis: [],
     siteConfig: null,
+    promoCodes: [],
     catalog: [],
     clients: [],
     dailySummary: null,
@@ -832,6 +833,66 @@
       });
   }
 
+  function loadPromoCodes(){
+    return fetch(api('/api/admin/promo-codes?mdp='+encodeURIComponent(state.mdp)))
+      .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Codes indisponibles'); return d; }); })
+      .then(function(data){
+        state.promoCodes = Array.isArray(data.codes) ? data.codes : [];
+        renderPromoCodes();
+      });
+  }
+
+  function renderPromoCodes(){
+    var list=$('promo-list');
+    if(!list) return;
+    if(!state.promoCodes.length){
+      list.innerHTML='<div class="empty">Aucun code réduction.</div>';
+      return;
+    }
+    list.innerHTML=state.promoCodes.map(function(item){
+      return '<div class="order" style="grid-template-columns:1fr .7fr .7fr auto;">'
+        +'<div><div class="num">'+esc(item.code||'')+'</div><div class="muted">'+esc(item.created_at?new Date(item.created_at).toLocaleDateString('fr-FR'):'')+'</div></div>'
+        +'<div><strong>'+esc(String(item.remise||0))+' %</strong><div class="muted">Remise</div></div>'
+        +'<div><span class="badge b-exp">'+(item.permanent?'Permanent':'Code')+'</span></div>'
+        +'<button class="btn-icon" data-delete-promo="'+esc(item.id)+'" type="button" title="Supprimer">×</button>'
+        +'</div>';
+    }).join('');
+  }
+
+  function createPromoCode(){
+    var code=(($('promo-code')||{}).value||'').trim();
+    var remise=(($('promo-discount')||{}).value||'').trim();
+    fetch(api('/api/admin/promo-codes'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mdp:state.mdp,code:code,remise:remise,permanent:!!(($('promo-permanent')||{}).checked)})
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Création impossible'); return d; }); })
+    .then(function(data){
+      state.promoCodes = Array.isArray(data.codes) ? data.codes : [];
+      if($('promo-code')) $('promo-code').value='';
+      if($('promo-discount')) $('promo-discount').value='';
+      renderPromoCodes();
+      setStatus('site-status','ok','Code réduction créé.');
+    })
+    .catch(function(err){ setStatus('site-status','err',err.message||'Erreur code réduction.'); });
+  }
+
+  function deletePromoCode(id){
+    fetch(api('/api/admin/promo-codes/'+encodeURIComponent(id)),{
+      method:'DELETE',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mdp:state.mdp})
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Suppression impossible'); return d; }); })
+    .then(function(data){
+      state.promoCodes = Array.isArray(data.codes) ? data.codes : [];
+      renderPromoCodes();
+      setStatus('site-status','ok','Code réduction supprimé.');
+    })
+    .catch(function(err){ setStatus('site-status','err',err.message||'Erreur suppression code.'); });
+  }
+
   function saveSiteConfig(){
     var payload = {
       mdp: state.mdp,
@@ -1121,6 +1182,8 @@
       adresse:'',
       cp:'',
       ville:'',
+      promo_permanent_code:'',
+      promo_permanent_remise:0,
       isNew:true
     };
     var current = state.selectedClient;
@@ -1143,6 +1206,10 @@
       +'<div class="site-grid">'
       +'<div class="field"><label>Code postal</label><input id="client-edit-cp" value="'+esc(current.cp||'')+'"></div>'
       +'<div class="field"><label>Ville</label><input id="client-edit-ville" value="'+esc(current.ville||'')+'"></div>'
+      +'</div>'
+      +'<div class="site-grid">'
+      +'<div class="field"><label>Code réduction permanent</label><input id="client-edit-promo-code" value="'+esc(current.promo_permanent_code||'')+'" placeholder="Ex : CLIENT10"></div>'
+      +'<div class="field"><label>Remise permanente %</label><input id="client-edit-promo-remise" inputmode="decimal" value="'+esc(current.promo_permanent_remise||'')+'" placeholder="10"></div>'
       +'</div>'
       +'<button class="btn btn-orange" id="client-edit-save" type="button">'+(current.isNew?'Creer le client':'Enregistrer le client')+'</button>'
       +'<div class="status" id="client-edit-status"></div>';
@@ -1167,7 +1234,9 @@
         mode_reglement:($('client-edit-payment').value||'').trim(),
         adresse:($('client-edit-adresse').value||'').trim(),
         cp:($('client-edit-cp').value||'').trim(),
-        ville:($('client-edit-ville').value||'').trim()
+        ville:($('client-edit-ville').value||'').trim(),
+        promo_permanent_code:($('client-edit-promo-code').value||'').trim(),
+        promo_permanent_remise:($('client-edit-promo-remise').value||'').trim()
       })
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Sauvegarde impossible'); return d; }); })
@@ -1605,7 +1674,7 @@
       btn.addEventListener('click',function(){
         var scope=btn.getAttribute('data-open-scope');
         if(scope==='site'){
-          loadSiteConfig().then(function(){
+          Promise.all([loadSiteConfig(), loadPromoCodes()]).then(function(){
             openModal('site-editor-section','site');
           });
           return;
@@ -1658,6 +1727,9 @@
         if(pricingOption) pricingOption.remove();
       }
       if(e.target && e.target.id==='client-edit-save') saveClientEditor();
+      if(e.target && e.target.id==='promo-create') createPromoCode();
+      var promoDelete=e.target.closest ? e.target.closest('[data-delete-promo]') : null;
+      if(promoDelete){ deletePromoCode(promoDelete.getAttribute('data-delete-promo')); return; }
       var copyTemplateBtn = e.target.closest ? e.target.closest('[data-copy-template]') : null;
       if(copyTemplateBtn){
         var field=$(copyTemplateBtn.getAttribute('data-copy-template'));

@@ -1004,6 +1004,7 @@ const INCIDENT_DATA_DIR = (() => {
 })();
 const INCIDENT_FILE = path.join(INCIDENT_DATA_DIR, 'incident.json');
 const SITE_CONFIG_FILE = path.join(INCIDENT_DATA_DIR, 'site-config.json');
+const PROMO_CODES_FILE = path.join(INCIDENT_DATA_DIR, 'promo-codes.json');
 const PRODUCT_OVERRIDES_FILE = path.join(INCIDENT_DATA_DIR, 'product-overrides.json');
 const CUSTOM_PRODUCTS_FILE = path.join(INCIDENT_DATA_DIR, 'custom-products.json');
 const VISITS_FILE = path.join(INCIDENT_DATA_DIR, 'visits.json');
@@ -1291,6 +1292,20 @@ function sauvegarderSiteConfig(config) {
     return payload;
 }
 
+function lirePromoCodes() {
+    try {
+        if (fs.existsSync(PROMO_CODES_FILE)) {
+            const raw = JSON.parse(fs.readFileSync(PROMO_CODES_FILE, 'utf8'));
+            return Array.isArray(raw) ? raw : [];
+        }
+    } catch(e) { console.error('Erreur lecture promo-codes:', e.message); }
+    return [];
+}
+
+function sauvegarderPromoCodes(codes) {
+    fs.writeFileSync(PROMO_CODES_FILE, JSON.stringify(Array.isArray(codes) ? codes : [], null, 2));
+}
+
 function lireIncident() {
     try {
         if (fs.existsSync(INCIDENT_FILE)) {
@@ -1453,6 +1468,43 @@ app.post('/api/admin/site-config', express.json(), (req, res) => {
         console.error('Erreur sauvegarde site-config:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
+});
+
+app.get('/api/admin/promo-codes', (req, res) => {
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(req.query.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    res.json({ success: true, codes: lirePromoCodes() });
+});
+
+app.post('/api/admin/promo-codes', express.json(), (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    const code = String(body.code || '').trim().toUpperCase().replace(/\s+/g, '');
+    const remise = Number(String(body.remise || '').replace(',', '.'));
+    if (!code) return res.status(400).json({ success: false, error: 'Code obligatoire' });
+    if (isNaN(remise) || remise <= 0 || remise > 100) return res.status(400).json({ success: false, error: 'Remise invalide' });
+    const codes = lirePromoCodes().filter(item => String(item.code || '').toUpperCase() !== code);
+    const item = {
+        id: CRYPTO.randomBytes(8).toString('hex'),
+        code,
+        remise,
+        permanent: body.permanent !== false,
+        active: true,
+        created_at: new Date().toISOString()
+    };
+    codes.push(item);
+    sauvegarderPromoCodes(codes);
+    res.json({ success: true, code: item, codes });
+});
+
+app.delete('/api/admin/promo-codes/:id', express.json(), (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    const codes = lirePromoCodes().filter(item => String(item.id) !== String(req.params.id));
+    sauvegarderPromoCodes(codes);
+    res.json({ success: true, codes });
 });
 
 app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res) => {
@@ -2060,6 +2112,8 @@ function safeClient(c) {
              mode_reglement:c.mode_reglement||'CB',
              societe:c.societe||'',
              siret:c.siret||'',
+             promo_permanent_code:c.promo_permanent_code||'',
+             promo_permanent_remise:Number(c.promo_permanent_remise||0),
              email_verified: !!c.email_verified,
              points:c.points, historique_points:c.historique_points||[],
              codes_promo:c.codes_promo||[] };
@@ -2110,6 +2164,8 @@ app.post('/api/admin/clients/:id', express.json(), (req, res) => {
     if (body.telephone !== undefined) clients[idx].telephone = String(body.telephone || '').trim();
     if (body.type_client !== undefined) clients[idx].type_client = String(body.type_client || 'Particulier').trim();
     if (body.mode_reglement !== undefined) clients[idx].mode_reglement = String(body.mode_reglement || 'CB').trim();
+    if (body.promo_permanent_code !== undefined) clients[idx].promo_permanent_code = String(body.promo_permanent_code || '').trim().toUpperCase();
+    if (body.promo_permanent_remise !== undefined) clients[idx].promo_permanent_remise = Number(String(body.promo_permanent_remise || '0').replace(',', '.')) || 0;
     clients[idx].updated_at = new Date().toISOString();
     sauvegarderClients(clients);
     res.json({ success: true, client: safeClient(clients[idx]) });
@@ -2142,6 +2198,8 @@ app.post('/api/admin/clients', express.json(), (req, res) => {
         points: 0,
         historique_points: [],
         codes_promo: [],
+        promo_permanent_code: String(body.promo_permanent_code || '').trim().toUpperCase(),
+        promo_permanent_remise: Number(String(body.promo_permanent_remise || '0').replace(',', '.')) || 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
@@ -2169,11 +2227,19 @@ app.post('/api/client/code-promo', authClient, express.json(), (req, res) => {
     const clients = lireClients();
     const client  = clients.find(c => c.email === req.clientEmail);
     if (!client) return res.status(404).json({ success: false });
-    const promo = (client.codes_promo||[]).find(p => p.code === code && !p.utilise);
-    if (!promo) return res.status(400).json({ success: false, error: 'Code invalide ou déjà utilisé' });
-    promo.utilise = true;
-    sauvegarderClient(client);
-    res.json({ success: true, remise: promo.remise });
+    const cleanCode = String(code || '').trim().toUpperCase();
+    if (client.promo_permanent_code && String(client.promo_permanent_code).toUpperCase() === cleanCode && Number(client.promo_permanent_remise || 0) > 0) {
+        return res.json({ success: true, remise: Number(client.promo_permanent_remise || 0), permanent: true });
+    }
+    const promo = (client.codes_promo||[]).find(p => String(p.code || '').toUpperCase() === cleanCode && !p.utilise);
+    if (promo) {
+        promo.utilise = true;
+        sauvegarderClient(client);
+        return res.json({ success: true, remise: promo.remise });
+    }
+    const globalPromo = lirePromoCodes().find(p => p.active !== false && String(p.code || '').toUpperCase() === cleanCode);
+    if (!globalPromo) return res.status(400).json({ success: false, error: 'Code invalide ou déjà utilisé' });
+    return res.json({ success: true, remise: Number(globalPromo.remise || 0), permanent: !!globalPromo.permanent });
 });
 
 // ── Ajouter points automatiquement à chaque commande ─────────────────────
