@@ -108,11 +108,13 @@
 
   function renderFixedProductInfo(product) {
     var paperRaw = getOptionFirstValue(product, function (key) { return /papier|grammage/i.test(key); });
+    var finishRaw = getOptionFirstValue(product, function (key) { return /finit|pellic|vernis|soft/i.test(key); });
     var paperInfo = splitPaperAndWeight(paperRaw);
     var rows = [
       { label: "Reference produit", value: getProductRef(product) },
       { label: "Type de papier", value: paperInfo.paper || paperRaw || "-" },
-      { label: "Grammage", value: paperInfo.weight || "-" }
+      { label: "Grammage", value: paperInfo.weight || "-" },
+      { label: "Finition", value: finishRaw || "-" }
     ];
     return '<div class="product-fixed-info">' + rows.map(function (row) {
       return '<div class="product-fixed-row"><strong>' + esc(row.label) + '</strong><span>' + esc(row.value) + '</span></div>';
@@ -732,7 +734,6 @@
           + '<div>'
             + '<div class="pill">' + esc(entry.gammeTitle) + '</div>'
             + '<h1 class="product-page-title">' + esc(product.title) + '</h1>'
-            + '<p class="product-detail-summary">' + esc(product.summary) + '</p>'
           + '</div>'
           + '<div class="product-detail-pricebox"><div class="muted">Prix de depart</div><div class="total" id="product-price-display">' + esc(normalizePriceLabel(product.priceLabel)) + '</div></div>'
         + '</div>'

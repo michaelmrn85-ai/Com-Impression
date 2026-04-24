@@ -1031,10 +1031,7 @@
       +'<div class="field"><label>Photo principale du produit</label><input id="product-edit-image-file" type="file" accept=".jpg,.jpeg,.png,.webp"><input id="product-edit-image" type="hidden" value="'+esc(entryRef.product.image||'')+'"><div class="muted" id="product-edit-image-name">'+esc(entryRef.product.image||'Aucune image')+'</div></div>'
       +'<div class="field"><label>Apercu photo</label><div id="product-edit-image-preview" style="min-height:180px;border:1px solid #eee3d9;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+(entryRef.product.imageUrl?'<img src="'+esc(entryRef.product.imageUrl)+'" alt="Apercu produit" style="width:100%;height:180px;object-fit:cover;display:block;">':'<span class="muted">Aucune image</span>')+'</div></div>'
       +'</div>'
-      +'<div class="site-grid">'
-      +'<div class="field"><label>Description</label><textarea id="product-edit-summary">'+esc(entryRef.product.summary||'')+'</textarea></div>'
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
-      +'</div>'
       +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Tarification / dimensions</label>'+renderProductPricingEditor(pricingRows)+'</div>'
@@ -1114,7 +1111,7 @@
         mdp:state.mdp,
         legacyCat:($('product-edit-gamme').value||entry.legacyCat||'').trim(),
         title:($('product-edit-name').value||'').trim(),
-        summary:($('product-edit-summary').value||'').trim(),
+        summary:'',
         image:($('product-edit-image').value||'').trim(),
         priceLabel:saleLabel,
         purchasePrice:(firstRow.purchasePrice||'').trim(),
@@ -1366,13 +1363,13 @@
       var heightInput = row.querySelector('.product-pricing-height');
       var widthCell = row.querySelector('.product-pricing-width-cell');
       var heightCell = row.querySelector('.product-pricing-height-cell');
-      var marginFactor = purchase > 0 && sale > 0 ? (sale / purchase) : 0;
+      var marginPercent = purchase > 0 && sale > 0 ? (((sale / purchase) - 1) * 100) : 0;
       var marginCell = row.querySelector('.pricing-margin');
       if(marginCell){
         if(purchase > 0 && sale > 0){
-          marginCell.innerHTML = formatPlainNumber(purchase) + ' x ' + formatPlainNumber(marginFactor) + '<div class="muted">= ' + formatPlainNumber(sale) + ' EUR</div>';
+          marginCell.textContent = formatPlainNumber(marginPercent) + ' %';
         } else {
-          marginCell.textContent = '0,00 x';
+          marginCell.textContent = '0,00 %';
         }
       }
       if(type === 'unitaire' && qtyInput && !(qtyInput.value||'').trim()){

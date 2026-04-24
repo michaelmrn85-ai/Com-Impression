@@ -256,7 +256,7 @@ function buildCatalogApiPayload() {
                 legacyCat: group.legacy,
                 title: override.title || prod.nom,
                 priceLabel: String(override.priceLabel || prod.prix || 'Sur devis').replace(/€/g, 'EUR'),
-                priceValue: override.priceValue != null ? Number(override.priceValue) : parseEuroLabel(prod.prix),
+                priceValue: override.priceValue != null ? parseNumberValue(override.priceValue) : parseEuroLabel(prod.prix),
                 summary: override.summary || prod.desc || group.description,
                 tags: [group.title, override.summary || prod.desc || '', optionKeyList.join(' ')].filter(Boolean),
                 options: options,
@@ -264,8 +264,8 @@ function buildCatalogApiPayload() {
                 defaultSelections,
                 quantityOptions: uniquePositiveNumbers(override.quantityOptions && override.quantityOptions.length ? override.quantityOptions : (Array.isArray(prod.Q) ? prod.Q : [])),
                 quantityPricing,
-                purchasePrice: override.purchasePrice == null || override.purchasePrice === '' ? null : Number(override.purchasePrice),
-                salePrice: override.salePrice == null || override.salePrice === '' ? (override.priceValue != null ? Number(override.priceValue) : parseEuroLabel(prod.prix)) : Number(override.salePrice),
+                purchasePrice: parseNumberValue(override.purchasePrice),
+                salePrice: override.salePrice == null || override.salePrice === '' ? (override.priceValue != null ? parseNumberValue(override.priceValue) : parseEuroLabel(prod.prix)) : parseNumberValue(override.salePrice),
                 requiresQuantityInput: (override.requiresQuantityInput != null ? !!override.requiresQuantityInput : !!(prod.prixUnit || prod.id === 'impression-doc')) || hasUnitPricing(quantityPricing),
                 deliveryDelayDays: override.deliveryDelayDays == null || override.deliveryDelayDays === '' ? null : Number(override.deliveryDelayDays),
                 hasDimensions: !!(prod.dims || prod.dimsLibres),
@@ -314,7 +314,7 @@ function buildCatalogApiPayload() {
                     legacyCat: group.legacy,
                     title: item.title,
                     priceLabel: String(item.priceLabel || 'Sur devis').replace(/€/g, 'EUR'),
-                    priceValue: item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : Number(item.priceValue),
+                    priceValue: item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : parseNumberValue(item.priceValue),
                     summary: item.summary || group.description,
                     tags: [group.title, item.summary || '', item.title || ''].filter(Boolean),
                     options,
@@ -322,8 +322,8 @@ function buildCatalogApiPayload() {
                     defaultSelections,
                     quantityOptions: uniquePositiveNumbers(normaliseCsvList(item.quantityOptions)),
                     quantityPricing,
-                    purchasePrice: item.purchasePrice == null || item.purchasePrice === '' ? null : Number(item.purchasePrice),
-                    salePrice: item.salePrice == null || item.salePrice === '' ? (item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : Number(item.priceValue)) : Number(item.salePrice),
+                    purchasePrice: parseNumberValue(item.purchasePrice),
+                    salePrice: item.salePrice == null || item.salePrice === '' ? (item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : parseNumberValue(item.priceValue)) : parseNumberValue(item.salePrice),
                     requiresQuantityInput: !!item.requiresQuantityInput || hasUnitPricing(quantityPricing),
                     deliveryDelayDays: item.deliveryDelayDays == null || item.deliveryDelayDays === '' ? null : Number(item.deliveryDelayDays),
                     hasDimensions: !!item.hasDimensions,
@@ -1091,6 +1091,14 @@ function normaliseCsvList(value) {
     return String(value || '').split('\n').join(',').split(',').map(item => item.trim()).filter(Boolean);
 }
 
+function parseNumberValue(value) {
+    if (value == null || value === '') return null;
+    if (typeof value === 'number') return isNaN(value) ? null : value;
+    const cleaned = String(value).replace(/\s/g, '').replace('€', '').replace(/EUR/ig, '').replace(',', '.');
+    const number = Number(cleaned);
+    return isNaN(number) ? null : number;
+}
+
 function uniquePositiveNumbers(list) {
     const values = [];
     normaliseCsvList(list).forEach(value => {
@@ -1105,11 +1113,11 @@ function normaliseQuantityPricing(list) {
     return list.map(item => {
         const type = String(item.type || '').trim().toLowerCase() || 'lot';
         const quantity = parseInt(item.quantity, 10);
-        const width = Number(item.width);
-        const height = Number(item.height);
-        const total = Number(item.total);
+        const width = parseNumberValue(item.width);
+        const height = parseNumberValue(item.height);
+        const total = parseNumberValue(item.total);
         const finish = String(item.finish || '').trim();
-        const purchasePrice = Number(item.purchasePrice);
+        const purchasePrice = parseNumberValue(item.purchasePrice);
         const optionsLibres = normaliseFreeOptions(item.optionsLibres);
         return {
             type,
@@ -1117,14 +1125,14 @@ function normaliseQuantityPricing(list) {
             width,
             height,
             finish,
-            purchasePrice: isNaN(purchasePrice) ? null : purchasePrice,
+            purchasePrice,
             total,
             optionsLibres
         };
     }).filter(item => {
-        if (isNaN(item.total) || item.total < 0) return false;
+        if (item.total == null || item.total < 0) return false;
         if (item.type === 'dimensions') {
-            return !isNaN(item.width) && item.width > 0 && !isNaN(item.height) && item.height > 0;
+            return item.width != null && item.width > 0 && item.height != null && item.height > 0;
         }
         return !isNaN(item.quantity) && item.quantity > 0;
     });
@@ -1587,9 +1595,9 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             title: String(body.title || '').trim(),
             summary: String(body.summary || '').trim(),
             priceLabel: String(body.priceLabel || '').trim(),
-            priceValue: body.priceValue == null || body.priceValue === '' ? null : Number(body.priceValue),
-            purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
-            salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
+            priceValue: parseNumberValue(body.priceValue),
+            purchasePrice: parseNumberValue(body.purchasePrice),
+            salePrice: parseNumberValue(body.salePrice),
             image: String(body.image || '').trim(),
             quantityOptions: uniquePositiveNumbers(body.quantityOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
@@ -1597,7 +1605,7 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             freeOptions: normaliseFreeOptions(body.freeOptions),
             uploadEnabled: body.uploadEnabled !== false,
             requiresQuantityInput: !!body.requiresQuantityInput || hasUnitPricing(quantityPricing),
-            deliveryDelayDays: body.deliveryDelayDays == null || body.deliveryDelayDays === '' ? null : Number(body.deliveryDelayDays),
+            deliveryDelayDays: parseNumberValue(body.deliveryDelayDays),
             quantityPricing
         };
         overrides[key] = next;
@@ -1629,9 +1637,9 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             title,
             summary: String(body.summary || '').trim(),
             priceLabel: String(body.priceLabel || 'Sur devis').trim(),
-            priceValue: body.priceValue == null || body.priceValue === '' ? null : Number(body.priceValue),
-            purchasePrice: body.purchasePrice == null || body.purchasePrice === '' ? null : Number(body.purchasePrice),
-            salePrice: body.salePrice == null || body.salePrice === '' ? null : Number(body.salePrice),
+            priceValue: parseNumberValue(body.priceValue),
+            purchasePrice: parseNumberValue(body.purchasePrice),
+            salePrice: parseNumberValue(body.salePrice),
             image: String(body.image || '').trim(),
             quantityOptions: uniquePositiveNumbers(body.quantityOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
@@ -1640,7 +1648,7 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             quantityPricing,
             uploadEnabled: body.uploadEnabled !== false,
             requiresQuantityInput: !!body.requiresQuantityInput || hasUnitPricing(quantityPricing),
-            deliveryDelayDays: body.deliveryDelayDays == null || body.deliveryDelayDays === '' ? null : Number(body.deliveryDelayDays),
+            deliveryDelayDays: parseNumberValue(body.deliveryDelayDays),
             hasDimensions: !!body.hasDimensions,
             minWidth: Number(body.minWidth) || 1,
             minHeight: Number(body.minHeight) || 1,
