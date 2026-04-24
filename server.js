@@ -1051,13 +1051,15 @@ function normaliseQuantityPricing(list) {
         const height = Number(item.height);
         const total = Number(item.total);
         const finish = String(item.finish || '').trim();
+        const optionsLibres = normaliseFreeOptions(item.optionsLibres);
         return {
             type,
             quantity,
             width,
             height,
             finish,
-            total
+            total,
+            optionsLibres
         };
     }).filter(item => {
         if (isNaN(item.total) || item.total < 0) return false;

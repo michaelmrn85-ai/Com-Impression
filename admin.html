@@ -88,8 +88,12 @@
     .manual-line-options-head strong{font-family:'Baloo 2',cursive;font-size:.95rem}
     .manual-options-list{display:grid;gap:8px}
     .manual-option-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
-    .product-free-options{display:grid;gap:8px}
-    .product-free-option-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+    .product-pricing-options td{background:#fffdfa;border-top:0;padding-top:0}
+    .product-pricing-options-box{border:1px dashed #efd8c0;border-radius:16px;padding:12px;display:grid;gap:8px}
+    .product-pricing-options-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .product-pricing-options-head strong{font-family:'Baloo 2',cursive;font-size:.95rem}
+    .product-pricing-options-list{display:grid;gap:8px}
+    .product-pricing-option-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
     .btn-icon{width:40px;height:40px;border-radius:50%;border:2px solid #f0e4dc;background:#fff;color:#dc2626;font-weight:900;cursor:pointer}
     .upload-box{border:2px dashed #f0d6bf;border-radius:18px;padding:14px;background:#fffdfa}
     .upload-preview{margin-top:12px;border:2px solid #f0e4dc;border-radius:18px;background:#fff;min-height:140px;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -117,7 +121,7 @@
     .day-kpi strong{display:block;font-family:'Baloo 2',cursive;font-size:1rem;line-height:1}
     .day-kpi span{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:1.8rem;color:var(--or)}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:1px dashed var(--line);border-radius:20px}
-    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-free-option-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
+    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
     @media(max-width:560px){.admin-summary,.day-kpis{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
   </style>
 </head>
