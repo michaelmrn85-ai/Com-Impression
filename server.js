@@ -284,6 +284,10 @@ function buildCatalogApiPayload() {
                 const options = {};
                 if (paperOptions.length) options.Papier = paperOptions;
                 if (finishOptions.length) options.Finition = finishOptions;
+                normaliseFreeOptions(item.freeOptions).forEach(option => {
+                    if (!options[option.nom]) options[option.nom] = [];
+                    if (!options[option.nom].includes(option.valeur)) options[option.nom].push(option.valeur);
+                });
                 const optionKeys = Object.keys(options);
                 const defaultSelections = {};
                 optionKeys.forEach(key => {
@@ -1143,7 +1147,19 @@ function applyOptionOverrides(optionMap, override) {
     if (override.finishOptions && override.finishOptions.length) {
         map[finishKey || 'Finition'] = override.finishOptions.slice();
     }
+    normaliseFreeOptions(override.freeOptions).forEach(option => {
+        if (!map[option.nom]) map[option.nom] = [];
+        if (!map[option.nom].includes(option.valeur)) map[option.nom].push(option.valeur);
+    });
     return map;
+}
+
+function normaliseFreeOptions(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map(option => ({
+        nom: String((option && option.nom) || '').trim(),
+        valeur: String((option && option.valeur) || '').trim()
+    })).filter(option => option.nom && option.valeur);
 }
 
 function readCartUploadMeta(token) {
@@ -1445,6 +1461,7 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             quantityOptions: normaliseCsvList(body.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
+            freeOptions: normaliseFreeOptions(body.freeOptions),
             uploadEnabled: body.uploadEnabled !== false,
             quantityPricing: normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : [])
         };
@@ -1483,6 +1500,7 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             quantityOptions: normaliseCsvList(body.quantityOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
+            freeOptions: normaliseFreeOptions(body.freeOptions),
             quantityPricing: normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : []),
             uploadEnabled: body.uploadEnabled !== false,
             requiresQuantityInput: !!body.requiresQuantityInput,

@@ -671,6 +671,7 @@
     var entryRef = state.selectedProduct;
     var paperOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /papier|grammage/i.test(k); })]||[]);
     var finishOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /finit|pellic|vernis|soft/i.test(k); })]||[]);
+    var freeOptions = getProductFreeOptions(entryRef.product || {});
     var gammeOptions = PRODUCT_GAMME_OPTIONS.map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
     }).join('');
@@ -690,6 +691,7 @@
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'</div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
+      +'<div class="field"><label>Options libres</label><div class="product-free-options" id="product-free-options"></div><button class="btn btn-light btn-small" id="product-free-option-add" type="button">+ Ajouter une option</button></div>'
       +'<div class="field"><label>Tarification / dimensions</label>'+renderProductPricingEditor(pricingRows)+'</div>'
       +'<div class="site-grid">'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-upload" type="checkbox" style="width:auto;" '+(entryRef.product.uploadEnabled!==false?'checked':'')+'> Upload actif sur la fiche produit</label>'
@@ -697,9 +699,45 @@
       +'</div>'
       +'<button class="btn btn-orange" id="product-edit-save" type="button">'+(entryRef.isNew?'Creer le produit':'Enregistrer le produit')+'</button>'
       +'<div class="status" id="product-edit-status"></div>';
+    freeOptions.forEach(function(option){ addProductFreeOption(option); });
     refreshProductPricingTable();
     bindProductImageUpload();
     openModal('modal-product-edit','produits');
+  }
+
+  function getProductFreeOptions(product){
+    var options = (product && product.options) || {};
+    return Object.keys(options).filter(function(key){
+      return !/papier|grammage|finit|pellic|vernis|soft/i.test(key);
+    }).reduce(function(rows, key){
+      (options[key] || []).forEach(function(value){
+        rows.push({ nom:key, valeur:value });
+      });
+      return rows;
+    }, []);
+  }
+
+  function addProductFreeOption(data){
+    var wrap=$('product-free-options');
+    if(!wrap) return;
+    var row=document.createElement('div');
+    row.className='product-free-option-row';
+    row.innerHTML=
+      '<div class="field"><label>Nom option</label><input class="product-free-option-name" placeholder="Nom libre" value="'+esc(data&&data.nom||'')+'"></div>'
+      +'<div class="field"><label>Valeur option</label><input class="product-free-option-value" placeholder="Valeur libre" value="'+esc(data&&data.valeur||'')+'"></div>'
+      +'<button class="btn-icon product-free-option-remove" type="button" title="Supprimer l option">×</button>';
+    wrap.appendChild(row);
+  }
+
+  function getProductFreeOptionsRows(){
+    return Array.prototype.slice.call(document.querySelectorAll('#product-free-options .product-free-option-row')).map(function(row){
+      return {
+        nom:((row.querySelector('.product-free-option-name')||{}).value || '').trim(),
+        valeur:((row.querySelector('.product-free-option-value')||{}).value || '').trim()
+      };
+    }).filter(function(option){
+      return option.nom || option.valeur;
+    });
   }
 
   function bindProductImageUpload(){
@@ -760,6 +798,7 @@
         quantityOptions:quantityOptions,
         paperOptions:($('product-edit-paper').value||'').trim(),
         finishOptions:($('product-edit-finish').value||'').trim(),
+        freeOptions:getProductFreeOptionsRows(),
         quantityPricing:pricing,
         uploadEnabled:!!(($('product-edit-upload')||{}).checked),
         hasDimensions:!!(($('product-edit-dimensions')||{}).checked) || pricingRows.some(function(row){ return row.type === 'dimensions'; })
@@ -950,8 +989,8 @@
         return '<tr class="product-pricing-row">'
           +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Unitaire</option><option value="dimensions" '+(row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></td>'
           +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></td>'
-          +'<td class="product-pricing-width-cell" style="display:'+(isDimensions?'table-cell':'none')+';"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"></td>'
-          +'<td class="product-pricing-height-cell" style="display:'+(isDimensions?'table-cell':'none')+';"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"></td>'
+          +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"'+(isDimensions?'':' disabled')+'></td>'
+          +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"'+(isDimensions?'':' disabled')+'></td>'
           +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value="'+esc(row.finish||'')+'"></td>'
           +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
           +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
@@ -1012,16 +1051,12 @@
           widthInput.value = '';
           widthInput.disabled = true;
         }
-        if(widthCell){
-          widthCell.style.display = 'none';
-        }
+        if(widthCell) widthCell.style.display = 'table-cell';
         if(heightInput){
           heightInput.value = '';
           heightInput.disabled = true;
         }
-        if(heightCell){
-          heightCell.style.display = 'none';
-        }
+        if(heightCell) heightCell.style.display = 'table-cell';
       }
     });
   }
@@ -1305,6 +1340,11 @@
         if(optionLine) addManualOption(optionLine);
       }
       if(e.target && e.target.id==='product-edit-save') saveProductEditor();
+      if(e.target && e.target.id==='product-free-option-add') addProductFreeOption();
+      if(e.target && e.target.classList && e.target.classList.contains('product-free-option-remove')){
+        var freeOption=e.target.closest('.product-free-option-row');
+        if(freeOption) freeOption.remove();
+      }
       if(e.target && e.target.id==='client-edit-save') saveClientEditor();
       var copyTemplateBtn = e.target.closest ? e.target.closest('[data-copy-template]') : null;
       if(copyTemplateBtn){
@@ -1331,8 +1371,8 @@
             '<tr class="product-pricing-row">'
             +'<td><select class="product-pricing-type"><option value="lot" selected>Lot</option><option value="unitaire">Unitaire</option><option value="dimensions">Dimensions</option></select></td>'
             +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
-            +'<td class="product-pricing-width-cell" style="display:none;"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value=""></td>'
-            +'<td class="product-pricing-height-cell" style="display:none;"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value=""></td>'
+            +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="" disabled></td>'
+            +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="" disabled></td>'
             +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value=""></td>'
             +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value=""></td>'
             +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value=""></td>'
