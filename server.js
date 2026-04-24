@@ -926,11 +926,17 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 let quantityTiers = tiers.filter(item => item.type !== 'dimensions');
                 const optionTiers = quantityTiers.filter(item => item.finish && selectedOptionValues.includes(String(item.finish).trim().toLowerCase()));
                 if (optionTiers.length) quantityTiers = optionTiers;
-                chosen = quantityTiers.find(item => item.quantity === parsedQty) || quantityTiers.find(item => item.quantity >= parsedQty) || quantityTiers[quantityTiers.length - 1];
+                const unitTiers = quantityTiers.filter(item => item.type === 'unitaire');
+                if (unitTiers.length) {
+                    chosen = unitTiers[0];
+                } else {
+                    chosen = quantityTiers.find(item => item.quantity === parsedQty) || quantityTiers.find(item => item.quantity >= parsedQty) || quantityTiers[quantityTiers.length - 1];
+                }
             }
             if (chosen) {
-                numeric = chosen.total;
+                numeric = chosen.type === 'unitaire' ? chosen.total * (isNaN(parsedQty) || parsedQty < 1 ? 1 : parsedQty) : chosen.total;
                 priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
+                if (chosen.type === 'unitaire') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
             }
         } else if (productData.priceLabel && numeric == null) {
             priceLabel = String(productData.priceLabel).replace(/€/g, 'EUR');
