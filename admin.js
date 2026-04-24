@@ -561,7 +561,7 @@
     .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Modification impossible'); return d; }); })
     .then(function(data){
       if(data.commande) Object.assign(cmd,data.commande);
-      setStatus('detail-status','ok','Modifications enregistrées.');
+      setStatus('detail-status',data.mailSent?'ok':'err',data.mailSent?'Modifications enregistrées. Email envoyé au client.':'Modifications enregistrées, mais email non envoyé : '+(data.mailError||'vérifie SMTP_USER / SMTP_PASS et que le PDF existe.'));
       return loadCommandes();
     })
     .catch(function(err){ setStatus('detail-status','err',err.message||'Erreur modification.'); });
@@ -633,7 +633,7 @@
     .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Modification produits impossible'); return d; }); })
     .then(function(data){
       if(data.commande) Object.assign(cmd,data.commande);
-      setStatus('detail-status','ok','Produits enregistrés.');
+      setStatus('detail-status',data.mailSent?'ok':'err',data.mailSent?'Produits enregistrés. Email envoyé au client.':'Produits enregistrés, mais email non envoyé : '+(data.mailError||'vérifie SMTP_USER / SMTP_PASS et que le PDF existe.'));
       return loadCommandes().then(function(){
         var fresh=findCommand(cmd.id||cmd.numero);
         if(fresh) openDetail(fresh.id||fresh.numero);
@@ -1119,6 +1119,7 @@
         finishOptions:($('product-edit-finish').value||'').trim(),
         quantityPricing:pricing,
         uploadEnabled:!!(($('product-edit-upload')||{}).checked),
+        requiresQuantityInput:pricingRows.some(function(row){ return row.type === 'unitaire'; }),
         hasDimensions:!!(($('product-edit-dimensions')||{}).checked) || pricingRows.some(function(row){ return row.type === 'dimensions'; })
       })
     })

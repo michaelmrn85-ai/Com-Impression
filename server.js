@@ -263,7 +263,7 @@ function buildCatalogApiPayload() {
                 quantityPricing: override.quantityPricing && override.quantityPricing.length ? override.quantityPricing.slice() : [],
                 purchasePrice: override.purchasePrice == null || override.purchasePrice === '' ? null : Number(override.purchasePrice),
                 salePrice: override.salePrice == null || override.salePrice === '' ? (override.priceValue != null ? Number(override.priceValue) : parseEuroLabel(prod.prix)) : Number(override.salePrice),
-                requiresQuantityInput: !!(prod.prixUnit || prod.id === 'impression-doc'),
+                requiresQuantityInput: override.requiresQuantityInput != null ? !!override.requiresQuantityInput : !!(prod.prixUnit || prod.id === 'impression-doc'),
                 hasDimensions: !!(prod.dims || prod.dimsLibres),
                 dimsLibres: !!prod.dimsLibres,
                 minDimensionsCm: prod.dimsLibres ? { width: 50, height: 50 } : null,
@@ -1527,6 +1527,7 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             finishOptions: normaliseCsvList(body.finishOptions),
             freeOptions: normaliseFreeOptions(body.freeOptions),
             uploadEnabled: body.uploadEnabled !== false,
+            requiresQuantityInput: !!body.requiresQuantityInput,
             quantityPricing: normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : [])
         };
         overrides[key] = next;
@@ -2679,7 +2680,12 @@ function rebuildManualPdfForCommand(cmd) {
 }
 
 async function notifyManualDocumentUpdated(cmd, pdfInfo) {
-    if (!cmd || !cmd.email || !pdfInfo || !pdfInfo.path || !fs.existsSync(pdfInfo.path)) return false;
+    if (!cmd || !cmd.email || !pdfInfo || !pdfInfo.path || !fs.existsSync(pdfInfo.path)) {
+        return { sent: false, error: 'Email client ou PDF manquant' };
+    }
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        return { sent: false, error: 'SMTP_USER ou SMTP_PASS manquant' };
+    }
     try {
         const transporter = createTransporter();
         const label = pdfInfo.label || (cmd.type_document_label || 'Document');
@@ -2699,10 +2705,10 @@ async function notifyManualDocumentUpdated(cmd, pdfInfo) {
             }),
             attachments: getBrandingAttachments([{ filename: pdfInfo.name, path: pdfInfo.path }])
         });
-        return true;
+        return { sent: true };
     } catch (e) {
         console.warn('Email document modifie non envoye:', e.message);
-        return false;
+        return { sent: false, error: e.message };
     }
 }
 
@@ -2938,8 +2944,8 @@ app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ window
     commandes[idx].updated_at = new Date().toISOString();
     const pdfInfo = rebuildManualPdfForCommand(commandes[idx]);
     sauvegarderCommandes(commandes);
-    const mailSent = await notifyManualDocumentUpdated(commandes[idx], pdfInfo);
-    res.json({ success: true, commande: commandes[idx], mailSent });
+    const mailResult = await notifyManualDocumentUpdated(commandes[idx], pdfInfo);
+    res.json({ success: true, commande: commandes[idx], mailSent: !!mailResult.sent, mailError: mailResult.error || '' });
 });
 
 // POST /api/commandes/:id/rdv-admin — modifier un rendez-vous client
@@ -3003,8 +3009,8 @@ app.post('/api/commandes/:id/lignes-admin', express.json({ limit: '1mb' }), rate
     commandes[idx].updated_at = new Date().toISOString();
     const pdfInfo = rebuildManualPdfForCommand(commandes[idx]);
     sauvegarderCommandes(commandes);
-    const mailSent = await notifyManualDocumentUpdated(commandes[idx], pdfInfo);
-    res.json({ success: true, commande: commandes[idx], mailSent });
+    const mailResult = await notifyManualDocumentUpdated(commandes[idx], pdfInfo);
+    res.json({ success: true, commande: commandes[idx], mailSent: !!mailResult.sent, mailError: mailResult.error || '' });
 });
 
 // POST /api/commandes/:id/statut — changer le statut + email client
