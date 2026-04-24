@@ -2462,13 +2462,14 @@ function readPngImageForPdf(filePath) {
             outPos += stride;
         }
         const rgb = Buffer.alloc(width * height * 3);
+        const alpha = channels === 4 ? Buffer.alloc(width * height) : null;
         for (let i = 0, j = 0; i < raw.length; i += channels, j += 3) {
-            const a = channels === 4 ? raw[i + 3] / 255 : 1;
-            rgb[j] = Math.round(raw[i] * a + 255 * (1 - a));
-            rgb[j + 1] = Math.round(raw[i + 1] * a + 255 * (1 - a));
-            rgb[j + 2] = Math.round(raw[i + 2] * a + 255 * (1 - a));
+            rgb[j] = raw[i];
+            rgb[j + 1] = raw[i + 1];
+            rgb[j + 2] = raw[i + 2];
+            if (alpha) alpha[j / 3] = raw[i + 3];
         }
-        return { width, height, data: zlib.deflateSync(rgb) };
+        return { width, height, data: zlib.deflateSync(rgb), alpha: alpha ? zlib.deflateSync(alpha) : null };
     } catch (e) {
         return null;
     }
@@ -2539,7 +2540,7 @@ function buildSimplePdfBuffer(definition) {
     }
 
     rect(0, 760, pageW, 82, orange);
-    drawLogo(40, 780, 138);
+    drawLogo(48, 772, 116);
     text('Communication visuelle & impression', 190, 794, { size: 10, color: [1, 1, 1] });
     rect(390, 780, 150, 42, [1, 1, 1], null);
     text(definition.title || 'Document', 404, 806, { font: 'F2', size: 13, color: orange });
@@ -2621,7 +2622,10 @@ function buildSimplePdfBuffer(definition) {
         '6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj'
     ];
     if (logo) {
-        objects.push(`7 0 obj << /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /FlateDecode] /Length ${logo.data.toString('hex').length + 1} >> stream\n${logo.data.toString('hex')}>\nendstream\nendobj`);
+        objects.push(`7 0 obj << /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8${logo.alpha ? ' /SMask 8 0 R' : ''} /Filter [/ASCIIHexDecode /FlateDecode] /Length ${logo.data.toString('hex').length + 1} >> stream\n${logo.data.toString('hex')}>\nendstream\nendobj`);
+        if (logo.alpha) {
+            objects.push(`8 0 obj << /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter [/ASCIIHexDecode /FlateDecode] /Length ${logo.alpha.toString('hex').length + 1} >> stream\n${logo.alpha.toString('hex')}>\nendstream\nendobj`);
+        }
     }
     let pdf = '%PDF-1.4\n';
     const offsets = [0];
