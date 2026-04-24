@@ -1081,6 +1081,15 @@
     return (Math.round(value*100)/100).toFixed(2).replace('.',',')+' €';
   }
 
+  function formatDateFr(value){
+    var match=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? match[3]+'/'+match[2]+'/'+match[1] : String(value||'');
+  }
+
+  function formatPercent(value){
+    return formatPlainNumber(Number(value || 0))+' %';
+  }
+
   function renderDailySummary(){
     var kpis=$('day-kpis');
     var table=$('day-gamme-table');
@@ -1092,19 +1101,19 @@
       return;
     }
     kpis.innerHTML=''
-      +'<article class="day-kpi"><strong>Date</strong><span>'+esc(String(summary.day||''))+'</span></article>'
+      +'<article class="day-kpi"><strong>Date</strong><span>'+esc(formatDateFr(summary.day||''))+'</span></article>'
       +'<article class="day-kpi"><strong>Commandes du jour</strong><span>'+esc(String(summary.orders||0))+'</span></article>'
       +'<article class="day-kpi"><strong>Total du jour</strong><span>'+esc(formatAmount(Number(summary.total||0)))+'</span></article>'
-      +'<article class="day-kpi"><strong>Marge estimee</strong><span>'+esc(formatAmount(Number(summary.margin||0)))+'</span></article>'
+      +'<article class="day-kpi"><strong>Marge estimee</strong><span>'+esc(formatPercent(summary.marginRate||0))+'</span></article>'
       +'<article class="day-kpi"><strong>Visites du jour</strong><span>'+esc(String(summary.visitsToday||0))+'</span></article>';
     if(!(summary.byGamme||[]).length){
       table.innerHTML='<div class="empty">Aucune commande classee aujourd hui.</div>';
       return;
     }
     table.innerHTML='<table class="admin-table-mini">'
-      +'<thead><tr><th>Gamme</th><th>Commandes</th><th>Total</th><th>Marge</th></tr></thead>'
+      +'<thead><tr><th>Gamme</th><th>Commandes</th><th>Total</th><th>Marge %</th></tr></thead>'
       +'<tbody>'+(summary.byGamme||[]).map(function(row){
-        return '<tr><td>'+esc(row.gamme||'Non classee')+'</td><td>'+esc(String(row.orders||0))+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td><td>'+esc(formatAmount(Number(row.margin||0)))+'</td></tr>';
+        return '<tr><td>'+esc(row.gamme||'Non classee')+'</td><td>'+esc(String(row.orders||0))+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td><td>'+esc(formatPercent(row.marginRate||0))+'</td></tr>';
       }).join('')+'</tbody>'
       +'<tfoot><tr><td>Total visites site</td><td colspan="3">'+esc(String(summary.visitsTotal||0))+'</td></tr></tfoot>'
       +'</table>';

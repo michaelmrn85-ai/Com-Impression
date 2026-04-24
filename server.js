@@ -1417,13 +1417,15 @@ app.get('/api/admin/daily-summary', (req, res) => {
                 orders: todayOrders.length,
                 total: Math.round(dayTotal * 100) / 100,
                 margin: Math.round(dayMargin * 100) / 100,
+                marginRate: (dayTotal - dayMargin) > 0 ? Math.round(((dayMargin / (dayTotal - dayMargin)) * 100) * 100) / 100 : 0,
                 visitsToday: Number((visits.byDay || {})[requestedDate] || 0),
                 visitsTotal: Number(visits.total || 0),
                 byGamme: Object.values(byGamme).sort((a, b) => b.total - a.total).map(item => ({
                     gamme: item.gamme,
                     total: Math.round(item.total * 100) / 100,
                     orders: item.orders,
-                    margin: Math.round(item.margin * 100) / 100
+                    margin: Math.round(item.margin * 100) / 100,
+                    marginRate: (item.total - item.margin) > 0 ? Math.round(((item.margin / (item.total - item.margin)) * 100) * 100) / 100 : 0
                 }))
             }
         });
