@@ -144,11 +144,20 @@
     return modes;
   }
 
+  function normaliseOptionKey(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s*[-/]\s*/g, " ")
+      .replace(/\s+/g, " ");
+  }
+
   function matchesSelectedSide(row, selections) {
-    var side = String((row && row.finish) || "").trim().toLowerCase();
+    var side = normaliseOptionKey((row && row.finish) || "");
     if (!side) return true;
     return Object.values(selections || {}).some(function (value) {
-      return String(value || "").trim().toLowerCase() === side;
+      return normaliseOptionKey(value) === side;
     });
   }
 
@@ -810,7 +819,7 @@
         quantityField.innerHTML = '<label>Quantite</label>' + modeHtml + '<div class="quantity-grid">' + currentQuantityOptions.map(function (qty) {
           var value = String(qty);
           return '<button type="button" class="quantity-chip' + (value === selected ? ' active' : '') + '" data-qty-choice="' + esc(value) + '">' + esc(value) + ' ex.</button>';
-        }).join("") + '</div><input id="product-qty-select" type="hidden" value="' + esc(selected) + '"><p>Choisissez la quantite imposee par le fournisseur.</p>';
+        }).join("") + '</div><input id="product-qty-select" type="hidden" value="' + esc(selected) + '">';
         return;
       }
       quantityField.innerHTML = '<label for="product-qty-input">Quantite</label>' + modeHtml + '<div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"></div>';

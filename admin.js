@@ -1641,7 +1641,8 @@
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Création impossible'); return d; }); })
     .then(function(data){
-      setStatus('manual-status','ok',((data.typeLabel||'Document')+' créé : '+(data.numero||'OK')+(data.docName ? ' — PDF : '+data.docName : '')+(data.docFolder ? ' — Dossier : '+data.docFolder : '')));
+      var mailText = data.mailSent ? ' — Email envoyé au client' : (' — Email non envoyé : ' + (data.mailError || 'vérifie SMTP_USER / SMTP_PASS et l email client'));
+      setStatus('manual-status',data.mailSent?'ok':'err',((data.typeLabel||'Document')+' créé : '+(data.numero||'OK')+(data.docName ? ' — PDF : '+data.docName : '')+(data.docFolder ? ' — Dossier : '+data.docFolder : '')+mailText));
       return loadCommandes();
     })
     .catch(function(err){ setStatus('manual-status','err',err.message||'Erreur création commande.'); })

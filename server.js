@@ -908,7 +908,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         let purchaseValue = null;
         let responseQuantityOptions = quantityOptions;
         if (productData.quantityPricing && productData.quantityPricing.length) {
-            const selectedOptionValues = Object.values(sels).map(value => String(value || '').trim().toLowerCase());
+            const selectedOptionValues = Object.values(sels).map(normaliseOptionKey);
             const parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
@@ -916,7 +916,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             const lotTiersForOption = tiers.filter(item => {
                 if (item.type !== 'lot') return false;
                 if (!item.finish) return true;
-                return selectedOptionValues.includes(String(item.finish).trim().toLowerCase());
+                return selectedOptionValues.includes(normaliseOptionKey(item.finish));
             });
             if (lotTiersForOption.length) responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
             let chosen = null;
@@ -938,7 +938,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (quantityMode === 'lot' || quantityMode === 'unitaire') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
-                const optionTiers = quantityTiers.filter(item => item.finish && selectedOptionValues.includes(String(item.finish).trim().toLowerCase()));
+                const optionTiers = quantityTiers.filter(item => item.finish && selectedOptionValues.includes(normaliseOptionKey(item.finish)));
                 if (optionTiers.length) quantityTiers = optionTiers;
                 const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
                 if (quantityMode === 'lot') {
@@ -1097,6 +1097,15 @@ function parseNumberValue(value) {
     const cleaned = String(value).replace(/\s/g, '').replace('€', '').replace(/EUR/ig, '').replace(',', '.');
     const number = Number(cleaned);
     return isNaN(number) ? null : number;
+}
+
+function normaliseOptionKey(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s*[-/]\s*/g, ' ')
+        .replace(/\s+/g, ' ');
 }
 
 function uniquePositiveNumbers(list) {
@@ -2759,7 +2768,7 @@ function rebuildManualPdfForCommand(cmd) {
     return { path: pdfPath, name: doc.nom || `${docType.label}-${cmd.numero || cmd.id}.pdf`, label: docType.label };
 }
 
-async function notifyManualDocumentUpdated(cmd, pdfInfo) {
+async function notifyManualDocumentUpdated(cmd, pdfInfo, options = {}) {
     if (!cmd || !cmd.email || !pdfInfo || !pdfInfo.path || !fs.existsSync(pdfInfo.path)) {
         return { sent: false, error: 'Email client ou PDF manquant' };
     }
@@ -2769,16 +2778,17 @@ async function notifyManualDocumentUpdated(cmd, pdfInfo) {
     try {
         const transporter = createTransporter();
         const label = pdfInfo.label || (cmd.type_document_label || 'Document');
+        const isCreation = options.creation === true;
         await transporter.sendMail({
             from: `"COM' Impression" <${process.env.SMTP_USER}>`,
             to: cmd.email,
-            subject: `${label} modifié — ${cmd.numero || cmd.id}`,
+            subject: `${label} ${isCreation ? 'disponible' : 'modifié'} — ${cmd.numero || cmd.id}`,
             html: emailTemplate({
-                title: `${label} modifié`,
-                subtitle: `Votre ${label.toLowerCase()} COM' Impression a ete mis a jour.`,
+                title: `${label} ${isCreation ? 'disponible' : 'modifié'}`,
+                subtitle: isCreation ? `Votre ${label.toLowerCase()} COM' Impression est disponible.` : `Votre ${label.toLowerCase()} COM' Impression a ete mis a jour.`,
                 body: `
                     <p>Bonjour ${escapeHtml(cmd.prenom || cmd.nom || 'Client')},</p>
-                    <p>Vous trouverez en piece jointe la version mise a jour de votre ${escapeHtml(label.toLowerCase())}.</p>
+                    <p>Vous trouverez en piece jointe ${isCreation ? 'votre' : 'la version mise a jour de votre'} ${escapeHtml(label.toLowerCase())}.</p>
                     <p>Reference : <strong>${escapeHtml(cmd.numero || cmd.id || '')}</strong></p>
                     ${emailSignatureBlock()}
                 `
@@ -2793,7 +2803,7 @@ async function notifyManualDocumentUpdated(cmd, pdfInfo) {
 }
 
 // POST /api/commandes/manuelle — créer une commande depuis l'espace admin
-app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'admin-manual-order' }), upload.array('fichiers', 20), (req, res) => {
+app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'admin-manual-order' }), upload.array('fichiers', 20), async (req, res) => {
     const d = req.body || {};
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(d.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
@@ -2903,7 +2913,21 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
         };
         commandes.push(cmd);
         sauvegarderCommandes(commandes);
-        res.json({ success: true, numero: cmd.numero, commande: cmd, typeLabel: docType.label, docName: pdfName, docFolder: docType.key });
+        const mailResult = await notifyManualDocumentUpdated(cmd, {
+            path: pdfPath,
+            name: pdfName,
+            label: docType.label
+        }, { creation: true });
+        res.json({
+            success: true,
+            numero: cmd.numero,
+            commande: cmd,
+            typeLabel: docType.label,
+            docName: pdfName,
+            docFolder: docType.key,
+            mailSent: !!mailResult.sent,
+            mailError: mailResult.error || ''
+        });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
     }
