@@ -312,6 +312,40 @@
     }).join('');
   }
 
+  function toggleManualRdv(show){
+    var form=$('rdv-manual-form');
+    if(!form) return;
+    form.style.display=show?'block':'none';
+    clearStatus('rdv-manual-status');
+  }
+
+  function createManualRdv(){
+    var prenom=(($('rdv-manual-prenom')||{}).value||'').trim();
+    var nom=(($('rdv-manual-nom')||{}).value||'').trim();
+    var email=(($('rdv-manual-email')||{}).value||'').trim();
+    var tel=(($('rdv-manual-tel')||{}).value||'').trim();
+    var date=(($('rdv-manual-date')||{}).value||'').trim();
+    var slot=(($('rdv-manual-slot')||{}).value||'').trim();
+    var product=(($('rdv-manual-product')||{}).value||'').trim() || 'Projet general';
+    var message=(($('rdv-manual-message')||{}).value||'').trim();
+    if(!prenom && !nom){ setStatus('rdv-manual-status','err','Indique au moins un prénom ou un nom.'); return; }
+    if(!date || !slot){ setStatus('rdv-manual-status','err','Date et créneau sont obligatoires.'); return; }
+    fetch(api('/api/commandes/rdv-manuel'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mdp:state.mdp,prenom:prenom,nom:nom,email:email,tel:tel,date:date,slot:slot,product:product,message:message})
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Création impossible'); return d; }); })
+    .then(function(){
+      ['rdv-manual-prenom','rdv-manual-nom','rdv-manual-email','rdv-manual-tel','rdv-manual-date','rdv-manual-slot','rdv-manual-product','rdv-manual-message'].forEach(function(id){
+        var el=$(id); if(el) el.value='';
+      });
+      toggleManualRdv(false);
+      return loadCommandes();
+    })
+    .catch(function(err){ setStatus('rdv-manual-status','err',err.message||'Erreur rendez-vous.'); });
+  }
+
   function renderPanierTable(cmd){
     if(Array.isArray(cmd.lignes) && cmd.lignes.length){
       return '<div style="overflow:auto;"><table class="admin-table-mini">'
@@ -344,6 +378,45 @@
       }).join('')+'</tbody>'
       +'<tfoot><tr><td colspan="3">Montant TTC</td><td>'+esc(cmd.prix_total||'--')+'</td></tr></tfoot>'
       +'</table></div>';
+  }
+
+  function editableRowsFromCommand(cmd){
+    if(Array.isArray(cmd.lignes) && cmd.lignes.length){
+      return cmd.lignes.map(function(row){
+        return {
+          produit:row.produit||'',
+          qte:row.qte||'',
+          montant:row.montant||'',
+          fichier:row.fichier||''
+        };
+      });
+    }
+    return String(cmd.panier||'').split(/\n|\|/).map(function(line){
+      return line.trim();
+    }).filter(Boolean).map(function(line){
+      return {
+        produit:extractProduct(line),
+        qte:extractQty(line),
+        montant:extractAmount(line),
+        fichier:extractFile(line)
+      };
+    });
+  }
+
+  function renderEditableProductRows(cmd){
+    var rows=editableRowsFromCommand(cmd);
+    if(!rows.length) rows=[{produit:'',qte:'',montant:'',fichier:''}];
+    return '<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Produit</th><th>Qté</th><th>Montant TTC</th><th>Fichier</th><th></th></tr></thead>'
+      +'<tbody id="detail-product-lines">'+rows.map(function(row){
+        return '<tr class="detail-product-line">'
+          +'<td><input class="detail-line-product" value="'+esc(row.produit||'')+'" placeholder="Produit"></td>'
+          +'<td><input class="detail-line-qty" value="'+esc(row.qte||'')+'" placeholder="250 ex."></td>'
+          +'<td><input class="detail-line-amount" value="'+esc(row.montant||'')+'" placeholder="35,90 €"></td>'
+          +'<td><input class="detail-line-file" value="'+esc(row.fichier||'')+'" placeholder="Nom du fichier"></td>'
+          +'<td><button class="btn-icon detail-line-remove" type="button" title="Supprimer la ligne">×</button></td>'
+        +'</tr>';
+      }).join('')+'</tbody></table></div>'
+      +'<div class="template-actions" style="margin-top:10px;"><button class="btn btn-light btn-small" id="detail-line-add" type="button">+ Ajouter un produit</button><button class="btn btn-orange btn-small" id="save-product-lines" type="button">Enregistrer les produits</button></div>';
   }
 
   function openDetail(id){
@@ -421,7 +494,8 @@
       +'<div class="field"><label>Notes internes</label><textarea id="detail-notes" placeholder="Notes visibles uniquement par toi">'+esc(cmd.notes||'')+'</textarea></div>'
       +'<button class="btn btn-dark btn-small" id="save-notes" type="button">Enregistrer les notes</button>'
       +'<div class="status" id="detail-status"></div></section>'
-      +'<section class="panel"><h3>Panier</h3>'+renderPanierTable(cmd)+'</section>'
+      +'<section class="panel" style="grid-column:1/-1;"><h3>Produits</h3>'+renderEditableProductRows(cmd)+'</section>'
+      +'<section class="panel"><h3>Panier actuel</h3>'+renderPanierTable(cmd)+'</section>'
       +'<section class="panel"><h3>Documents disponibles</h3>'+(docs||'<p class="muted">Aucun document déposé pour cette commande.</p>')+docUpload+'</section>'
       +'</div>';
     openModal('modal-detail',state.scope||'cours');
@@ -517,6 +591,54 @@
       return loadCommandes();
     })
     .catch(function(err){ setStatus('detail-status','err',err.message||'Erreur modification rendez-vous.'); });
+  }
+
+  function getDetailProductRows(){
+    return Array.prototype.slice.call(document.querySelectorAll('#detail-product-lines .detail-product-line')).map(function(row){
+      return {
+        produit:((row.querySelector('.detail-line-product')||{}).value||'').trim(),
+        qte:((row.querySelector('.detail-line-qty')||{}).value||'').trim(),
+        montant:((row.querySelector('.detail-line-amount')||{}).value||'').trim(),
+        fichier:((row.querySelector('.detail-line-file')||{}).value||'').trim()
+      };
+    }).filter(function(row){
+      return row.produit || row.qte || row.montant || row.fichier;
+    });
+  }
+
+  function addDetailProductLine(data){
+    var wrap=$('detail-product-lines');
+    if(!wrap) return;
+    wrap.insertAdjacentHTML('beforeend',
+      '<tr class="detail-product-line">'
+      +'<td><input class="detail-line-product" value="'+esc(data&&data.produit||'')+'" placeholder="Produit"></td>'
+      +'<td><input class="detail-line-qty" value="'+esc(data&&data.qte||'')+'" placeholder="250 ex."></td>'
+      +'<td><input class="detail-line-amount" value="'+esc(data&&data.montant||'')+'" placeholder="35,90 €"></td>'
+      +'<td><input class="detail-line-file" value="'+esc(data&&data.fichier||'')+'" placeholder="Nom du fichier"></td>'
+      +'<td><button class="btn-icon detail-line-remove" type="button" title="Supprimer la ligne">×</button></td>'
+      +'</tr>'
+    );
+  }
+
+  function saveProductLines(){
+    var cmd=state.selected; if(!cmd) return;
+    var rows=getDetailProductRows();
+    if(!rows.length){ setStatus('detail-status','err','Ajoute au moins une ligne produit.'); return; }
+    fetch(api('/api/commandes/'+encodeURIComponent(cmd.id||cmd.numero)+'/lignes-admin'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mdp:state.mdp,lignes:rows})
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Modification produits impossible'); return d; }); })
+    .then(function(data){
+      if(data.commande) Object.assign(cmd,data.commande);
+      setStatus('detail-status','ok','Produits enregistrés.');
+      return loadCommandes().then(function(){
+        var fresh=findCommand(cmd.id||cmd.numero);
+        if(fresh) openDetail(fresh.id||fresh.numero);
+      });
+    })
+    .catch(function(err){ setStatus('detail-status','err',err.message||'Erreur modification produits.'); });
   }
 
   function saveNotes(){
@@ -1508,6 +1630,16 @@
       if(e.target && e.target.id==='save-statut') saveStatut();
       if(e.target && e.target.id==='save-command-edit') saveCommandEdit();
       if(e.target && e.target.id==='save-rdv-edit') saveRdvEdit();
+      if(e.target && e.target.id==='rdv-manual-open') toggleManualRdv(true);
+      if(e.target && e.target.id==='rdv-manual-cancel') toggleManualRdv(false);
+      if(e.target && e.target.id==='rdv-manual-save') createManualRdv();
+      if(e.target && e.target.id==='detail-line-add') addDetailProductLine();
+      if(e.target && e.target.id==='save-product-lines') saveProductLines();
+      if(e.target && e.target.classList && e.target.classList.contains('detail-line-remove')){
+        var productLine=e.target.closest('.detail-product-line');
+        if(productLine) productLine.remove();
+        if(!document.querySelector('#detail-product-lines .detail-product-line')) addDetailProductLine();
+      }
       if(e.target && e.target.id==='save-notes') saveNotes();
       if(e.target && e.target.id==='upload-doc') uploadDocument();
       if(e.target && e.target.id==='manual-add-line') addManualLine();

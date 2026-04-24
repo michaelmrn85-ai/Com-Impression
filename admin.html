@@ -257,7 +257,28 @@
       <div class="box-body">
         <div class="toolbar">
           <input class="search" id="rdv-search" type="search" placeholder="Rechercher un rendez-vous, client, email, sujet...">
+          <button class="btn btn-orange btn-small" id="rdv-manual-open" type="button">+ Ajouter un rendez-vous</button>
           <button class="btn btn-dark btn-small" id="rdv-reload" type="button">Actualiser</button>
+        </div>
+        <div class="panel" id="rdv-manual-form" style="display:none;margin-bottom:16px;">
+          <h3>Rendez-vous manuel</h3>
+          <div class="site-grid">
+            <div class="field"><label>Prénom</label><input id="rdv-manual-prenom"></div>
+            <div class="field"><label>Nom</label><input id="rdv-manual-nom"></div>
+            <div class="field"><label>Email</label><input id="rdv-manual-email" type="email"></div>
+            <div class="field"><label>Téléphone</label><input id="rdv-manual-tel"></div>
+          </div>
+          <div class="site-grid">
+            <div class="field"><label>Date</label><input id="rdv-manual-date" type="date"></div>
+            <div class="field"><label>Créneau</label><input id="rdv-manual-slot" placeholder="Ex : 10:30"></div>
+          </div>
+          <div class="field"><label>Produit ou sujet</label><input id="rdv-manual-product" placeholder="Projet général"></div>
+          <div class="field"><label>Précisions</label><textarea id="rdv-manual-message"></textarea></div>
+          <div class="template-actions">
+            <button class="btn btn-orange btn-small" id="rdv-manual-save" type="button">Enregistrer le rendez-vous</button>
+            <button class="btn btn-light btn-small" id="rdv-manual-cancel" type="button">Annuler</button>
+          </div>
+          <div class="status" id="rdv-manual-status"></div>
         </div>
         <div class="list" id="rdv-list"></div>
       </div>

@@ -194,6 +194,14 @@ function parseEuroLabel(value) {
     return Number(match[1].replace(',', '.').replace(' ', ''));
 }
 
+function parseMoneyAmount(value) {
+    const euro = parseEuroLabel(value);
+    if (euro != null) return euro;
+    const match = String(value || '').replace(/\s+/g, '').match(/-?\d+(?:[,.]\d{1,2})?/);
+    if (!match) return null;
+    return Number(match[0].replace(',', '.'));
+}
+
 function extractLegacyCatalog() {
     if (legacyCatalogCache) return legacyCatalogCache;
 
@@ -2342,6 +2350,64 @@ function escapePdfText(value) {
     return String(value || '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
+function readPngImageForPdf(filePath) {
+    try {
+        const zlib = require('zlib');
+        const buffer = fs.readFileSync(filePath);
+        if (buffer.toString('hex', 0, 8) !== '89504e470d0a1a0a') return null;
+        let offset = 8;
+        let width = 0, height = 0, bitDepth = 0, colorType = 0;
+        const idat = [];
+        while (offset < buffer.length) {
+            const length = buffer.readUInt32BE(offset); offset += 4;
+            const type = buffer.toString('ascii', offset, offset + 4); offset += 4;
+            const data = buffer.slice(offset, offset + length); offset += length + 4;
+            if (type === 'IHDR') {
+                width = data.readUInt32BE(0);
+                height = data.readUInt32BE(4);
+                bitDepth = data[8];
+                colorType = data[9];
+            } else if (type === 'IDAT') idat.push(data);
+            else if (type === 'IEND') break;
+        }
+        if (bitDepth !== 8 || (colorType !== 6 && colorType !== 2)) return null;
+        const channels = colorType === 6 ? 4 : 3;
+        const inflated = zlib.inflateSync(Buffer.concat(idat));
+        const stride = width * channels;
+        const raw = Buffer.alloc(width * height * channels);
+        let inPos = 0, outPos = 0;
+        for (let y = 0; y < height; y += 1) {
+            const filter = inflated[inPos++];
+            for (let x = 0; x < stride; x += 1) {
+                const left = x >= channels ? raw[outPos + x - channels] : 0;
+                const up = y > 0 ? raw[outPos + x - stride] : 0;
+                const upLeft = y > 0 && x >= channels ? raw[outPos + x - stride - channels] : 0;
+                let val = inflated[inPos++];
+                if (filter === 1) val = (val + left) & 255;
+                else if (filter === 2) val = (val + up) & 255;
+                else if (filter === 3) val = (val + Math.floor((left + up) / 2)) & 255;
+                else if (filter === 4) {
+                    const p = left + up - upLeft;
+                    const pa = Math.abs(p - left), pb = Math.abs(p - up), pc = Math.abs(p - upLeft);
+                    val = (val + (pa <= pb && pa <= pc ? left : (pb <= pc ? up : upLeft))) & 255;
+                }
+                raw[outPos + x] = val;
+            }
+            outPos += stride;
+        }
+        const rgb = Buffer.alloc(width * height * 3);
+        for (let i = 0, j = 0; i < raw.length; i += channels, j += 3) {
+            const a = channels === 4 ? raw[i + 3] / 255 : 1;
+            rgb[j] = Math.round(raw[i] * a + 255 * (1 - a));
+            rgb[j + 1] = Math.round(raw[i + 1] * a + 255 * (1 - a));
+            rgb[j + 2] = Math.round(raw[i + 2] * a + 255 * (1 - a));
+        }
+        return { width, height, data: zlib.deflateSync(rgb) };
+    } catch (e) {
+        return null;
+    }
+}
+
 function wrapPdfText(value, maxChars) {
     const words = String(value || '').split(/\s+/).filter(Boolean);
     const lines = [];
@@ -2380,7 +2446,7 @@ function buildSimplePdfBuffer(definition) {
     }
     function money(value) {
         if (typeof value === 'number' && !isNaN(value)) return value.toFixed(2).replace('.', ',') + ' EUR';
-        const numeric = parseEuroLabel(value);
+        const numeric = parseMoneyAmount(value);
         if (numeric == null) return String(value || '--').replace(/€/g, 'EUR');
         return numeric.toFixed(2).replace('.', ',') + ' EUR';
     }
@@ -2396,32 +2462,45 @@ function buildSimplePdfBuffer(definition) {
         const options = (row.optionsLibres || []).map(option => `${option.nom || 'Option'} : ${option.valeur || '--'}`).join(', ');
         return [row.produit || 'Produit', options, row.fichier ? `Fichier : ${row.fichier}` : ''].filter(Boolean).join(' - ');
     }
+    const logo = readPngImageForPdf(BRAND_LOGO_PATH);
+    function drawLogo(x, y, w) {
+        if (!logo) {
+            text("COM' Impression", x, y + 26, { font: 'F2', size: 18, color: [1, 1, 1] });
+            return;
+        }
+        const h = w * (logo.height / logo.width);
+        commands.push(`q ${w} 0 0 ${h} ${x} ${y} cm /ImLogo Do Q`);
+    }
 
     rect(0, 760, pageW, 82, orange);
-    text("COM' Impression", 42, 805, { font: 'F2', size: 24, color: [1, 1, 1] });
-    text('Communication visuelle & impression', 42, 786, { size: 10, color: [1, 1, 1] });
-    text(definition.title || 'Document', 410, 805, { font: 'F2', size: 24, color: [1, 1, 1] });
-    text(docNumber(), 410, 786, { font: 'F2', size: 12, color: [1, 1, 1] });
+    drawLogo(40, 780, 138);
+    text('Communication visuelle & impression', 190, 794, { size: 10, color: [1, 1, 1] });
+    rect(390, 780, 150, 42, [1, 1, 1], null);
+    text(definition.title || 'Document', 404, 806, { font: 'F2', size: 13, color: orange });
+    text(`Numero ${docNumber()}`, 404, 790, { font: 'F2', size: 10, color: dark });
 
-    rect(40, 690, 245, 52, pale, lineColor);
-    text(`Numero de ${String(definition.title || 'document').toLowerCase()}  ${docNumber()}`, 54, 724, { font: 'F2', size: 10 });
-    text(`Date d'emission  ${definition.date || formatDate(new Date())}`, 54, 708, { size: 10 });
-    if (definition.deliveryDate) text(`Livraison souhaitee  ${definition.deliveryDate}`, 54, 692, { size: 10 });
+    rect(40, 688, 245, 58, pale, lineColor);
+    text(`Date d'emission`, 54, 724, { font: 'F2', size: 9 });
+    text(definition.date || formatDate(new Date()), 145, 724, { size: 9 });
+    if (definition.deliveryDate) {
+        text(`Livraison souhaitee`, 54, 706, { font: 'F2', size: 9 });
+        text(definition.deliveryDate, 145, 706, { size: 9 });
+    }
 
-    rect(310, 668, 245, 74, null, lineColor);
+    rect(310, 642, 245, 104, null, lineColor);
     text(process.env.INVOICE_COMPANY_NAME || 'EI - Moreno Michael', 324, 724, { font: 'F2', size: 11 });
-    text(process.env.INVOICE_ADDRESS_1 || '78 AVENUE des Champs Elysees, Bureau 326', 324, 708, { size: 9 });
-    text(process.env.INVOICE_ADDRESS_2 || '75008 Paris, FR', 324, 694, { size: 9 });
-    text(process.env.ADMIN_EMAIL || BRAND_CONTACT_EMAIL, 324, 680, { size: 9 });
-    text(process.env.INVOICE_SIRET || '80143116400053', 324, 666, { size: 9 });
+    wrapPdfText(process.env.INVOICE_ADDRESS_1 || '78 AVENUE des Champs Elysees, Bureau 326', 38).forEach((line, index) => text(line, 324, 708 - (index * 12), { size: 8.5 }));
+    text(process.env.INVOICE_ADDRESS_2 || '75008 Paris, FR', 324, 684, { size: 8.5 });
+    text(process.env.ADMIN_EMAIL || BRAND_CONTACT_EMAIL, 324, 670, { size: 8.5 });
+    text(process.env.INVOICE_SIRET || '80143116400053', 324, 656, { size: 8.5 });
 
-    rect(40, 570, 515, 78, null, lineColor);
-    text('Client', 54, 626, { font: 'F2', size: 12, color: orange });
+    rect(40, 540, 515, 88, null, lineColor);
+    text('Client', 54, 606, { font: 'F2', size: 12, color: orange });
     (definition.clientLines || []).slice(0, 5).forEach((line, index) => {
-        text(line, 54, 609 - (index * 14), { size: 9 });
+        text(line, 54, 589 - (index * 13), { size: 8.5 });
     });
 
-    let y = 528;
+    let y = 498;
     rect(40, y, 515, 28, pale, lineColor);
     text('Description', 54, y + 10, { font: 'F2', size: 9 });
     text('Qte', 318, y + 10, { font: 'F2', size: 9 });
@@ -2431,7 +2510,7 @@ function buildSimplePdfBuffer(definition) {
     y -= 24;
     (definition.productRows || []).forEach(row => {
         const qty = qtyNumber(row.qte);
-        const total = parseEuroLabel(row.montant) || 0;
+        const total = parseMoneyAmount(row.montant) || 0;
         const unit = qty > 0 && total > 0 ? total / qty : total;
         const chunks = wrapPdfText(rowText(row), 48);
         const rowH = Math.max(26, chunks.length * 11 + 12);
@@ -2458,23 +2537,26 @@ function buildSimplePdfBuffer(definition) {
     text('Pas d escompte accorde pour paiement anticipe.', 40, y - 14, { size: 8 });
     text('En cas de retard de paiement, penalites au taux legal et indemnite forfaitaire de recouvrement de 40 EUR.', 40, y - 28, { size: 8 });
 
-    rect(40, 70, 515, 68, pale, lineColor);
-    text('Details du paiement', 54, 118, { font: 'F2', size: 11, color: orange });
-    text(`Nom du beneficiaire  ${process.env.INVOICE_COMPANY_NAME || 'EI - Moreno Michael'}`, 54, 101, { size: 8.5 });
-    text(`BIC  ${process.env.INVOICE_BIC || 'QNTOFRP1XXX'}`, 54, 87, { size: 8.5 });
-    text(`IBAN  ${process.env.INVOICE_IBAN || 'FR7616958000014360415617762'}`, 190, 87, { size: 8.5 });
-    text(`Reference  ${definition.numero || docNumber()}`, 54, 73, { size: 8.5 });
+    rect(40, 66, 515, 88, pale, lineColor);
+    text('Details du paiement', 54, 132, { font: 'F2', size: 11, color: orange });
+    text(`Nom du beneficiaire  ${process.env.INVOICE_COMPANY_NAME || 'EI - Moreno Michael'}`, 54, 114, { size: 8.5 });
+    text(`BIC  ${process.env.INVOICE_BIC || 'QNTOFRP1XXX'}`, 54, 100, { size: 8.5 });
+    text(`IBAN  ${process.env.INVOICE_IBAN || 'FR7616958000014360415617762'}`, 54, 86, { size: 8.5 });
+    text(`Reference  ${definition.numero || docNumber()}`, 54, 72, { size: 8.5 });
     text(`${definition.title || 'Document'} ${docNumber()} - 1/1`, 445, 36, { size: 8, color: [0.45, 0.45, 0.45] });
 
     const stream = commands.join('\n');
     const objects = [
         '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
         '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-        '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >> endobj',
+        '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >>' + (logo ? ' /XObject << /ImLogo 7 0 R >>' : '') + ' >> /Contents 4 0 R >> endobj',
         `4 0 obj << /Length ${Buffer.byteLength(stream, 'utf8')} >> stream\n${stream}\nendstream\nendobj`,
         '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
         '6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj'
     ];
+    if (logo) {
+        objects.push(`7 0 obj << /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /FlateDecode] /Length ${logo.data.toString('hex').length + 1} >> stream\n${logo.data.toString('hex')}>\nendstream\nendobj`);
+    }
     let pdf = '%PDF-1.4\n';
     const offsets = [0];
     objects.forEach(obj => {
@@ -2496,6 +2578,33 @@ function buildManualDocumentMeta(type) {
     if (clean === 'devis') return { key: 'devis', label: 'Devis' };
     if (clean === 'facture') return { key: 'facture', label: 'Facture' };
     return { key: 'commande', label: 'Commande' };
+}
+
+function rebuildManualPdfForCommand(cmd) {
+    if (!cmd || !Array.isArray(cmd.documents)) return;
+    const docType = buildManualDocumentMeta(cmd.type_document || 'commande');
+    const doc = cmd.documents.find(item => String(item.fichier || '').indexOf(docType.key + path.sep) === 0 || String(item.type || '') === docType.label);
+    if (!doc || !doc.fichier) return;
+    const pdfPath = path.join(DOCS_DIR, doc.fichier);
+    try { fs.mkdirSync(path.dirname(pdfPath), { recursive: true }); } catch(e) {}
+    const pdfBuffer = buildSimplePdfBuffer({
+        title: docType.label,
+        docKey: docType.key,
+        numero: cmd.numero || cmd.id,
+        date: cmd.date || formatDate(new Date()),
+        clientLines: [
+            `${cmd.prenom || ''} ${cmd.nom || ''}`.trim() || 'Client',
+            cmd.email || '--',
+            cmd.tel || '--',
+            cmd.type_client ? `Profil : ${cmd.type_client}` : '',
+            cmd.siret ? `SIRET / structure : ${cmd.siret}` : ''
+        ].filter(Boolean),
+        productRows: cmd.lignes || [],
+        total: cmd.prix_total || '--',
+        deliveryDate: cmd.date_livraison || ''
+    });
+    fs.writeFileSync(pdfPath, pdfBuffer);
+    doc.date = new Date().toLocaleDateString('fr-FR');
 }
 
 // POST /api/commandes/manuelle — créer une commande depuis l'espace admin
@@ -2615,6 +2724,44 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
     }
 });
 
+// POST /api/commandes/rdv-manuel — créer un rendez-vous depuis l admin
+app.post('/api/commandes/rdv-manuel', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-manual-rdv' }), (req, res) => {
+    const d = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(d.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    const date = String(d.date || '').trim();
+    const slot = String(d.slot || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ success: false, error: 'Date invalide' });
+    if (!slot) return res.status(400).json({ success: false, error: 'Creneau obligatoire' });
+    if (!String(d.prenom || d.nom || '').trim()) return res.status(400).json({ success: false, error: 'Nom client obligatoire' });
+    try {
+        const commandes = lireCommandes();
+        const numero = genererNumero();
+        const cmd = {
+            id: numero,
+            numero,
+            date: formatDate(new Date()),
+            prenom: String(d.prenom || '').trim(),
+            nom: String(d.nom || '').trim(),
+            email: String(d.email || '').trim(),
+            tel: String(d.tel || '').trim(),
+            panier: `Rendez-vous - Date: ${date} - Creneau: ${slot} - Produit: ${String(d.product || 'Projet general').trim() || 'Projet general'}`,
+            prix_total: '-',
+            message: String(d.message || '').trim(),
+            code_acces: genererCode(),
+            statut: 'Recue',
+            notes: 'Rendez-vous cree manuellement depuis l admin.',
+            documents: [],
+            created_at: new Date().toISOString()
+        };
+        commandes.push(cmd);
+        sauvegarderCommandes(commandes);
+        res.json({ success: true, commande: cmd });
+    } catch(e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // Enregistrer chaque pré-commande COM'Impression automatiquement
 // (hook appelé depuis /api/devis après succès)
 function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni) {
@@ -2690,6 +2837,7 @@ app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ window
     commandes[idx].type_document = docType.key;
     commandes[idx].type_document_label = docType.label;
     commandes[idx].updated_at = new Date().toISOString();
+    rebuildManualPdfForCommand(commandes[idx]);
     sauvegarderCommandes(commandes);
     res.json({ success: true, commande: commandes[idx] });
 });
@@ -2716,6 +2864,44 @@ app.post('/api/commandes/:id/rdv-admin', express.json(), rateLimit({ windowMs: 1
     commandes[idx].panier = `Rendez-vous - Date: ${date} - Creneau: ${slot} - Produit: ${product}`;
     commandes[idx].message = String(body.message || '').trim();
     commandes[idx].updated_at = new Date().toISOString();
+    sauvegarderCommandes(commandes);
+    res.json({ success: true, commande: commandes[idx] });
+});
+
+// POST /api/commandes/:id/lignes-admin — modifier les produits d un devis/commande
+app.post('/api/commandes/:id/lignes-admin', express.json({ limit: '1mb' }), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-lines-edit' }), (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+
+    const commandes = lireCommandes();
+    const idx = commandes.findIndex(c => String(c.id) === String(req.params.id) || String(c.numero) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Commande introuvable' });
+
+    const lignes = (Array.isArray(body.lignes) ? body.lignes : []).map(row => ({
+        produit: String((row && row.produit) || '').trim(),
+        qte: String((row && row.qte) || '').trim(),
+        montant: String((row && row.montant) || '').trim(),
+        fichier: String((row && row.fichier) || '').trim(),
+        optionsLibres: normaliseFreeOptions(row && row.optionsLibres)
+    })).filter(row => row.produit || row.qte || row.montant || row.fichier || row.optionsLibres.length);
+    if (!lignes.length) return res.status(400).json({ success: false, error: 'Ajoutez au moins une ligne produit' });
+
+    const total = lignes.reduce((sum, row) => sum + (parseMoneyAmount(row.montant) || 0), 0);
+    commandes[idx].lignes = lignes;
+    commandes[idx].panier = lignes.map(row => {
+        const options = (row.optionsLibres || []).map(option => `${option.nom}: ${option.valeur}`).join(', ');
+        return [
+            row.produit || 'Produit',
+            `fichier: ${row.fichier || '--'}`,
+            `Qté: ${row.qte || '--'}`,
+            `Prix: ${row.montant || '--'}`,
+            options ? `Options: ${options}` : ''
+        ].filter(Boolean).join(' — ');
+    }).join('\n');
+    if (total > 0) commandes[idx].prix_total = total.toFixed(2).replace('.', ',') + ' €';
+    commandes[idx].updated_at = new Date().toISOString();
+    rebuildManualPdfForCommand(commandes[idx]);
     sauvegarderCommandes(commandes);
     res.json({ success: true, commande: commandes[idx] });
 });
