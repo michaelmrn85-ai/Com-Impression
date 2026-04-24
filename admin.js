@@ -93,6 +93,7 @@
   function isDone(cmd){ return cmd.statut === 'Expediee'; }
   function isCancelled(cmd){ return cmd.statut === 'Annulee'; }
   function isInProgress(cmd){ return !isDone(cmd) && !isCancelled(cmd); }
+  function isRdvCommand(cmd){ return /^Rendez-vous/i.test(String((cmd && cmd.panier) || '')); }
   function ordersForScope(scope){
     if(scope==='terminees') return state.commandes.filter(isDone);
     if(scope==='annulees') return state.commandes.filter(isCancelled);
@@ -102,6 +103,7 @@
     $('count-cours').textContent = state.commandes.filter(isInProgress).length;
     $('count-terminees').textContent = state.commandes.filter(isDone).length;
     $('count-annulees').textContent = state.commandes.filter(isCancelled).length;
+    if($('count-rdv')) $('count-rdv').textContent = state.commandes.filter(isRdvCommand).length;
     if($('count-produits')) $('count-produits').textContent = state.catalog.length;
     if($('count-clients')) $('count-clients').textContent = state.clients.length;
     if($('count-cours-summary')) $('count-cours-summary').textContent = state.commandes.filter(isInProgress).length;
@@ -189,6 +191,7 @@
         updateCounts();
         loadAvisAdmin(false);
         if($('modal-orders').classList.contains('open')) renderOrders();
+        if($('modal-rdv') && $('modal-rdv').classList.contains('open')) renderAppointments();
       })
       .catch(function(err){
         $('last-update').textContent = 'Erreur : ' + (err.message || 'chargement impossible');
@@ -259,6 +262,49 @@
     var s=String(text||'').trim();
     if(!s) return '--';
     return s.split('—')[0].replace(/\[fichier\s*:[^\]]+\]/i,'').trim() || s;
+  }
+
+  function extractRdvInfo(cmd){
+    var text=String((cmd && cmd.panier) || '');
+    var dateMatch=text.match(/Date\s*:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})/i);
+    var slotMatch=text.match(/Creneau\s*:\s*([^—-]+)/i);
+    var productMatch=text.match(/Produit\s*:\s*(.+)$/i);
+    return {
+      date: dateMatch ? formatDateFr(dateMatch[1].trim()) : '--',
+      rawDate: dateMatch ? dateMatch[1].trim() : '',
+      slot: slotMatch ? slotMatch[1].trim() : '--',
+      product: productMatch ? productMatch[1].trim() : 'Projet general'
+    };
+  }
+
+  function renderAppointments(){
+    var list=$('rdv-list');
+    if(!list) return;
+    var q=(($('rdv-search')||{}).value||'').toLowerCase().trim();
+    var appointments=state.commandes.filter(isRdvCommand).filter(function(cmd){
+      if(!q) return true;
+      var info=extractRdvInfo(cmd);
+      return [cmd.numero, cmd.prenom, cmd.nom, cmd.email, cmd.tel, cmd.message, cmd.panier, info.date, info.slot, info.product]
+        .join(' ').toLowerCase().indexOf(q)!==-1;
+    }).sort(function(a,b){
+      var infoA=extractRdvInfo(a);
+      var infoB=extractRdvInfo(b);
+      return String(infoA.rawDate || a.created_at || '').localeCompare(String(infoB.rawDate || b.created_at || ''));
+    });
+    if(!appointments.length){
+      list.innerHTML='<div class="empty">Aucun rendez-vous client pour le moment.</div>';
+      return;
+    }
+    list.innerHTML=appointments.map(function(cmd){
+      var info=extractRdvInfo(cmd);
+      var fullName=((cmd.prenom||'')+' '+(cmd.nom||'')).trim()||'Client';
+      return '<div class="order">'
+        +'<div><div class="num">'+esc(info.date)+' à '+esc(info.slot)+'</div><div class="muted">'+esc(cmd.numero||cmd.id||'')+'</div></div>'
+        +'<div><strong>'+esc(fullName)+'</strong><div class="muted">'+esc(cmd.email||'')+'</div></div>'
+        +'<div><span class="badge b-bat">Rendez-vous</span><div class="muted">'+esc(info.product)+'</div></div>'
+        +'<button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+        +'</div>';
+    }).join('');
   }
 
   function renderPanierTable(cmd){
@@ -1304,11 +1350,13 @@
     $('admin-password').addEventListener('keydown',function(e){ if(e.key==='Enter') login(); });
     $('btn-refresh').addEventListener('click',loadCommandes);
     $('orders-reload').addEventListener('click',loadCommandes);
+    if($('rdv-reload')) $('rdv-reload').addEventListener('click',loadCommandes);
     if($('products-reload')) $('products-reload').addEventListener('click',function(){ loadProductsAdmin(false); });
     if($('clients-reload')) $('clients-reload').addEventListener('click',function(){ loadClientsAdmin(false); });
     if($('products-create')) $('products-create').addEventListener('click',function(){ openProductEditor(); });
     if($('clients-create')) $('clients-create').addEventListener('click',function(){ openClientEditor(); });
     $('orders-search').addEventListener('input',renderOrders);
+    if($('rdv-search')) $('rdv-search').addEventListener('input',renderAppointments);
     if($('products-search')) $('products-search').addEventListener('input',renderProductsList);
     if($('clients-search')) $('clients-search').addEventListener('input',renderClientsList);
     if($('day-summary-load')) $('day-summary-load').addEventListener('click',function(){ loadDailySummary(false); });
@@ -1327,6 +1375,7 @@
           return;
         }
         if(scope==='jour'){ loadDailySummary(true); return; }
+        if(scope==='rdv'){ renderAppointments(); openModal('modal-rdv','rdv'); return; }
         if(scope==='emails'){ renderEmailTemplates(); openModal('modal-email-templates','emails'); return; }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }

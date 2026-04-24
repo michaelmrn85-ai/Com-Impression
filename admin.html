@@ -165,6 +165,7 @@
         <button class="admin-tab" data-open-scope="cours" type="button">Commandes en cours <span class="admin-tab-count" id="count-cours">0</span></button>
         <button class="admin-tab" data-open-scope="terminees" type="button">Terminees <span class="admin-tab-count" id="count-terminees">0</span></button>
         <button class="admin-tab" data-open-scope="annulees" type="button">Annulees <span class="admin-tab-count" id="count-annulees">0</span></button>
+        <button class="admin-tab" data-open-scope="rdv" type="button">Rendez-vous <span class="admin-tab-count" id="count-rdv">0</span></button>
         <button class="admin-tab" data-open-scope="manual" type="button">Commande manuelle</button>
         <button class="admin-tab" data-open-scope="avis" type="button">Avis <span class="admin-tab-count" id="count-avis">0</span></button>
         <button class="admin-tab" data-open-scope="produits" type="button">Produits <span class="admin-tab-count" id="count-produits">0</span></button>
@@ -242,6 +243,22 @@
           <h3>Totaux par gamme</h3>
           <div id="day-gamme-table"></div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-section" id="modal-rdv">
+    <div class="box">
+      <div class="box-head">
+        <h2>Rendez-vous</h2>
+        <button class="btn btn-light btn-small" data-close type="button">Retour</button>
+      </div>
+      <div class="box-body">
+        <div class="toolbar">
+          <input class="search" id="rdv-search" type="search" placeholder="Rechercher un rendez-vous, client, email, sujet...">
+          <button class="btn btn-dark btn-small" id="rdv-reload" type="button">Actualiser</button>
+        </div>
+        <div class="list" id="rdv-list"></div>
       </div>
     </div>
   </section>
