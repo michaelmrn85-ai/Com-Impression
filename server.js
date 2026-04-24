@@ -2459,9 +2459,12 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
                 notif: false
             };
         });
+        const pdfDir = MANUAL_DOC_DIRS[docType.key] || MANUAL_DOC_DIRS.commande;
+        fs.mkdirSync(pdfDir, { recursive: true });
         const pdfName = `${docType.label}-${numero}.pdf`;
-        const pdfStored = path.join(docType.key, `${numero}_${Date.now()}_${docType.key}.pdf`);
-        const pdfPath = path.join(DOCS_DIR, pdfStored);
+        const pdfFileName = `${numero}_${Date.now()}_${docType.key}.pdf`;
+        const pdfStored = path.join(docType.key, pdfFileName);
+        const pdfPath = path.join(pdfDir, pdfFileName);
         const pdfBuffer = buildSimplePdfBuffer({
             title: docType.label,
             numero,
@@ -2523,7 +2526,7 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
         };
         commandes.push(cmd);
         sauvegarderCommandes(commandes);
-        res.json({ success: true, numero: cmd.numero, commande: cmd, typeLabel: docType.label, docName: pdfName });
+        res.json({ success: true, numero: cmd.numero, commande: cmd, typeLabel: docType.label, docName: pdfName, docFolder: docType.key });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
     }

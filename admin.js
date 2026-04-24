@@ -1326,7 +1326,7 @@
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Création impossible'); return d; }); })
     .then(function(data){
-      setStatus('manual-status','ok',((data.typeLabel||'Document')+' créé : '+(data.numero||'OK')+(data.docName ? ' — PDF : '+data.docName : '')));
+      setStatus('manual-status','ok',((data.typeLabel||'Document')+' créé : '+(data.numero||'OK')+(data.docName ? ' — PDF : '+data.docName : '')+(data.docFolder ? ' — Dossier : '+data.docFolder : '')));
       return loadCommandes();
     })
     .catch(function(err){ setStatus('manual-status','err',err.message||'Erreur création commande.'); })
