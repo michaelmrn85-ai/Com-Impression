@@ -261,6 +261,7 @@ function buildCatalogApiPayload() {
                 ref: buildProductRef(refIndex++),
                 id: prod.id,
                 legacyCat: group.legacy,
+                isCustomProduct: false,
                 title: override.title || prod.nom,
                 priceLabel: String(override.priceLabel || prod.prix || 'Sur devis').replace(/€/g, 'EUR'),
                 priceValue: override.priceValue != null ? parseNumberValue(override.priceValue) : parseEuroLabel(prod.prix),
@@ -319,6 +320,7 @@ function buildCatalogApiPayload() {
                     ref: buildProductRef(refIndex++),
                     id: item.id,
                     legacyCat: group.legacy,
+                    isCustomProduct: true,
                     title: item.title,
                     priceLabel: String(item.priceLabel || 'Sur devis').replace(/€/g, 'EUR'),
                     priceValue: item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : parseNumberValue(item.priceValue),
@@ -1137,9 +1139,9 @@ function normaliseQuantityPricing(list) {
         const quantity = parseInt(item.quantity, 10);
         const width = parseNumberValue(item.width);
         const height = parseNumberValue(item.height);
-        const total = parseNumberValue(item.total);
+        const total = parseNumberValue(item.total != null ? item.total : (item.salePrice != null ? item.salePrice : (item.priceValue != null ? item.priceValue : item.price)));
         const finish = String(item.finish || '').trim();
-        const purchasePrice = parseNumberValue(item.purchasePrice);
+        const purchasePrice = parseNumberValue(item.purchasePrice != null ? item.purchasePrice : item.prixAchat);
         const optionsLibres = normaliseFreeOptions(item.optionsLibres);
         return {
             type,
@@ -1610,10 +1612,12 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
-        const overrides = lireProductOverrides();
-        const key = buildProductOverrideKey(req.params.legacyCat, req.params.productId);
+        const legacyCat = String(body.legacyCat || req.params.legacyCat || '').trim();
+        const productId = String(req.params.productId || '').trim();
         const quantityPricing = normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : []);
         const next = {
+            legacyCat,
+            id: productId,
             title: String(body.title || '').trim(),
             summary: String(body.summary || '').trim(),
             priceLabel: String(body.priceLabel || '').trim(),
@@ -1628,8 +1632,32 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             uploadEnabled: body.uploadEnabled !== false,
             requiresQuantityInput: !!body.requiresQuantityInput || hasUnitPricing(quantityPricing),
             deliveryDelayDays: parseNumberValue(body.deliveryDelayDays),
+            hasDimensions: !!body.hasDimensions,
+            minWidth: Number(body.minWidth) || 1,
+            minHeight: Number(body.minHeight) || 1,
+            unit: String(body.unit || '').trim(),
             quantityPricing
         };
+        const customProducts = lireCustomProducts();
+        const customIndex = customProducts.findIndex(item => item && item.id === productId && (item.legacyCat === req.params.legacyCat || item.legacyCat === legacyCat || body.isCustomProduct === true));
+        if (customIndex >= 0) {
+            customProducts[customIndex] = Object.assign({}, customProducts[customIndex], next, {
+                legacyCat,
+                id: productId,
+                updated_at: new Date().toISOString()
+            });
+            sauvegarderCustomProducts(customProducts);
+            return res.json({ success: true, product: customProducts[customIndex] });
+        }
+
+        const overrides = lireProductOverrides();
+        const key = buildProductOverrideKey(req.params.legacyCat, productId);
+        delete next.legacyCat;
+        delete next.id;
+        delete next.hasDimensions;
+        delete next.minWidth;
+        delete next.minHeight;
+        delete next.unit;
         overrides[key] = next;
         sauvegarderProductOverrides(overrides);
         res.json({ success: true, override: next });

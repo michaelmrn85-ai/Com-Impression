@@ -381,6 +381,33 @@ textarea {
   gap: 10px !important;
 }
 
+body[data-page="client"] #client-dashboard-view {
+  display: grid;
+  gap: 34px;
+}
+
+body[data-page="client"] #client-dashboard-view > .dashboard-card,
+body[data-page="client"] #client-dashboard-view > .grid-2 {
+  margin: 0;
+}
+
+body[data-page="client"] #client-dashboard-view > .grid-2 {
+  gap: 30px;
+}
+
+body[data-page="client"] .client-overview {
+  gap: 24px;
+}
+
+body[data-page="client"] #client-dashboard-view .dashboard-card,
+body[data-page="client"] #client-dashboard-view .form-card {
+  padding: 30px;
+}
+
+body[data-page="client"] #client-dashboard-view .section-head {
+  margin-bottom: 24px;
+}
+
 .loyalty-head {
   align-items: baseline;
 }
