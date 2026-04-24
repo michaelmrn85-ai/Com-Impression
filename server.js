@@ -161,8 +161,15 @@ const BRAND_CONTACT_PHONE = '07 43 69 56 41';
 const BRAND_SITE_URL = 'https://com-impression.fr';
 
 function createTransporter() {
+    const port = parseInt(process.env.SMTP_PORT || '465', 10);
+    const host = process.env.SMTP_HOST || 'smtp.ionos.fr';
+    const secure = String(process.env.SMTP_SECURE || '').trim()
+        ? String(process.env.SMTP_SECURE).trim() !== 'false'
+        : port === 465;
     return nodemailer.createTransport({
-        host: 'smtp.ionos.fr', port: 465, secure: true,
+        host,
+        port,
+        secure,
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
         tls: { rejectUnauthorized: false }, connectionTimeout: 30000
     });
@@ -908,15 +915,19 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         let purchaseValue = null;
         let responseQuantityOptions = quantityOptions;
         if (productData.quantityPricing && productData.quantityPricing.length) {
-            const selectedOptionValues = Object.values(sels).map(normaliseOptionKey);
+            const selectedSideValues = Object.keys(sels)
+                .filter(key => /recto|verso/i.test(key))
+                .map(key => normaliseOptionKey(sels[key]))
+                .filter(Boolean);
             const parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
             const tiers = normaliseQuantityPricing(productData.quantityPricing);
             const lotTiersForOption = tiers.filter(item => {
                 if (item.type !== 'lot') return false;
-                if (!item.finish) return true;
-                return selectedOptionValues.includes(normaliseOptionKey(item.finish));
+                if (!selectedSideValues.length) return true;
+                if (!item.finish) return false;
+                return selectedSideValues.includes(normaliseOptionKey(item.finish));
             });
             if (lotTiersForOption.length) responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
             let chosen = null;
@@ -938,7 +949,9 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (quantityMode === 'lot' || quantityMode === 'unitaire') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
-                const optionTiers = quantityTiers.filter(item => item.finish && selectedOptionValues.includes(normaliseOptionKey(item.finish)));
+                const optionTiers = selectedSideValues.length
+                    ? quantityTiers.filter(item => item.finish && selectedSideValues.includes(normaliseOptionKey(item.finish)))
+                    : [];
                 if (optionTiers.length) quantityTiers = optionTiers;
                 const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
                 if (quantityMode === 'lot') {
