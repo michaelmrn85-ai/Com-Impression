@@ -2694,6 +2694,32 @@ app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ window
     res.json({ success: true, commande: commandes[idx] });
 });
 
+// POST /api/commandes/:id/rdv-admin — modifier un rendez-vous client
+app.post('/api/commandes/:id/rdv-admin', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-rdv-edit' }), (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+
+    const commandes = lireCommandes();
+    const idx = commandes.findIndex(c => String(c.id) === String(req.params.id) || String(c.numero) === String(req.params.id));
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Rendez-vous introuvable' });
+    if (!/^Rendez-vous/i.test(String(commandes[idx].panier || ''))) {
+        return res.status(400).json({ success: false, error: 'Cette commande n est pas un rendez-vous' });
+    }
+
+    const date = String(body.date || '').trim();
+    const slot = String(body.slot || '').trim();
+    const product = String(body.product || 'Projet general').trim() || 'Projet general';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ success: false, error: 'Date invalide' });
+    if (!slot) return res.status(400).json({ success: false, error: 'Creneau obligatoire' });
+
+    commandes[idx].panier = `Rendez-vous - Date: ${date} - Creneau: ${slot} - Produit: ${product}`;
+    commandes[idx].message = String(body.message || '').trim();
+    commandes[idx].updated_at = new Date().toISOString();
+    sauvegarderCommandes(commandes);
+    res.json({ success: true, commande: commandes[idx] });
+});
+
 // POST /api/commandes/:id/statut — changer le statut + email client
 app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-status' }), async (req, res) => {
     const { statut, mdp } = req.body;

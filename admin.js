@@ -351,6 +351,7 @@
     state.selected=cmd;
     $('detail-title').textContent='Commande '+(cmd.numero||cmd.id);
     var fullName=((cmd.prenom||'')+' '+(cmd.nom||'')).trim()||'Client';
+    var rdvInfo=isRdvCommand(cmd) ? extractRdvInfo(cmd) : null;
     var statutOptions=STATUTS.map(function(st){
       return '<option value="'+esc(st)+'" '+(cmd.statut===st?'selected':'')+'>'+esc(STATUT_LABELS[st])+'</option>';
     }).join('');
@@ -405,6 +406,15 @@
       +'</div>'
       +'<button class="btn btn-orange btn-small" id="save-command-edit" type="button">Enregistrer les modifications</button>'
       +'</section>'
+      +(rdvInfo ? '<section class="panel"><h3>Modifier le rendez-vous</h3>'
+        +'<div class="site-grid">'
+        +'<div class="field"><label>Date</label><input id="edit-rdv-date" type="date" value="'+esc(rdvInfo.rawDate||'')+'"></div>'
+        +'<div class="field"><label>Créneau</label><input id="edit-rdv-slot" value="'+esc(rdvInfo.slot||'')+'" placeholder="Ex : 10:30"></div>'
+        +'</div>'
+        +'<div class="field"><label>Produit ou sujet</label><input id="edit-rdv-product" value="'+esc(rdvInfo.product||'')+'"></div>'
+        +'<div class="field"><label>Précisions</label><textarea id="edit-rdv-message">'+esc(cmd.message||'')+'</textarea></div>'
+        +'<button class="btn btn-orange btn-small" id="save-rdv-edit" type="button">Enregistrer le rendez-vous</button>'
+      +'</section>' : '')
       +'<section class="panel"><h3>Traitement</h3>'
       +'<div class="field"><label>Statut</label><select id="detail-statut">'+statutOptions+'</select></div>'
       +'<button class="btn btn-orange btn-small" id="save-statut" type="button">Mettre à jour le statut</button>'
@@ -480,6 +490,33 @@
       return loadCommandes();
     })
     .catch(function(err){ setStatus('detail-status','err',err.message||'Erreur modification.'); });
+  }
+
+  function saveRdvEdit(){
+    var cmd=state.selected; if(!cmd) return;
+    var date=(($('edit-rdv-date')||{}).value||'').trim();
+    var slot=(($('edit-rdv-slot')||{}).value||'').trim();
+    var product=(($('edit-rdv-product')||{}).value||'').trim() || 'Projet general';
+    var message=(($('edit-rdv-message')||{}).value||'').trim();
+    if(!date || !slot){ setStatus('detail-status','err','Date et créneau sont obligatoires.'); return; }
+    fetch(api('/api/commandes/'+encodeURIComponent(cmd.id||cmd.numero)+'/rdv-admin'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        mdp:state.mdp,
+        date:date,
+        slot:slot,
+        product:product,
+        message:message
+      })
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Modification rendez-vous impossible'); return d; }); })
+    .then(function(data){
+      if(data.commande) Object.assign(cmd,data.commande);
+      setStatus('detail-status','ok','Rendez-vous modifié.');
+      return loadCommandes();
+    })
+    .catch(function(err){ setStatus('detail-status','err',err.message||'Erreur modification rendez-vous.'); });
   }
 
   function saveNotes(){
@@ -1470,6 +1507,7 @@
       if(deleteBtn){ deleteCommand(deleteBtn.getAttribute('data-delete-command')); return; }
       if(e.target && e.target.id==='save-statut') saveStatut();
       if(e.target && e.target.id==='save-command-edit') saveCommandEdit();
+      if(e.target && e.target.id==='save-rdv-edit') saveRdvEdit();
       if(e.target && e.target.id==='save-notes') saveNotes();
       if(e.target && e.target.id==='upload-doc') uploadDocument();
       if(e.target && e.target.id==='manual-add-line') addManualLine();
