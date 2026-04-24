@@ -22,12 +22,27 @@
     </section>
     <section class="section">
       <div class="list-card">
-        <p>COM' Impression</p>
-        <p>Montreverd (85) - Vendee</p>
-        <p>Email de contact : michael@com-impression.fr</p>
-        <p>Cette page doit encore etre completee avec les informations legales finales avant publication officielle.</p>
+        <div id="legal-mentions-content" style="white-space:pre-line;line-height:1.8;">
+COM' Impression
+
+Montreverd (85) - Vendee
+
+Email de contact : michael@com-impression.fr
+
+Cette page doit encore etre completee avec les informations legales finales avant publication officielle.
+        </div>
       </div>
     </section>
   </main>
+  <script>
+    fetch('/api/site-config')
+      .then(function(response){ return response.json(); })
+      .then(function(data){
+        var content = data && data.config && data.config.legalContent;
+        var target = document.getElementById('legal-mentions-content');
+        if(target && content) target.textContent = content;
+      })
+      .catch(function(){});
+  </script>
 </body>
 </html>

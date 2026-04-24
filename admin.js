@@ -801,6 +801,8 @@
     $('site-products-subtitle').value = config.productsSubtitle || '';
     renderSiteProductOptions(config.seasonalProductIds || []);
     $('site-popup-message').value = config.message || config.popupMessage || '';
+    if($('site-cgv-content')) $('site-cgv-content').value = config.cgvContent || '';
+    if($('site-legal-content')) $('site-legal-content').value = config.legalContent || '';
   }
 
   function loadSiteConfig(){
@@ -829,6 +831,8 @@
               productsAccent: state.siteConfig.productsAccent,
               productsSubtitle: state.siteConfig.productsSubtitle,
               seasonalProductIds: state.siteConfig.seasonalProductIds || [],
+              cgvContent: state.siteConfig.cgvContent || '',
+              legalContent: state.siteConfig.legalContent || '',
               message: incident.message || ''
             });
           });
@@ -912,7 +916,9 @@
       productsTitle: $('site-products-title').value || '',
       productsAccent: $('site-products-accent').value || '',
       productsSubtitle: $('site-products-subtitle').value || '',
-      seasonalProductIds: getSelectedSiteProductIds()
+      seasonalProductIds: getSelectedSiteProductIds(),
+      cgvContent: (($('site-cgv-content')||{}).value || ''),
+      legalContent: (($('site-legal-content')||{}).value || '')
     };
     var incidentPayload = {
       mdp: state.mdp,
@@ -1114,6 +1120,7 @@
         summary:'',
         image:($('product-edit-image').value||'').trim(),
         priceLabel:saleLabel,
+        isCustomProduct: !!((entry.product || {}).isCustomProduct),
         purchasePrice:(firstRow.purchasePrice||'').trim(),
         salePrice:(firstRow.salePrice||'').trim(),
         quantityOptions:quantityOptions,

@@ -526,6 +526,17 @@ function emailWrapper(content, couleur, nomBrand, lien, sousTitre) {
 </body></html>`;
 }
 
+function emailTemplate(options = {}) {
+    const title = escapeHtml(options.title || "COM' Impression");
+    const subtitle = escapeHtml(options.subtitle || '');
+    const body = options.body || '';
+    return emailWrapper(`
+        <h2 style="color:#F47B20;margin:0 0 12px;">${title}</h2>
+        ${subtitle ? `<p style="color:#5C5C5C;font-size:15px;line-height:1.7;margin:0 0 20px;">${subtitle}</p>` : ''}
+        ${body}
+    `, '#F47B20', "COM' Impression", BRAND_SITE_URL, 'Montreverd (85) - Vendee');
+}
+
 function blocClient(d, couleur) {
     return `<table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f3ef;border-radius:10px;padding:16px 20px;margin:20px 0;">
       <tr><td style="padding:4px 0;font-size:14px;"><span style="color:#888;width:120px;display:inline-block;">Nom</span><strong>${escapeHtml(d.prenom||'')} ${escapeHtml(d.nom||'')}</strong></td></tr>
@@ -759,6 +770,9 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
             : `IMPRYLO -- ${d.nom||''}`;
 
         const pdfAttachments = attachments;
+        let adminMailSent = false;
+        let clientMailSent = false;
+        let clientMailError = '';
 
         await transporter.sendMail({
             from: `"${nomBrand} Web" <${process.env.SMTP_USER}>`,
@@ -766,6 +780,7 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
             subject: sujet, html: emailWrapper(contenuAdmin, couleur, nomBrand, lien, sousTitre),
             attachments: getBrandingAttachments(pdfAttachments)
         });
+        adminMailSent = true;
 
         if (d.email && d.email.includes('@')) {
             try {
@@ -778,14 +793,23 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
                     html: emailWrapper(contenuClient, couleur, nomBrand, lien, sousTitre),
                      attachments: getBrandingAttachments((typeof pdfPath !== 'undefined' && pdfPath && !isContact && !isPartenariat) ? [{ filename: `Bon-de-commande-${numCmd}.pdf`, path: pdfPath }] : [])
                 });
-            } catch(e) { console.warn('Email client non envoye:', e.message); }
+                clientMailSent = true;
+            } catch(e) {
+                clientMailError = e.message || 'Email client non envoye';
+                console.warn('Email client non envoye:', e.message);
+            }
         }
 
         files.forEach(f => { try { fs.unlinkSync(f.path); } catch(e) {} });
         cartUploads.forEach(item => removeCartUpload(item.token));
         // Enregistrer dans le suivi de commandes (avec le même code que dans l'email)
         enregistrerCommande(d, panierTexte, prixTotal, numCmd, codeAcces);
-        res.status(200).json({ success: true });
+        res.status(200).json({
+            success: true,
+            adminMailSent,
+            clientMailSent,
+            clientMailError
+        });
 
     } catch (error) {
         console.error('Erreur /api/devis:', error);
@@ -1329,6 +1353,16 @@ function defaultSiteConfig() {
         productsAccent: 'communiquer',
         productsSubtitle: 'Des supports print de qualité, pour tous vos projets pro ou perso.',
         seasonalProductIds: ['fairepart-a5', 'fairepart-a6', 'carte-invit', 'menu-evt-carte'],
+        cgvContent: [
+            "Les CGV definitives doivent encore etre ajoutees avant lancement public.",
+            "Cette page temporaire evite les liens casses pendant la finalisation technique du site."
+        ].join('\n\n'),
+        legalContent: [
+            "COM' Impression",
+            "Montreverd (85) - Vendee",
+            "Email de contact : michael@com-impression.fr",
+            "Cette page doit encore etre completee avec les informations legales finales avant publication officielle."
+        ].join('\n\n'),
         updated_at: ''
     };
 }
@@ -1363,6 +1397,8 @@ function normaliserSiteConfig(raw) {
         productsAccent: (raw && raw.productsAccent) || base.productsAccent,
         productsSubtitle: (raw && raw.productsSubtitle) || base.productsSubtitle,
         seasonalProductIds: ids.length ? ids : base.seasonalProductIds.slice(),
+        cgvContent: (raw && raw.cgvContent) || base.cgvContent,
+        legalContent: (raw && raw.legalContent) || base.legalContent,
         updated_at: (raw && raw.updated_at) || ''
     };
 }
@@ -2824,16 +2860,18 @@ async function notifyManualDocumentUpdated(cmd, pdfInfo, options = {}) {
             from: `"COM' Impression" <${process.env.SMTP_USER}>`,
             to: cmd.email,
             subject: `${label} ${isCreation ? 'disponible' : 'modifié'} — ${cmd.numero || cmd.id}`,
-            html: emailTemplate({
-                title: `${label} ${isCreation ? 'disponible' : 'modifié'}`,
-                subtitle: isCreation ? `Votre ${label.toLowerCase()} COM' Impression est disponible.` : `Votre ${label.toLowerCase()} COM' Impression a ete mis a jour.`,
-                body: `
-                    <p>Bonjour ${escapeHtml(cmd.prenom || cmd.nom || 'Client')},</p>
-                    <p>Vous trouverez en piece jointe ${isCreation ? 'votre' : 'la version mise a jour de votre'} ${escapeHtml(label.toLowerCase())}.</p>
-                    <p>Reference : <strong>${escapeHtml(cmd.numero || cmd.id || '')}</strong></p>
-                    ${emailSignatureBlock()}
-                `
-            }),
+            html: emailWrapper(`
+                <div style="display:inline-block;padding:7px 14px;border-radius:999px;background:#fff3e6;color:#F47B20;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:14px;">${escapeHtml(label)} ${isCreation ? 'disponible' : 'modifié'}</div>
+                <h2 style="color:#171310;font-size:28px;line-height:1.15;margin:0 0 14px;">Votre ${escapeHtml(label.toLowerCase())} COM' Impression</h2>
+                <p style="color:#5C5C5C;font-size:15px;line-height:1.75;margin:0 0 22px;">
+                    Bonjour <strong>${escapeHtml(cmd.prenom || cmd.nom || 'Client')}</strong>,<br><br>
+                    Vous trouverez en piece jointe ${isCreation ? 'votre' : 'la version mise a jour de votre'} ${escapeHtml(label.toLowerCase())}.
+                </p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff7ef;border:1px solid #efd8c0;border-radius:18px;padding:16px 18px;margin:18px 0 22px;">
+                    <tr><td style="font-size:14px;padding:5px 0;"><span style="color:#8c827b;width:140px;display:inline-block;">Reference</span><strong>${escapeHtml(cmd.numero || cmd.id || '')}</strong></td></tr>
+                    <tr><td style="font-size:14px;padding:5px 0;"><span style="color:#8c827b;width:140px;display:inline-block;">Montant</span><strong>${escapeHtml(cmd.prix_total || '--')}</strong></td></tr>
+                </table>
+            `, '#F47B20', "COM' Impression", BRAND_SITE_URL, 'Document client COM\' Impression'),
             attachments: getBrandingAttachments([{ filename: pdfInfo.name, path: pdfInfo.path }])
         });
         return { sent: true };

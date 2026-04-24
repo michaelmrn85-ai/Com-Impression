@@ -1205,6 +1205,7 @@
           + '<div class="split-line"><strong>Client</strong><span>' + esc(orderData.customerName || "") + '</span></div>'
           + '<div class="split-line"><strong>Email</strong><span>' + esc(orderData.customerEmail || "") + '</span></div>'
           + '<div class="split-line"><strong>Total regle</strong><span class="product-price">' + esc(orderData.totalLabel || "0,00 EUR") + '</span></div>'
+          + '<div class="split-line"><strong>Email client</strong><span>' + esc(orderData.clientMailSent ? "Envoye" : "Non confirme") + '</span></div>'
           + (orderData.promoCode ? '<div class="split-line"><strong>Code reduction</strong><span>' + esc(orderData.promoCode) + ' · ' + esc(String(orderData.promoDiscount || 0)) + '%</span></div>' : '')
         + '</div>'
         + '<div class="cart-table">'
@@ -1483,7 +1484,7 @@
             return json;
           });
         })
-        .then(function () {
+        .then(function (data) {
           writeCart([]);
           ["checkout-prenom", "checkout-nom", "checkout-email", "checkout-tel", "checkout-adresse"].forEach(function (id) {
             if (!connectedClient && $(id)) $(id).value = "";
@@ -1493,6 +1494,8 @@
           appliedPromo = null;
           closePaymentModal();
           renderCart();
+          orderSnapshot.clientMailSent = !!(data && data.clientMailSent);
+          orderSnapshot.clientMailError = (data && data.clientMailError) || "";
           renderOrderSuccess(orderSnapshot);
           return true;
         });
@@ -2164,9 +2167,9 @@
             return json;
           });
         })
-        .then(function () {
+        .then(function (data) {
           form.reset();
-          setStatus(status, "ok", "Votre demande de rendez-vous a bien ete envoyee.");
+          setStatus(status, "ok", data && data.clientMailSent ? "Votre demande de rendez-vous a bien ete envoyee. Un email de confirmation vous a ete adresse." : "Votre demande de rendez-vous a bien ete envoyee. Email client non confirme cote serveur.");
         })
         .catch(function (error) {
           setStatus(status, "err", error.message || "Impossible d'envoyer votre demande.");
@@ -2299,9 +2302,9 @@
               return json;
             });
           })
-          .then(function () {
+          .then(function (data) {
             partnershipForm.reset();
-            setStatus(partnershipStatus, "ok", "Votre demande de partenariat a bien ete envoyee.");
+            setStatus(partnershipStatus, "ok", data && data.clientMailSent ? "Votre demande de partenariat a bien ete envoyee. Un email de confirmation vous a ete adresse." : "Votre demande de partenariat a bien ete envoyee. Email client non confirme cote serveur.");
           })
           .catch(function (error) {
             setStatus(partnershipStatus, "err", error.message || "Impossible d'envoyer votre demande.");
