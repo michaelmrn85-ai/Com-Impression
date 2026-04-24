@@ -181,13 +181,15 @@
     style.textContent =
       ".site-announcement{background:#171310;color:#fff;padding:10px 18px;text-align:center;font-weight:700;font-size:.95rem;line-height:1.4;}" +
       ".site-announcement[hidden]{display:none!important;}" +
-      ".site-popup-overlay{position:fixed;inset:0;background:rgba(23,19,16,.56);display:none;align-items:center;justify-content:center;padding:20px;z-index:90;}" +
+      ".site-popup-overlay{position:fixed;inset:0;background:rgba(23,19,16,.42);display:none;align-items:center;justify-content:center;padding:20px;z-index:90;backdrop-filter:blur(5px);}" +
       ".site-popup-overlay.open{display:flex;}" +
-      ".site-popup-card{width:min(560px,100%);background:#fffaf5;border-radius:28px;padding:28px;box-shadow:0 28px 70px rgba(23,19,16,.28);position:relative;display:grid;gap:14px;}" +
-      ".site-popup-card h3{margin:0;font-family:'Sora',sans-serif;font-size:1.7rem;line-height:1.05;}" +
-      ".site-popup-card p{margin:0;color:#5f5751;font-size:1rem;line-height:1.65;}" +
-      ".site-popup-close{position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:999px;border:0;background:#171310;color:#fff;font-size:1.6rem;cursor:pointer;}" +
-      ".site-popup-actions{display:flex;justify-content:flex-end;}" +
+      ".site-popup-card{width:min(560px,100%);background:#fff;border:1px solid #eee3d9;border-radius:18px;padding:24px;box-shadow:0 28px 70px rgba(23,19,16,.24);position:relative;display:grid;gap:16px;}" +
+      ".site-popup-head{display:flex;align-items:flex-start;gap:14px;padding-right:46px;}" +
+      ".site-popup-mark{width:42px;height:42px;border-radius:14px;background:#ff751f;color:#fff;display:grid;place-items:center;font-weight:900;font-size:1.3rem;flex:0 0 auto;}" +
+      ".site-popup-card h3{margin:0;font-family:'Sora',sans-serif;font-size:1.45rem;line-height:1.15;}" +
+      ".site-popup-card p{margin:0;color:#5f5751;font-size:1rem;line-height:1.65;white-space:pre-line;}" +
+      ".site-popup-close{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:999px;border:1px solid #eee3d9;background:#fffaf5;color:#171310;font-size:1.4rem;cursor:pointer;}" +
+      ".site-popup-actions{display:flex;justify-content:flex-end;padding-top:2px;}" +
       ".site-popup-actions .btn-light{width:auto;}" +
       ".cart-added-popup .site-popup-card{max-width:520px;}" +
       ".cart-added-popup .site-popup-actions{justify-content:flex-start;gap:12px;flex-wrap:wrap;}" +
@@ -238,8 +240,7 @@
       existing.innerHTML =
         '<div class="site-popup-card">'
           + '<button class="site-popup-close" type="button" aria-label="Fermer">×</button>'
-          + '<div class="pill">Information</div>'
-          + '<h3 id="site-popup-title"></h3>'
+          + '<div class="site-popup-head"><div class="site-popup-mark">i</div><div><div class="pill">Information client</div><h3 id="site-popup-title"></h3></div></div>'
           + '<p id="site-popup-message"></p>'
           + '<div class="site-popup-actions"><button class="btn-light" id="site-popup-ok" type="button">J\'ai compris</button></div>'
         + '</div>';
@@ -495,6 +496,21 @@
     return buildFallbackRef(product && (product.id || product.productId || product.title));
   }
 
+  function formatDateFr(value) {
+    if (!value) return "";
+    var date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+
+  function getEstimatedDeliveryDate(product) {
+    var days = Number(product && product.deliveryDelayDays);
+    if (isNaN(days) || days < 0) return "";
+    var date = new Date();
+    date.setDate(date.getDate() + Math.round(days));
+    return formatDateFr(date);
+  }
+
   function buildOrderRows(cart) {
     return cart.map(function (item) {
       var unitLabel = item.priceUnit != null ? euro(item.priceUnit) : (item.quantity && item.priceValue != null ? euro(item.priceValue / item.quantity) : (item.priceLabel || "Sur devis"));
@@ -507,6 +523,7 @@
         totalLabel: item.priceValue != null ? euro(item.priceValue) : (item.priceLabel || "Sur devis"),
         notes: item.notes || "",
         gamme: item.gamme || "",
+        deliveryDate: item.deliveryDate || "",
         configuration: item.configuration || item.finish || ""
       };
     });
@@ -531,6 +548,7 @@
       notes: notes || "",
       finish: paperFinish || "",
       paperFinish: paperFinish || "",
+      deliveryDate: getEstimatedDeliveryDate(product),
       configuration: configuration || "",
       priceUnit: typeof unitValue === "number" ? unitValue : null,
       priceValue: typeof totalValue === "number" ? totalValue : (typeof product.priceValue === "number" ? product.priceValue * qty : null),
@@ -550,6 +568,7 @@
         item.label,
         "Qte: " + item.quantity,
         item.finishLabel ? "Finition papier: " + item.finishLabel : "",
+        item.deliveryDate ? "Livraison estimee: " + item.deliveryDate : "",
         "Total TTC: " + item.totalLabel
       ].filter(Boolean);
       if (item.configuration) parts.push("Configuration: " + item.configuration);
@@ -593,6 +612,7 @@
             + '<div class="pill">Votre selection</div>'
             + '<div class="product-side-current"><strong>' + esc(product.title) + '</strong><span>' + esc(entry.gammeTitle) + '</span></div>'
             + '<div class="product-side-meta"><strong>Reference</strong><span>' + esc(getProductRef(product)) + '</span></div>'
+            + (getEstimatedDeliveryDate(product) ? '<div class="product-side-meta"><strong>Livraison estimee</strong><span>' + esc(getEstimatedDeliveryDate(product)) + '</span></div>' : '')
             + '<div class="product-side-meta"><strong>Fichier</strong><span id="product-upload-summary">Aucun fichier</span></div>'
             + '<div class="product-side-meta"><strong>Total TTC</strong><span class="product-price" id="product-total-summary">' + esc(normalizePriceLabel(product.priceLabel)) + '</span></div>'
             + '<div class="hero-actions product-detail-actions">'
@@ -715,7 +735,7 @@
         });
     }
 
-    renderQuantityField(product.quantityOptions && product.quantityOptions.length ? String(product.quantityOptions[0]) : "1");
+    renderQuantityField(product.requiresQuantityInput ? "1" : (product.quantityOptions && product.quantityOptions.length ? String(product.quantityOptions[0]) : "1"));
     document.querySelectorAll("[data-product-option]").forEach(function (select) {
       select.addEventListener("change", function () {
         requestPricing();
@@ -1020,7 +1040,7 @@
           + '<div class="cart-table-body">'
             + rows.map(function (item) {
               return '<div class="cart-table-row">'
-                + '<div class="cart-label"><div class="cart-cell-value"><strong>' + esc(item.title || "") + '</strong><div class="muted">' + esc(item.ref || "") + '</div>' + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + '</div></div>'
+                + '<div class="cart-label"><div class="cart-cell-value"><strong>' + esc(item.title || "") + '</strong><div class="muted">' + esc(item.ref || "") + '</div>' + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.deliveryDate ? '<div class="muted">Livraison estimee: ' + esc(item.deliveryDate) + '</div>' : '') + '</div></div>'
                 + '<div class="cart-file-cell"><span class="cart-cell-value">' + esc(((item.uploadNames || []).length ? item.uploadNames.join(", ") : "Aucun fichier")) + '</span></div>'
                 + '<div class="cart-total-cell product-price"><span class="cart-cell-value">' + esc(item.priceValue != null ? euro(item.priceValue) : item.priceLabel || "-") + '</span></div>'
                 + '<div></div>'
@@ -1120,7 +1140,7 @@
             + '<div class="cart-table-body">'
               + cart.map(function (item) {
                 return '<div class="cart-table-row">'
-                  + '<div class="cart-label"><span class="cart-mobile-label">Produit</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.ref || getProductRef(item)) + '</div>' + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.paperFinish ? '<div class="muted">' + esc(item.paperFinish) + '</div>' : '') + '</div></div>'
+                  + '<div class="cart-label"><span class="cart-mobile-label">Produit</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.ref || getProductRef(item)) + '</div>' + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.paperFinish ? '<div class="muted">' + esc(item.paperFinish) + '</div>' : '') + (item.deliveryDate ? '<div class="muted">Livraison estimee: ' + esc(item.deliveryDate) + '</div>' : '') + '</div></div>'
                   + '<div class="cart-file-cell"><span class="cart-mobile-label">Fichier</span><span class="cart-cell-value">' + esc(((item.uploadNames || []).length ? item.uploadNames.join(", ") : "Aucun fichier")) + '</span></div>'
                   + '<div class="cart-total-cell product-price"><span class="cart-mobile-label">Total TTC</span><span class="cart-cell-value">' + esc(item.priceValue != null ? euro(item.priceValue) : item.priceLabel || "-") + '</span></div>'
                   + '<div class="cart-action"><span class="cart-mobile-label">Action</span><span class="cart-cell-value"><button class="cart-remove-btn" type="button" data-remove-cart="' + esc(item.id) + '" aria-label="Supprimer">×</button></span></div>'

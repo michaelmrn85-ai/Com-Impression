@@ -245,7 +245,10 @@ function buildCatalogApiPayload() {
                 defaultSelections[key] = (prod.opts[key] || [])[0] || '';
             });
             const override = overrides[buildProductOverrideKey(group.legacy, prod.id)] || {};
+            const quantityPricing = normaliseQuantityPricing(override.quantityPricing || []);
             const options = applyOptionOverrides(prod.opts || {}, override);
+            const sideOptions = getPricingSideOptions(quantityPricing);
+            if (sideOptions.length) options['Recto / verso'] = sideOptions;
             const optionKeyList = Object.keys(options || {});
             const product = {
                 ref: buildProductRef(refIndex++),
@@ -260,10 +263,11 @@ function buildCatalogApiPayload() {
                 optionKeys: optionKeyList,
                 defaultSelections,
                 quantityOptions: override.quantityOptions && override.quantityOptions.length ? override.quantityOptions.slice() : (Array.isArray(prod.Q) ? prod.Q : []),
-                quantityPricing: override.quantityPricing && override.quantityPricing.length ? override.quantityPricing.slice() : [],
+                quantityPricing,
                 purchasePrice: override.purchasePrice == null || override.purchasePrice === '' ? null : Number(override.purchasePrice),
                 salePrice: override.salePrice == null || override.salePrice === '' ? (override.priceValue != null ? Number(override.priceValue) : parseEuroLabel(prod.prix)) : Number(override.salePrice),
-                requiresQuantityInput: override.requiresQuantityInput != null ? !!override.requiresQuantityInput : !!(prod.prixUnit || prod.id === 'impression-doc'),
+                requiresQuantityInput: (override.requiresQuantityInput != null ? !!override.requiresQuantityInput : !!(prod.prixUnit || prod.id === 'impression-doc')) || hasUnitPricing(quantityPricing),
+                deliveryDelayDays: override.deliveryDelayDays == null || override.deliveryDelayDays === '' ? null : Number(override.deliveryDelayDays),
                 hasDimensions: !!(prod.dims || prod.dimsLibres),
                 dimsLibres: !!prod.dimsLibres,
                 minDimensionsCm: prod.dimsLibres ? { width: 50, height: 50 } : null,
@@ -289,9 +293,12 @@ function buildCatalogApiPayload() {
             .map(item => {
                 const paperOptions = normaliseCsvList(item.paperOptions);
                 const finishOptions = normaliseCsvList(item.finishOptions);
+                const quantityPricing = normaliseQuantityPricing(Array.isArray(item.quantityPricing) ? item.quantityPricing : []);
                 const options = {};
                 if (paperOptions.length) options.Papier = paperOptions;
                 if (finishOptions.length) options.Finition = finishOptions;
+                const sideOptions = getPricingSideOptions(quantityPricing);
+                if (sideOptions.length) options['Recto / verso'] = sideOptions;
                 normaliseFreeOptions(item.freeOptions).forEach(option => {
                     if (!options[option.nom]) options[option.nom] = [];
                     if (!options[option.nom].includes(option.valeur)) options[option.nom].push(option.valeur);
@@ -314,10 +321,11 @@ function buildCatalogApiPayload() {
                     optionKeys,
                     defaultSelections,
                     quantityOptions: normaliseCsvList(item.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0),
-                    quantityPricing: normaliseQuantityPricing(Array.isArray(item.quantityPricing) ? item.quantityPricing : []),
+                    quantityPricing,
                     purchasePrice: item.purchasePrice == null || item.purchasePrice === '' ? null : Number(item.purchasePrice),
                     salePrice: item.salePrice == null || item.salePrice === '' ? (item.priceValue == null || item.priceValue === '' ? parseEuroLabel(item.priceLabel) : Number(item.priceValue)) : Number(item.salePrice),
-                    requiresQuantityInput: !!item.requiresQuantityInput,
+                    requiresQuantityInput: !!item.requiresQuantityInput || hasUnitPricing(quantityPricing),
+                    deliveryDelayDays: item.deliveryDelayDays == null || item.deliveryDelayDays === '' ? null : Number(item.deliveryDelayDays),
                     hasDimensions: !!item.hasDimensions,
                     dimsLibres: !!item.hasDimensions,
                     minDimensionsCm: item.hasDimensions ? { width: Number(item.minWidth) || 1, height: Number(item.minHeight) || 1 } : null,
@@ -881,20 +889,25 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         const width = body.width == null ? '' : String(body.width);
         const height = body.height == null ? '' : String(body.height);
         const resolved = resolveLegacyProduct(legacyCat, productId);
-        if (!resolved) return res.status(404).json({ success: false, error: 'Produit introuvable' });
+        const customProduct = !resolved
+            ? lireCustomProducts().find(item => String(item.legacyCat || '') === legacyCat && String(item.id || '') === productId)
+            : null;
+        if (!resolved && !customProduct) return res.status(404).json({ success: false, error: 'Produit introuvable' });
         const override = lireProductOverrides()[buildProductOverrideKey(legacyCat, productId)] || {};
+        const productData = resolved ? override : customProduct;
 
-        const quantityOptions = override.quantityOptions && override.quantityOptions.length
-            ? override.quantityOptions.slice()
-            : resolveQuantityOptions(resolved.ctx, resolved.prod, sels);
+        const quantityOptions = productData.quantityOptions && productData.quantityOptions.length
+            ? normaliseCsvList(productData.quantityOptions).map(value => parseInt(value, 10)).filter(value => !isNaN(value) && value > 0)
+            : (resolved ? resolveQuantityOptions(resolved.ctx, resolved.prod, sels) : []);
         const quantityValue = quantity || (quantityOptions[0] != null ? String(quantityOptions[0]) : '');
-        let priceLabel = resolved.ctx.calcPrix(resolved.prod, sels, quantityValue, width, height);
+        let priceLabel = resolved ? resolved.ctx.calcPrix(resolved.prod, sels, quantityValue, width, height) : String(customProduct.priceLabel || 'Sur devis');
         let numeric = parseEuroLabel(priceLabel);
-        if (override.quantityPricing && override.quantityPricing.length) {
+        if (productData.quantityPricing && productData.quantityPricing.length) {
+            const selectedOptionValues = Object.values(sels).map(value => String(value || '').trim().toLowerCase());
             const parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
-            const tiers = normaliseQuantityPricing(override.quantityPricing);
+            const tiers = normaliseQuantityPricing(productData.quantityPricing);
             let chosen = null;
             if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
                 const dimensionalTiers = tiers.filter(item => item.type === 'dimensions');
@@ -910,15 +923,17 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 }
             }
             if (!chosen) {
-                const quantityTiers = tiers.filter(item => item.type !== 'dimensions');
+                let quantityTiers = tiers.filter(item => item.type !== 'dimensions');
+                const optionTiers = quantityTiers.filter(item => item.finish && selectedOptionValues.includes(String(item.finish).trim().toLowerCase()));
+                if (optionTiers.length) quantityTiers = optionTiers;
                 chosen = quantityTiers.find(item => item.quantity === parsedQty) || quantityTiers.find(item => item.quantity >= parsedQty) || quantityTiers[quantityTiers.length - 1];
             }
             if (chosen) {
                 numeric = chosen.total;
                 priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
             }
-        } else if (override.priceLabel && numeric == null) {
-            priceLabel = String(override.priceLabel).replace(/€/g, 'EUR');
+        } else if (productData.priceLabel && numeric == null) {
+            priceLabel = String(productData.priceLabel).replace(/€/g, 'EUR');
             numeric = parseEuroLabel(priceLabel);
         }
         res.json({
@@ -1060,6 +1075,7 @@ function normaliseQuantityPricing(list) {
         const height = Number(item.height);
         const total = Number(item.total);
         const finish = String(item.finish || '').trim();
+        const purchasePrice = Number(item.purchasePrice);
         const optionsLibres = normaliseFreeOptions(item.optionsLibres);
         return {
             type,
@@ -1067,6 +1083,7 @@ function normaliseQuantityPricing(list) {
             width,
             height,
             finish,
+            purchasePrice: isNaN(purchasePrice) ? null : purchasePrice,
             total,
             optionsLibres
         };
@@ -1077,6 +1094,21 @@ function normaliseQuantityPricing(list) {
         }
         return !isNaN(item.quantity) && item.quantity > 0;
     });
+}
+
+function hasUnitPricing(pricing) {
+    return Array.isArray(pricing) && pricing.some(item => item && item.type === 'unitaire');
+}
+
+function getPricingSideOptions(pricing) {
+    const values = [];
+    (Array.isArray(pricing) ? pricing : []).forEach(item => {
+        const value = String((item && item.finish) || '').trim();
+        if (value && !values.some(existing => existing.toLowerCase() === value.toLowerCase())) {
+            values.push(value);
+        }
+    });
+    return values;
 }
 
 function getProductImageUrl(filename) {
@@ -1440,7 +1472,7 @@ app.get('/api/admin/daily-summary', (req, res) => {
                 orders: todayOrders.length,
                 total: Math.round(dayTotal * 100) / 100,
                 margin: Math.round(dayMargin * 100) / 100,
-                marginRate: (dayTotal - dayMargin) > 0 ? Math.round(((dayMargin / (dayTotal - dayMargin)) * 100) * 100) / 100 : 0,
+                marginRate: dayTotal > 0 ? Math.round(((dayMargin / dayTotal) * 100) * 100) / 100 : 0,
                 visitsToday: Number((visits.byDay || {})[requestedDate] || 0),
                 visitsTotal: Number(visits.total || 0),
                 byGamme: Object.values(byGamme).sort((a, b) => b.total - a.total).map(item => ({
@@ -1448,7 +1480,7 @@ app.get('/api/admin/daily-summary', (req, res) => {
                     total: Math.round(item.total * 100) / 100,
                     orders: item.orders,
                     margin: Math.round(item.margin * 100) / 100,
-                    marginRate: (item.total - item.margin) > 0 ? Math.round(((item.margin / (item.total - item.margin)) * 100) * 100) / 100 : 0
+                    marginRate: item.total > 0 ? Math.round(((item.margin / item.total) * 100) * 100) / 100 : 0
                 }))
             }
         });
@@ -1514,6 +1546,7 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
     try {
         const overrides = lireProductOverrides();
         const key = buildProductOverrideKey(req.params.legacyCat, req.params.productId);
+        const quantityPricing = normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : []);
         const next = {
             title: String(body.title || '').trim(),
             summary: String(body.summary || '').trim(),
@@ -1527,8 +1560,9 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             finishOptions: normaliseCsvList(body.finishOptions),
             freeOptions: normaliseFreeOptions(body.freeOptions),
             uploadEnabled: body.uploadEnabled !== false,
-            requiresQuantityInput: !!body.requiresQuantityInput,
-            quantityPricing: normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : [])
+            requiresQuantityInput: !!body.requiresQuantityInput || hasUnitPricing(quantityPricing),
+            deliveryDelayDays: body.deliveryDelayDays == null || body.deliveryDelayDays === '' ? null : Number(body.deliveryDelayDays),
+            quantityPricing
         };
         overrides[key] = next;
         sauvegarderProductOverrides(overrides);
@@ -1552,6 +1586,7 @@ app.post('/api/admin/products', express.json(), (req, res) => {
         if (customProducts.some(item => item.legacyCat === legacyCat && item.id === id)) {
             return res.status(409).json({ success: false, error: 'Un produit avec ce nom existe deja dans cette gamme' });
         }
+        const quantityPricing = normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : []);
         const product = {
             legacyCat,
             id,
@@ -1566,9 +1601,10 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
             freeOptions: normaliseFreeOptions(body.freeOptions),
-            quantityPricing: normaliseQuantityPricing(Array.isArray(body.quantityPricing) ? body.quantityPricing : []),
+            quantityPricing,
             uploadEnabled: body.uploadEnabled !== false,
-            requiresQuantityInput: !!body.requiresQuantityInput,
+            requiresQuantityInput: !!body.requiresQuantityInput || hasUnitPricing(quantityPricing),
+            deliveryDelayDays: body.deliveryDelayDays == null || body.deliveryDelayDays === '' ? null : Number(body.deliveryDelayDays),
             hasDimensions: !!body.hasDimensions,
             minWidth: Number(body.minWidth) || 1,
             minHeight: Number(body.minHeight) || 1,

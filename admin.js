@@ -93,17 +93,19 @@
   }
   function isDone(cmd){ return cmd.statut === 'Expediee'; }
   function isCancelled(cmd){ return cmd.statut === 'Annulee'; }
-  function isInProgress(cmd){ return !isDone(cmd) && !isCancelled(cmd); }
   function isRdvCommand(cmd){ return /^Rendez-vous/i.test(String((cmd && cmd.panier) || '')); }
+  function isStandardCommand(cmd){ return !isRdvCommand(cmd); }
+  function isInProgress(cmd){ return isStandardCommand(cmd) && !isDone(cmd) && !isCancelled(cmd); }
   function ordersForScope(scope){
-    if(scope==='terminees') return state.commandes.filter(isDone);
-    if(scope==='annulees') return state.commandes.filter(isCancelled);
+    var commandes = state.commandes.filter(isStandardCommand);
+    if(scope==='terminees') return commandes.filter(isDone);
+    if(scope==='annulees') return commandes.filter(isCancelled);
     return state.commandes.filter(isInProgress);
   }
   function updateCounts(){
     $('count-cours').textContent = state.commandes.filter(isInProgress).length;
-    $('count-terminees').textContent = state.commandes.filter(isDone).length;
-    $('count-annulees').textContent = state.commandes.filter(isCancelled).length;
+    $('count-terminees').textContent = state.commandes.filter(isStandardCommand).filter(isDone).length;
+    $('count-annulees').textContent = state.commandes.filter(isStandardCommand).filter(isCancelled).length;
     if($('count-rdv')) $('count-rdv').textContent = state.commandes.filter(isRdvCommand).length;
     if($('count-produits')) $('count-produits').textContent = state.catalog.length;
     if($('count-clients')) $('count-clients').textContent = state.clients.length;
@@ -1006,7 +1008,8 @@
         quantityPricing:[],
         uploadEnabled:true,
         hasDimensions:false,
-        requiresQuantityInput:false
+        requiresQuantityInput:false,
+        deliveryDelayDays:''
       },
       isNew:true
     };
@@ -1032,6 +1035,7 @@
       +'<div class="field"><label>Description</label><textarea id="product-edit-summary">'+esc(entryRef.product.summary||'')+'</textarea></div>'
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'</div>'
+      +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Tarification / dimensions</label>'+renderProductPricingEditor(pricingRows)+'</div>'
       +'<div class="site-grid">'
@@ -1094,6 +1098,7 @@
         width:row.width,
         height:row.height,
         finish:row.finish,
+        purchasePrice:row.purchasePrice,
         total:row.salePrice,
         optionsLibres:row.optionsLibres
       };
@@ -1117,6 +1122,7 @@
         quantityOptions:quantityOptions,
         paperOptions:($('product-edit-paper').value||'').trim(),
         finishOptions:($('product-edit-finish').value||'').trim(),
+        deliveryDelayDays:($('product-edit-delivery-delay').value||'').trim(),
         quantityPricing:pricing,
         uploadEnabled:!!(($('product-edit-upload')||{}).checked),
         requiresQuantityInput:pricingRows.some(function(row){ return row.type === 'unitaire'; }),
@@ -1287,7 +1293,7 @@
           width:row.width == null ? '' : String(row.width).trim(),
           height:row.height == null ? '' : String(row.height).trim(),
           finish:row.finish == null ? '' : String(row.finish).trim(),
-          purchasePrice:product.purchasePrice == null ? '' : String(product.purchasePrice),
+          purchasePrice:row.purchasePrice == null ? (product.purchasePrice == null ? '' : String(product.purchasePrice)) : String(row.purchasePrice),
           salePrice:row.total == null ? '' : String(row.total),
           optionsLibres:Array.isArray(row.optionsLibres) ? row.optionsLibres : []
         };
@@ -1312,7 +1318,7 @@
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th>Largeur</th><th>Hauteur</th><th>Finition</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge %</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Prix d achat</th><th>Prix de vente</th><th>Marge %</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
         var isDimensions = row.type === 'dimensions';
         var optionsHtml = (Array.isArray(row.optionsLibres) ? row.optionsLibres : []).map(function(option){
@@ -1327,7 +1333,7 @@
           +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></td>'
           +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"'+(isDimensions?'':' disabled')+'></td>'
           +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"'+(isDimensions?'':' disabled')+'></td>'
-          +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value="'+esc(row.finish||'')+'"></td>'
+          +'<td><input class="product-pricing-finish" placeholder="Recto, recto-verso..." value="'+esc(row.finish||'')+'"></td>'
           +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
           +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
           +'<td><span class="pricing-margin">0,00</span></td>'
@@ -1344,6 +1350,12 @@
   }
 
   function refreshProductPricingTable(){
+    var hasDimensionRow = Array.prototype.slice.call(document.querySelectorAll('#product-pricing-rows .product-pricing-type')).some(function(input){
+      return input.value === 'dimensions';
+    });
+    document.querySelectorAll('.pricing-dim-col').forEach(function(cell){
+      cell.style.display = hasDimensionRow ? 'table-cell' : 'none';
+    });
     document.querySelectorAll('#product-pricing-rows .product-pricing-row').forEach(function(row){
       var purchase = parseAmount((row.querySelector('.product-pricing-purchase')||{}).value);
       var sale = parseAmount((row.querySelector('.product-pricing-sale')||{}).value);
@@ -1354,7 +1366,7 @@
       var widthCell = row.querySelector('.product-pricing-width-cell');
       var heightCell = row.querySelector('.product-pricing-height-cell');
       var marginValue = sale - purchase;
-      var marginRate = purchase > 0 ? (((sale / purchase) - 1) * 100) : 0;
+      var marginRate = sale > 0 ? ((marginValue / sale) * 100) : 0;
       var marginCell = row.querySelector('.pricing-margin');
       if(marginCell){
         if(purchase > 0 && sale > 0){
@@ -1391,12 +1403,12 @@
           widthInput.value = '';
           widthInput.disabled = true;
         }
-        if(widthCell) widthCell.style.display = 'table-cell';
+        if(widthCell) widthCell.style.display = hasDimensionRow ? 'table-cell' : 'none';
         if(heightInput){
           heightInput.value = '';
           heightInput.disabled = true;
         }
-        if(heightCell) heightCell.style.display = 'table-cell';
+        if(heightCell) heightCell.style.display = hasDimensionRow ? 'table-cell' : 'none';
       }
     });
   }
@@ -1758,7 +1770,7 @@
             +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
             +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="" disabled></td>'
             +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="" disabled></td>'
-            +'<td><input class="product-pricing-finish" placeholder="Mat, brillant..." value=""></td>'
+            +'<td><input class="product-pricing-finish" placeholder="Recto, recto-verso..." value=""></td>'
             +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value=""></td>'
             +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value=""></td>'
             +'<td><span class="pricing-margin">0,00</span></td>'
