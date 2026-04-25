@@ -1372,6 +1372,24 @@
         return Promise.reject(new Error("Champ SumUp introuvable."));
       }
       mount.innerHTML = "";
+      function verifySumupCheckout(attempt) {
+        return fetch(API_BASE + "/api/sumup/verify-checkout/" + encodeURIComponent(currentSumupCheckoutId))
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+              if (!response.ok || !payload.success) throw new Error(payload.error || ("HTTP " + response.status));
+              return payload;
+            });
+          })
+          .then(function (payload) {
+            if (payload.paid) return payload;
+            if (attempt >= 8) throw new Error("Le paiement SumUp n'est pas encore valide.");
+            return new Promise(function (resolve) {
+              setTimeout(resolve, 1500);
+            }).then(function () {
+              return verifySumupCheckout(attempt + 1);
+            });
+          });
+      }
       return fetch(API_BASE + "/api/sumup/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1404,15 +1422,8 @@
                 setStatus(sumupStatus, "ok", "Paiement transmis a SumUp, verification en cours...");
                 return;
               }
-              fetch(API_BASE + "/api/sumup/verify-checkout/" + encodeURIComponent(currentSumupCheckoutId))
-                .then(function (response) {
-                  return response.json().catch(function () { return {}; }).then(function (payload) {
-                    if (!response.ok || !payload.success) throw new Error(payload.error || ("HTTP " + response.status));
-                    return payload;
-                  });
-                })
-                .then(function (payload) {
-                  if (!payload.paid) throw new Error("Le paiement SumUp n'est pas encore valide.");
+              verifySumupCheckout(1)
+                .then(function () {
                   return submitOrder({
                     payment_id: currentSumupCheckoutId,
                     payment_status: "paye"
