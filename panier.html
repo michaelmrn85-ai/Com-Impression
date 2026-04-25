@@ -122,6 +122,9 @@
             <strong class="total" id="cart-payable-total">0,00 EUR</strong>
           </div>
         </div>
+        <div class="cart-minimum-alert" id="cart-minimum-alert" hidden>
+          Paiement SumUp disponible a partir de 1,00 EUR. Ajoutez un produit ou augmentez la quantite pour payer par carte.
+        </div>
         <button class="btn" id="cart-validate" type="button">Paiement</button>
         <div class="status" id="cart-validate-status"></div>
       </div>
@@ -260,6 +263,7 @@
         <div class="footer-col">
           <h4>Paiement securise</h4>
           <p>Paiement securise par carte bancaire via SumUp, ou reglement par virement bancaire selon votre commande.</p>
+          <p class="footer-warning">Minimum paiement SumUp : 1,00 EUR.</p>
         </div>
         <div class="footer-col">
           <h4>COM' Impression</h4>
@@ -270,6 +274,7 @@
       </div>
       <div class="footer-payments">
         <div class="payment-strip"><span class="payment-badge">Paiement securise avec SumUp et virement bancaire</span></div>
+        <div class="footer-minimum-alert" id="cart-footer-minimum-alert" hidden>Panier inferieur a 1,00 EUR : le paiement SumUp est bloque.</div>
       </div>
       <div class="footer-bottom">
         <span>© 2026 COM' Impression. Tous droits reserves.</span>

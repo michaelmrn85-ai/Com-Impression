@@ -1114,6 +1114,8 @@
     var cartValidated = false;
     var appliedPromo = null;
     var SUMUP_PENDING_KEY = "ci_sumup_pending_checkout";
+    var minimumAlert = $("cart-minimum-alert");
+    var footerMinimumAlert = $("cart-footer-minimum-alert");
 
     if (goProducts) {
       goProducts.addEventListener("click", function () {
@@ -1146,8 +1148,13 @@
 
     function updatePayableTotal() {
       var payable = getPayableTotalInfo();
+      var underSumupMinimum = typeof payable.numeric === "number" && payable.numeric > 0 && payable.numeric < 1;
       if ($("cart-payable-total")) $("cart-payable-total").textContent = payable.label || "0,00 EUR";
       if (paymentTotal) paymentTotal.textContent = payable.label || "0,00 EUR";
+      if (minimumAlert) minimumAlert.hidden = !underSumupMinimum;
+      if (footerMinimumAlert) footerMinimumAlert.hidden = !underSumupMinimum;
+      if (validateBtn) validateBtn.disabled = underSumupMinimum;
+      if (sumupBtn) sumupBtn.disabled = underSumupMinimum;
     }
 
     function openAuthModal() {
@@ -1491,6 +1498,10 @@
       var totalInfo = getPayableTotalInfo();
       if (typeof totalInfo.numeric !== "number") {
         setStatus(targetStatus || validateStatus, "err", "Le paiement CB est disponible uniquement pour les produits a tarif chiffre.");
+        return false;
+      }
+      if (totalInfo.numeric < 1) {
+        setStatus(targetStatus || validateStatus, "err", "Le paiement SumUp est autorise uniquement a partir de 1,00 EUR.");
         return false;
       }
       setStatus(targetStatus || validateStatus, "ok", "Panier valide. Redirection vers SumUp en cours.");
@@ -1978,7 +1989,7 @@
         }));
       }, []);
       var billingDocs = docs.filter(function (item) {
-        return /devis|facture/i.test(String((item.doc && item.doc.type) || ""));
+        return /devis|facture|avoir/i.test(String((item.doc && item.doc.type) || ""));
       });
       var regularOrders = commandes.filter(function (cmd) {
         return !/^Rendez-vous/i.test(String(cmd.panier || ""));

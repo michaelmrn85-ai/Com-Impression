@@ -1331,6 +1331,33 @@ body[data-page="client"] #client-dashboard-view .section-head {
   font-size: 0.98rem;
 }
 
+.footer-warning,
+.footer-minimum-alert,
+.cart-minimum-alert {
+  border: 1px solid rgba(244, 123, 32, 0.36);
+  background: #fff3e6;
+  color: #9a3412;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
+.footer-warning {
+  color: #ffb37a;
+  background: rgba(244, 123, 32, 0.14);
+  border-color: rgba(244, 123, 32, 0.38);
+}
+
+.cart-minimum-alert {
+  margin: 12px 0;
+}
+
+.footer-minimum-alert {
+  margin-top: 12px;
+  text-align: center;
+  width: 100%;
+}
+
 .footer-tags {
   display: flex;
   flex-wrap: wrap;

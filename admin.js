@@ -2,7 +2,7 @@
   'use strict';
 
   var API_BASE = window.CI_ADMIN_API_BASE || window.location.origin;
-  var STATUTS = ['Recue','BAT envoye','BAT fichier a revoir','BAT valide','En production','En cours de livraison','Expediee','Annulee'];
+  var STATUTS = ['Recue','BAT envoye','BAT fichier a revoir','BAT valide','En production','En cours de livraison','Expediee','Remboursement','Annulee'];
   var STATUT_LABELS = {
     'Recue':'Reçue',
     'BAT envoye':'BAT envoyé',
@@ -11,6 +11,7 @@
     'En production':'En production',
     'En cours de livraison':'En cours de livraison',
     'Expediee':'Terminée',
+    'Remboursement':'Remboursement',
     'Annulee':'Annulée'
   };
   var state = {
@@ -88,7 +89,7 @@
     if(statut==='BAT envoye'||statut==='BAT valide'||statut==='BAT fichier a revoir') return 'b-bat';
     if(statut==='En production') return 'b-prod';
     if(statut==='En cours de livraison'||statut==='Expediee') return 'b-exp';
-    if(statut==='Annulee') return 'b-ann';
+    if(statut==='Annulee'||statut==='Remboursement') return 'b-ann';
     return '';
   }
   function isDone(cmd){ return cmd.statut === 'Expediee'; }
@@ -514,7 +515,10 @@
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Mise à jour impossible'); return d; }); })
     .then(function(data){
-      setStatus('detail-status','ok','Statut mis à jour.');
+      var message = statut === 'Remboursement'
+        ? (data.refundMailSent ? 'Remboursement enregistré. Avoir PDF envoyé au client et commande annulée.' : 'Remboursement enregistré, commande annulée, mais email non envoyé : '+(data.refundMailError||'vérifie SMTP.'))
+        : 'Statut mis à jour.';
+      setStatus('detail-status', statut === 'Remboursement' && !data.refundMailSent ? 'err' : 'ok', message);
       if(data.commande) Object.assign(cmd,data.commande);
       return loadCommandes();
     })

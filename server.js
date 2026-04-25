@@ -807,6 +807,13 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
         // Enregistrer dans le suivi de commandes (avec le même code que dans l'email)
         const savedCommand = enregistrerCommande(d, panierTexte, prixTotal, numCmd, codeAcces);
         const loyalty = payeCB && d.email ? ajouterPoints(d.email, prixTotal, numCmd, d.prenom || '', d.nom || '') : null;
+        let invoiceMailSent = false;
+        let invoiceMailError = '';
+        if (payeCB && savedCommand) {
+            const invoiceResult = await generateCommandDocumentAndNotify(savedCommand, 'facture', { creation: true });
+            invoiceMailSent = !!invoiceResult.sent;
+            invoiceMailError = invoiceResult.error || '';
+        }
         res.status(200).json({
             success: true,
             numero: numCmd || (savedCommand && savedCommand.numero) || '',
@@ -815,6 +822,8 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
             pointsAdded: loyalty ? loyalty.pts : 0,
             loyaltyTotal: loyalty && loyalty.client ? loyalty.client.points : null,
             loyaltyCode: loyalty && loyalty.codeGenere ? loyalty.codeGenere : null,
+            invoiceMailSent,
+            invoiceMailError,
             adminMailSent,
             clientMailSent,
             clientMailError
@@ -834,8 +843,8 @@ app.post('/api/sumup/create-checkout', express.json(), async (req, res) => {
         const amount = Number(req.body.amount || 0);
         const currency = String(req.body.currency || 'EUR').toUpperCase();
         const description = String(req.body.description || "Commande COM' Impression").trim();
-        if (!amount || amount < 0.5) {
-            return res.status(400).json({ success: false, error: 'Montant invalide (minimum 0,50 EUR).' });
+        if (!amount || amount < 1) {
+            return res.status(400).json({ success: false, error: 'Montant invalide (minimum SumUp : 1,00 EUR).' });
         }
         const reference = 'CI-' + Date.now();
         const checkoutBody = {
@@ -2446,7 +2455,8 @@ if (!fs.existsSync(DOCS_DIR)) { try { fs.mkdirSync(DOCS_DIR, { recursive:true })
 const MANUAL_DOC_DIRS = {
     devis: path.join(DOCS_DIR, 'devis'),
     commande: path.join(DOCS_DIR, 'commande'),
-    facture: path.join(DOCS_DIR, 'facture')
+    facture: path.join(DOCS_DIR, 'facture'),
+    avoir: path.join(DOCS_DIR, 'avoir')
 };
 Object.values(MANUAL_DOC_DIRS).forEach(dir => {
     if (!fs.existsSync(dir)) {
@@ -2716,7 +2726,7 @@ function buildSimplePdfBuffer(definition) {
         return match ? Number(match[0].replace(',', '.')) : 1;
     }
     function docNumber() {
-        const prefix = definition.docKey === 'facture' ? 'F' : (definition.docKey === 'devis' ? 'D' : 'C');
+        const prefix = definition.docKey === 'facture' ? 'F' : (definition.docKey === 'devis' ? 'D' : (definition.docKey === 'avoir' ? 'A' : 'C'));
         return `${prefix}-${String(definition.numero || '').replace(/^CI-/, '')}`;
     }
     function rowText(row) {
@@ -2841,7 +2851,83 @@ function buildManualDocumentMeta(type) {
     const clean = String(type || 'commande').trim().toLowerCase();
     if (clean === 'devis') return { key: 'devis', label: 'Devis' };
     if (clean === 'facture') return { key: 'facture', label: 'Facture' };
+    if (clean === 'avoir' || clean === 'remboursement') return { key: 'avoir', label: 'Avoir' };
     return { key: 'commande', label: 'Commande' };
+}
+
+function getCommandPdfRows(cmd) {
+    if (cmd && Array.isArray(cmd.lignes) && cmd.lignes.length) return cmd.lignes;
+    const items = parsePanierJson(cmd && cmd.panier_json);
+    if (items.length) {
+        return items.map(item => ({
+            produit: item.label || item.ref || 'Produit',
+            qte: item.quantity || '1',
+            montant: item.totalLabel || '',
+            fichier: '',
+            optionsLibres: [
+                item.finishLabel ? { nom: 'Finition', valeur: item.finishLabel } : null,
+                item.configuration ? { nom: 'Configuration', valeur: item.configuration } : null
+            ].filter(Boolean)
+        }));
+    }
+    return String((cmd && cmd.panier) || '').split(/\n|\|/).filter(Boolean).map(line => ({
+        produit: line.trim(),
+        qte: '1',
+        montant: '',
+        fichier: '',
+        optionsLibres: []
+    }));
+}
+
+function createGeneratedPdfForCommand(cmd, type) {
+    if (!cmd) return null;
+    const docType = buildManualDocumentMeta(type || cmd.type_document || 'commande');
+    const pdfDir = MANUAL_DOC_DIRS[docType.key] || MANUAL_DOC_DIRS.commande;
+    fs.mkdirSync(pdfDir, { recursive: true });
+    const numero = cmd.numero || cmd.id || genererNumero();
+    const pdfName = `${docType.label}-${numero}.pdf`;
+    const pdfFileName = `${numero}_${Date.now()}_${docType.key}.pdf`;
+    const pdfStored = path.join(docType.key, pdfFileName);
+    const pdfPath = path.join(pdfDir, pdfFileName);
+    const pdfBuffer = buildSimplePdfBuffer({
+        title: docType.label,
+        docKey: docType.key,
+        numero,
+        date: formatDate(new Date()),
+        clientLines: [
+            `${cmd.prenom || ''} ${cmd.nom || ''}`.trim() || 'Client',
+            cmd.email || '--',
+            cmd.tel || '--',
+            cmd.type_client ? `Profil : ${cmd.type_client}` : '',
+            cmd.siret ? `SIRET / structure : ${cmd.siret}` : ''
+        ].filter(Boolean),
+        productRows: getCommandPdfRows(cmd),
+        total: cmd.prix_total || '--',
+        deliveryDate: cmd.date_livraison || ''
+    });
+    fs.writeFileSync(pdfPath, pdfBuffer);
+    const doc = {
+        id: Date.now(),
+        nom: pdfName,
+        fichier: pdfStored,
+        type: docType.label,
+        date: new Date().toLocaleDateString('fr-FR'),
+        notif: true
+    };
+    if (!Array.isArray(cmd.documents)) cmd.documents = [];
+    cmd.documents.unshift(doc);
+    return { path: pdfPath, name: pdfName, label: docType.label, document: doc };
+}
+
+async function generateCommandDocumentAndNotify(cmd, type, options = {}) {
+    const commandes = lireCommandes();
+    const idx = commandes.findIndex(c => String(c.id) === String(cmd && cmd.id) || String(c.numero) === String(cmd && cmd.numero));
+    if (idx === -1) return { sent: false, error: 'Commande introuvable' };
+    const pdfInfo = createGeneratedPdfForCommand(commandes[idx], type);
+    commandes[idx].updated_at = new Date().toISOString();
+    sauvegarderCommandes(commandes);
+    const mailResult = await notifyManualDocumentUpdated(commandes[idx], pdfInfo, options);
+    return Object.assign({ pdfInfo, commande: commandes[idx] }, mailResult);
 }
 
 function rebuildManualPdfForCommand(cmd) {
@@ -3232,12 +3318,16 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
     const publicBaseUrl = getPublicBaseUrl(req);
 
     const commandes = lireCommandes();
-    const idx = commandes.findIndex(c => c.id === req.params.id);
+    const idx = commandes.findIndex(c => String(c.id) === String(req.params.id) || String(c.numero) === String(req.params.id));
     if (idx === -1) return res.status(404).json({ success: false, error: 'Commande introuvable' });
 
     const ancienStatut = commandes[idx].statut;
-    commandes[idx].statut = statut;
+    const isRefund = String(statut || '') === 'Remboursement';
+    commandes[idx].statut = isRefund ? 'Annulee' : statut;
     commandes[idx].updated_at = new Date().toISOString();
+    if (isRefund) {
+        commandes[idx].notes = [commandes[idx].notes || '', `Remboursement demande le ${new Date().toLocaleString('fr-FR')}. Avoir genere et envoye au client.`].filter(Boolean).join('\n');
+    }
     sauvegarderCommandes(commandes);
 
     // Email automatique au client si statut change
@@ -3250,7 +3340,8 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
         'En production': 'Votre commande est en cours de production',
         'En cours de livraison': 'Votre commande est en cours de livraison',
         'Expediee':      'Votre commande est exp\u00e9di\u00e9e !',
-        'Annulee':       'Commande annul\u00e9e'
+        'Annulee':       'Commande annul\u00e9e',
+        'Remboursement': 'Remboursement et avoir'
     };
     const STATUTS_MSG = {
         'Recue':         'Nous avons bien re\u00e7u votre commande et allons la traiter rapidement.',
@@ -3260,10 +3351,18 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
         'En production': 'Votre commande est actuellement en cours de fabrication. Livraison pr\u00e9vue sous J+3.',
         'En cours de livraison': 'Votre commande a quitt\u00e9 notre atelier et est actuellement en cours de livraison.',
         'Expediee':      'Votre commande a \u00e9t\u00e9 exp\u00e9di\u00e9e ! Vous recevrez votre colis sous 24-48h.',
-        'Annulee':       'Votre commande a \u00e9t\u00e9 annul\u00e9e. N\'h\u00e9sitez pas \u00e0 nous contacter pour plus d\'informations.'
+        'Annulee':       'Votre commande a \u00e9t\u00e9 annul\u00e9e. N\'h\u00e9sitez pas \u00e0 nous contacter pour plus d\'informations.',
+        'Remboursement': 'Votre remboursement est en cours. Vous trouverez votre avoir en piece jointe.'
     };
 
-    if (cmd.email && statut !== ancienStatut && statut !== 'Recue') {
+    let refundMailSent = false;
+    let refundMailError = '';
+    if (isRefund) {
+        const refundResult = await generateCommandDocumentAndNotify(cmd, 'avoir', { creation: true });
+        refundMailSent = !!refundResult.sent;
+        refundMailError = refundResult.error || '';
+        if (refundResult.commande) commandes[idx] = refundResult.commande;
+    } else if (cmd.email && statut !== ancienStatut && statut !== 'Recue') {
         try {
             const transporter = createTransporter();
             const factureAttach = [];
@@ -3299,7 +3398,7 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
         } catch(e) { console.warn('Email statut non envoye:', e.message); }
     }
 
-    res.json({ success: true, commande: commandes[idx] });
+    res.json({ success: true, commande: commandes[idx], refundMailSent, refundMailError });
 });
 
 // POST /api/commandes/:id/notes — sauvegarder notes internes
