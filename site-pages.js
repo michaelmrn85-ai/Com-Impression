@@ -1382,7 +1382,13 @@
           })
           .then(function (payload) {
             if (payload.paid) return payload;
-            if (attempt >= 8) throw new Error("Le paiement SumUp n'est pas encore valide.");
+            var status = String(payload.status || "").toUpperCase();
+            if (status === "FAILED" || status === "CANCELLED" || status === "DECLINED") {
+              throw new Error("Paiement refuse ou annule par SumUp. Statut : " + status + ".");
+            }
+            if (attempt >= 8) {
+              throw new Error(status ? ("Paiement non valide chez SumUp. Statut : " + status + ".") : "Le paiement SumUp n'est pas encore valide.");
+            }
             return new Promise(function (resolve) {
               setTimeout(resolve, 1500);
             }).then(function () {
