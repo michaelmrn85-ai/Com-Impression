@@ -1412,14 +1412,30 @@
             id: "sumup-card-element",
             checkoutId: currentSumupCheckoutId,
             showSubmitButton: false,
-            onResponse: function (type) {
-              if (type === "invalid") {
+            onResponse: function (type, body) {
+              var responseType = String(type || "").toLowerCase();
+              var responseMessage = body && (body.message || body.error_message || body.error || body.detail);
+              if (responseType === "invalid") {
                 setStatus(sumupStatus, "err", "Les coordonnees bancaires sont invalides.");
                 resetPaymentButton();
                 return;
               }
-              if (type === "sent") {
+              if (responseType === "sent") {
                 setStatus(sumupStatus, "ok", "Paiement transmis a SumUp, verification en cours...");
+                return;
+              }
+              if (responseType === "auth-screen") {
+                setStatus(sumupStatus, "ok", "Validation bancaire en cours...");
+                return;
+              }
+              if (responseType === "failure" || responseType === "failed" || responseType === "error") {
+                setStatus(sumupStatus, "err", responseMessage || "Paiement refuse ou annule par SumUp.");
+                resetPaymentButton();
+                return;
+              }
+              if (responseType !== "success") {
+                setStatus(sumupStatus, "err", responseMessage || "Reponse SumUp inconnue. Le paiement n'a pas ete valide.");
+                resetPaymentButton();
                 return;
               }
               verifySumupCheckout(1)
