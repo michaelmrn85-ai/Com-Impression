@@ -494,6 +494,7 @@
       +'</section>' : '')
       +'<section class="panel"><h3>Traitement</h3>'
       +'<div class="field"><label>Statut</label><select id="detail-statut">'+statutOptions+'</select></div>'
+      +'<div class="field"><label>Mode de remboursement</label><select id="detail-refund-mode"><option value="CB">CB</option><option value="Virement">Virement</option></select></div>'
       +'<button class="btn btn-orange btn-small" id="save-statut" type="button">Mettre à jour le statut</button>'
       +'<div class="field"><label>Notes internes</label><textarea id="detail-notes" placeholder="Notes visibles uniquement par toi">'+esc(cmd.notes||'')+'</textarea></div>'
       +'<button class="btn btn-dark btn-small" id="save-notes" type="button">Enregistrer les notes</button>'
@@ -508,15 +509,16 @@
   function saveStatut(){
     var cmd=state.selected; if(!cmd) return;
     var statut=$('detail-statut').value;
+    var refundMode=(($('detail-refund-mode')||{}).value||'CB');
     fetch(api('/api/commandes/'+encodeURIComponent(cmd.id)+'/statut'),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({statut:statut,mdp:state.mdp})
+      body:JSON.stringify({statut:statut,refundMode:refundMode,mdp:state.mdp})
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Mise à jour impossible'); return d; }); })
     .then(function(data){
       var message = statut === 'Remboursement'
-        ? (data.refundMailSent ? 'Remboursement enregistré. Avoir PDF envoyé au client et commande annulée.' : 'Remboursement enregistré, commande annulée, mais email non envoyé : '+(data.refundMailError||'vérifie SMTP.'))
+        ? (data.refundMailSent ? 'Remboursement '+refundMode+' enregistré. Avoir PDF envoyé au client, commande annulée et points retirés.' : 'Remboursement '+refundMode+' enregistré, commande annulée, mais email non envoyé : '+(data.refundMailError||'vérifie SMTP.'))
         : 'Statut mis à jour.';
       setStatus('detail-status', statut === 'Remboursement' && !data.refundMailSent ? 'err' : 'ok', message);
       if(data.commande) Object.assign(cmd,data.commande);
@@ -1499,9 +1501,9 @@
       +'</table>';
     if((summary.refundOrders||[]).length){
       table.innerHTML += '<h3 style="margin-top:18px;">Remboursements du jour</h3><table class="admin-table-mini">'
-        +'<thead><tr><th>Commande</th><th>Client</th><th>Montant</th></tr></thead>'
+        +'<thead><tr><th>Commande</th><th>Client</th><th>Mode</th><th>Montant</th></tr></thead>'
         +'<tbody>'+(summary.refundOrders||[]).map(function(row){
-          return '<tr><td>'+esc(row.numero||'--')+'</td><td>'+esc(row.client||'Client')+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td></tr>';
+          return '<tr><td>'+esc(row.numero||'--')+'</td><td>'+esc(row.client||'Client')+'</td><td>'+esc(row.mode||'--')+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td></tr>';
         }).join('')+'</tbody></table>';
     }
   }

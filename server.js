@@ -254,6 +254,9 @@ function buildCatalogApiPayload() {
             const override = overrides[buildProductOverrideKey(group.legacy, prod.id)] || {};
             const quantityPricing = normaliseQuantityPricing(override.quantityPricing || []);
             const options = applyOptionOverrides(prod.opts || {}, override);
+            if (prod.id === 'impression-doc') {
+                options.Grammage = ['80g', '90g', '100g', '120g', '160g'];
+            }
             const sideOptions = getPricingSideOptions(quantityPricing);
             if (sideOptions.length) {
                 if (prod.id === 'impression-doc') options.Impression = sideOptions;
@@ -578,6 +581,7 @@ function buildDailySummaryData(requestedDate) {
             numero: cmd.numero || cmd.id || '',
             client: `${cmd.prenom || ''} ${cmd.nom || ''}`.trim() || cmd.email || 'Client',
             total: parseEuroLabel(cmd.prix_total) || 0,
+            mode: cmd.refund_mode || '',
             date: String(cmd.updated_at || cmd.created_at || '').slice(0, 10)
         })),
         byGamme: Object.values(byGamme).sort((a, b) => b.total - a.total).map(item => ({
@@ -1730,6 +1734,7 @@ function buildDailySummaryPdfBuffer(summary) {
             rect(40, y - 4, 515, 22, null, lineColor);
             text(String(item.numero || '--'), 52, y + 4, { size: 8.5 });
             text(String(item.client || 'Client').slice(0, 34), 150, y + 4, { size: 8.5 });
+            text(String(item.mode || '--'), 370, y + 4, { size: 8.5 });
             text(money(item.total), 450, y + 4, { font: 'F2', size: 8.5, color: orange });
             y -= 22;
         });
@@ -2164,6 +2169,34 @@ function ajouterPoints(email, montant, numCommande, prenom='', nom='') {
     }
     sauvegarderClient(client);
     return { client, pts, codeGenere };
+}
+
+function retirerPointsPourRemboursement(email, numCommande) {
+    if (!email || !numCommande) return { removed: 0, total: null };
+    const client = getOuCreerClient(email);
+    client.points = Number(client.points || 0);
+    client.historique_points = Array.isArray(client.historique_points) ? client.historique_points : [];
+    const alreadyRemoved = client.historique_points.some(entry =>
+        String(entry.commande || '') === String(numCommande) &&
+        Number(entry.points || 0) < 0 &&
+        /remboursement/i.test(String(entry.motif || ''))
+    );
+    if (alreadyRemoved) return { removed: 0, total: client.points };
+    const earned = client.historique_points
+        .filter(entry => String(entry.commande || '') === String(numCommande) && Number(entry.points || 0) > 0)
+        .reduce((sum, entry) => sum + Number(entry.points || 0), 0);
+    if (earned <= 0) return { removed: 0, total: client.points };
+    const removed = Math.min(earned, client.points);
+    client.points = Math.max(0, client.points - removed);
+    client.historique_points.push({
+        date: new Date().toLocaleDateString('fr-FR'),
+        commande: numCommande,
+        points: -removed,
+        total: client.points,
+        motif: 'Remboursement'
+    });
+    sauvegarderClient(client);
+    return { removed, total: client.points };
 }
 
 // ── AUTH — Lien magique ────────────────────────────────────────────────────
@@ -3461,6 +3494,7 @@ app.post('/api/commandes/:id/lignes-admin', express.json({ limit: '1mb' }), rate
 // POST /api/commandes/:id/statut — changer le statut + email client
 app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-status' }), async (req, res) => {
     const { statut, mdp } = req.body;
+    const refundMode = String((req.body || {}).refundMode || 'CB').trim() === 'Virement' ? 'Virement' : 'CB';
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     const publicBaseUrl = getPublicBaseUrl(req);
@@ -3474,7 +3508,13 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
     commandes[idx].statut = isRefund ? 'Annulee' : statut;
     commandes[idx].updated_at = new Date().toISOString();
     if (isRefund) {
-        commandes[idx].notes = [commandes[idx].notes || '', `Remboursement demande le ${new Date().toLocaleString('fr-FR')}. Avoir genere et envoye au client.`].filter(Boolean).join('\n');
+        commandes[idx].refund_mode = refundMode;
+        const pointsResult = commandes[idx].points_refunded
+            ? { removed: 0, total: null }
+            : retirerPointsPourRemboursement(commandes[idx].email, commandes[idx].numero || commandes[idx].id);
+        commandes[idx].points_refunded = true;
+        commandes[idx].points_refunded_count = Number(commandes[idx].points_refunded_count || 0) + Number(pointsResult.removed || 0);
+        commandes[idx].notes = [commandes[idx].notes || '', `Remboursement ${refundMode} demande le ${new Date().toLocaleString('fr-FR')}. Avoir genere et envoye au client. Points retires : ${pointsResult.removed || 0}.`].filter(Boolean).join('\n');
     }
     sauvegarderCommandes(commandes);
 
@@ -3500,7 +3540,7 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
         'En cours de livraison': 'Votre commande a quitt\u00e9 notre atelier et est actuellement en cours de livraison.',
         'Expediee':      'Votre commande a \u00e9t\u00e9 exp\u00e9di\u00e9e ! Vous recevrez votre colis sous 24-48h.',
         'Annulee':       'Votre commande a \u00e9t\u00e9 annul\u00e9e. N\'h\u00e9sitez pas \u00e0 nous contacter pour plus d\'informations.',
-        'Remboursement': 'Votre remboursement est en cours. Vous trouverez votre avoir en piece jointe.'
+        'Remboursement': `Votre remboursement par ${refundMode} est en cours. Vous trouverez votre avoir en piece jointe.`
     };
 
     let refundMailSent = false;
