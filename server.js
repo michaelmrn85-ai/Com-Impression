@@ -493,6 +493,103 @@ function deriveRowsForStats(cmd) {
     });
 }
 
+function isRefundedCommand(cmd) {
+    const docs = Array.isArray(cmd && cmd.documents) ? cmd.documents : [];
+    return String((cmd && cmd.statut) || '') === 'Annulee' && (
+        /remboursement|avoir/i.test(String((cmd && cmd.notes) || '')) ||
+        docs.some(doc => /avoir/i.test(String((doc && doc.type) || '') + ' ' + String((doc && doc.nom) || '')))
+    );
+}
+
+function buildDailySummaryData(requestedDate) {
+    const commandes = lireCommandes();
+    const visits = lireVisits();
+    const catalog = buildCatalogApiPayload();
+    const productIndex = {};
+    (catalog.gammes || []).forEach(gamme => {
+        (gamme.products || []).forEach(product => {
+            productIndex[String(product.ref || '').toUpperCase()] = {
+                ref: String(product.ref || '').toUpperCase(),
+                gamme: gamme.title,
+                title: product.title,
+                purchasePrice: product.purchasePrice == null ? null : Number(product.purchasePrice),
+                salePrice: product.salePrice == null ? null : Number(product.salePrice)
+            };
+        });
+    });
+
+    const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === requestedDate && cmd.statut !== 'Annulee');
+    const refundOrders = commandes.filter(cmd => isRefundedCommand(cmd) && String(cmd.updated_at || cmd.created_at || '').slice(0, 10) === requestedDate);
+    const byGamme = {};
+    let dayTotal = 0;
+    let dayMargin = 0;
+    let refundTotal = 0;
+
+    todayOrders.forEach(cmd => {
+        const rows = deriveRowsForStats(cmd);
+        if (!rows.length) {
+            const amount = parseEuroLabel(cmd.prix_total) || 0;
+            dayTotal += amount;
+            byGamme['Non classee'] = byGamme['Non classee'] || { gamme: 'Non classee', total: 0, orders: 0, margin: 0 };
+            byGamme['Non classee'].total += amount;
+            byGamme['Non classee'].orders += 1;
+            return;
+        }
+        rows.forEach(row => {
+            const ref = String(row.ref || '').toUpperCase();
+            const product = productIndex[ref] || null;
+            const gamme = row.gamme || (product && product.gamme) || 'Non classee';
+            const total = Number(row.total || 0);
+            let margin = 0;
+            if (row.purchaseValue != null && !isNaN(Number(row.purchaseValue))) {
+                margin = total - Number(row.purchaseValue);
+            } else if (product && product.purchasePrice != null) {
+                if (product.salePrice && product.salePrice > 0 && total > 0) {
+                    margin = total - (product.purchasePrice * (total / product.salePrice));
+                } else {
+                    margin = total - product.purchasePrice;
+                }
+            }
+            dayTotal += total;
+            dayMargin += margin;
+            if (!byGamme[gamme]) byGamme[gamme] = { gamme, total: 0, orders: 0, margin: 0 };
+            byGamme[gamme].total += total;
+            byGamme[gamme].orders += 1;
+            byGamme[gamme].margin += margin;
+        });
+    });
+
+    refundOrders.forEach(cmd => {
+        refundTotal += parseEuroLabel(cmd.prix_total) || 0;
+    });
+
+    return {
+        day: requestedDate,
+        orders: todayOrders.length,
+        refunds: refundOrders.length,
+        refundTotal: Math.round(refundTotal * 100) / 100,
+        netTotal: Math.round((dayTotal - refundTotal) * 100) / 100,
+        total: Math.round(dayTotal * 100) / 100,
+        margin: Math.round(dayMargin * 100) / 100,
+        marginRate: dayTotal > 0 ? Math.round(((dayMargin / dayTotal) * 100) * 100) / 100 : 0,
+        visitsToday: Number((visits.byDay || {})[requestedDate] || 0),
+        visitsTotal: Number(visits.total || 0),
+        refundOrders: refundOrders.map(cmd => ({
+            numero: cmd.numero || cmd.id || '',
+            client: `${cmd.prenom || ''} ${cmd.nom || ''}`.trim() || cmd.email || 'Client',
+            total: parseEuroLabel(cmd.prix_total) || 0,
+            date: String(cmd.updated_at || cmd.created_at || '').slice(0, 10)
+        })),
+        byGamme: Object.values(byGamme).sort((a, b) => b.total - a.total).map(item => ({
+            gamme: item.gamme,
+            total: Math.round(item.total * 100) / 100,
+            orders: item.orders,
+            margin: Math.round(item.margin * 100) / 100,
+            marginRate: item.total > 0 ? Math.round(((item.margin / item.total) * 100) * 100) / 100 : 0
+        }))
+    };
+}
+
 function emailWrapper(content, couleur, nomBrand, lien, sousTitre) {
     return `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -1548,83 +1645,131 @@ app.get('/api/admin/daily-summary', (req, res) => {
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
-        const commandes = lireCommandes();
-        const visits = lireVisits();
-        const catalog = buildCatalogApiPayload();
-        const productIndex = {};
-        (catalog.gammes || []).forEach(gamme => {
-            (gamme.products || []).forEach(product => {
-                productIndex[String(product.ref || '').toUpperCase()] = {
-                    ref: String(product.ref || '').toUpperCase(),
-                    gamme: gamme.title,
-                    title: product.title,
-                    purchasePrice: product.purchasePrice == null ? null : Number(product.purchasePrice),
-                    salePrice: product.salePrice == null ? null : Number(product.salePrice)
-                };
-            });
-        });
-
         const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '').trim())
             ? String(req.query.date || '').trim()
             : getVisitDayKey();
-        const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === requestedDate && cmd.statut !== 'Annulee');
-        const byGamme = {};
-        let dayTotal = 0;
-        let dayMargin = 0;
-
-        todayOrders.forEach(cmd => {
-            const rows = deriveRowsForStats(cmd);
-            if (!rows.length) {
-                const amount = parseEuroLabel(cmd.prix_total) || 0;
-                dayTotal += amount;
-                byGamme['Non classee'] = byGamme['Non classee'] || { gamme: 'Non classee', total: 0, orders: 0, margin: 0 };
-                byGamme['Non classee'].total += amount;
-                byGamme['Non classee'].orders += 1;
-                return;
-            }
-            rows.forEach(row => {
-                const ref = String(row.ref || '').toUpperCase();
-                const product = productIndex[ref] || null;
-                const gamme = row.gamme || (product && product.gamme) || 'Non classee';
-                const total = Number(row.total || 0);
-                let margin = 0;
-                if (row.purchaseValue != null && !isNaN(Number(row.purchaseValue))) {
-                    margin = total - Number(row.purchaseValue);
-                } else if (product && product.purchasePrice != null) {
-                    if (product.salePrice && product.salePrice > 0 && total > 0) {
-                        margin = total - (product.purchasePrice * (total / product.salePrice));
-                    } else {
-                        margin = total - product.purchasePrice;
-                    }
-                }
-                dayTotal += total;
-                dayMargin += margin;
-                if (!byGamme[gamme]) byGamme[gamme] = { gamme, total: 0, orders: 0, margin: 0 };
-                byGamme[gamme].total += total;
-                byGamme[gamme].orders += 1;
-                byGamme[gamme].margin += margin;
-            });
-        });
-
         res.json({
             success: true,
-            summary: {
-                day: requestedDate,
-                orders: todayOrders.length,
-                total: Math.round(dayTotal * 100) / 100,
-                margin: Math.round(dayMargin * 100) / 100,
-                marginRate: dayTotal > 0 ? Math.round(((dayMargin / dayTotal) * 100) * 100) / 100 : 0,
-                visitsToday: Number((visits.byDay || {})[requestedDate] || 0),
-                visitsTotal: Number(visits.total || 0),
-                byGamme: Object.values(byGamme).sort((a, b) => b.total - a.total).map(item => ({
-                    gamme: item.gamme,
-                    total: Math.round(item.total * 100) / 100,
-                    orders: item.orders,
-                    margin: Math.round(item.margin * 100) / 100,
-                    marginRate: item.total > 0 ? Math.round(((item.margin / item.total) * 100) * 100) / 100 : 0
-                }))
-            }
+            summary: buildDailySummaryData(requestedDate)
         });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+function buildDailySummaryPdfBuffer(summary) {
+    const commands = [];
+    const pageW = 595;
+    const dark = [0.09, 0.07, 0.06];
+    const orange = [0.96, 0.48, 0.13];
+    const pale = [1, 0.97, 0.93];
+    const lineColor = [0.93, 0.86, 0.80];
+    function color(values, op) { return `${values.map(v => Number(v).toFixed(3)).join(' ')} ${op}`; }
+    function rect(x, y, w, h, fill, stroke) {
+        if (fill) commands.push(`${color(fill, 'rg')} ${x} ${y} ${w} ${h} re f`);
+        if (stroke) commands.push(`${color(stroke, 'RG')} ${x} ${y} ${w} ${h} re S`);
+    }
+    function text(value, x, y, options) {
+        const opts = Object.assign({ size: 10, font: 'F1', color: dark }, options || {});
+        commands.push(`${color(opts.color, 'rg')} BT /${opts.font} ${opts.size} Tf 1 0 0 1 ${x} ${y} Tm (${escapePdfText(value)}) Tj ET`);
+    }
+    function money(value) {
+        return (Number(value || 0)).toFixed(2).replace('.', ',') + ' EUR';
+    }
+
+    rect(0, 760, pageW, 82, orange);
+    text("COM' Impression", 40, 805, { font: 'F2', size: 22, color: [1, 1, 1] });
+    text('Recapitulatif de journee', 40, 785, { size: 11, color: [1, 1, 1] });
+    rect(374, 782, 165, 36, [1, 1, 1], null);
+    text(formatDate(new Date(summary.day || new Date())), 392, 796, { font: 'F2', size: 13, color: orange });
+
+    const kpis = [
+        ['Commandes', String(summary.orders || 0)],
+        ['Total du jour', money(summary.total)],
+        ['Remboursements', `${summary.refunds || 0} / ${money(summary.refundTotal)}`],
+        ['Net jour', money(summary.netTotal)],
+        ['Marge estimee', `${Number(summary.marginRate || 0).toFixed(2).replace('.', ',')} %`],
+        ['Visites', String(summary.visitsToday || 0)]
+    ];
+    let y = 708;
+    kpis.forEach((item, index) => {
+        const x = 40 + ((index % 3) * 172);
+        const boxY = y - (Math.floor(index / 3) * 74);
+        rect(x, boxY, 150, 52, pale, lineColor);
+        text(item[0], x + 12, boxY + 31, { font: 'F2', size: 9 });
+        text(item[1], x + 12, boxY + 12, { font: 'F2', size: 13, color: orange });
+    });
+
+    y = 550;
+    text('Totaux par gamme', 40, y, { font: 'F2', size: 14, color: orange });
+    y -= 24;
+    rect(40, y - 4, 515, 24, pale, lineColor);
+    text('Gamme', 52, y + 5, { font: 'F2', size: 9 });
+    text('Commandes', 285, y + 5, { font: 'F2', size: 9 });
+    text('Total', 370, y + 5, { font: 'F2', size: 9 });
+    text('Marge', 470, y + 5, { font: 'F2', size: 9 });
+    y -= 24;
+    (summary.byGamme || []).slice(0, 12).forEach(row => {
+        rect(40, y - 4, 515, 22, null, lineColor);
+        text(String(row.gamme || 'Non classee').slice(0, 34), 52, y + 4, { size: 8.5 });
+        text(String(row.orders || 0), 285, y + 4, { size: 8.5 });
+        text(money(row.total), 370, y + 4, { size: 8.5 });
+        text(`${Number(row.marginRate || 0).toFixed(2).replace('.', ',')} %`, 470, y + 4, { size: 8.5 });
+        y -= 22;
+    });
+    if (!(summary.byGamme || []).length) {
+        text('Aucune commande classee sur cette date.', 52, y, { size: 9, color: [0.45, 0.45, 0.45] });
+        y -= 26;
+    }
+
+    y -= 20;
+    text('Remboursements / avoirs', 40, y, { font: 'F2', size: 14, color: orange });
+    y -= 24;
+    if ((summary.refundOrders || []).length) {
+        (summary.refundOrders || []).slice(0, 10).forEach(item => {
+            rect(40, y - 4, 515, 22, null, lineColor);
+            text(String(item.numero || '--'), 52, y + 4, { size: 8.5 });
+            text(String(item.client || 'Client').slice(0, 34), 150, y + 4, { size: 8.5 });
+            text(money(item.total), 450, y + 4, { font: 'F2', size: 8.5, color: orange });
+            y -= 22;
+        });
+    } else {
+        text('Aucun remboursement sur cette date.', 52, y, { size: 9, color: [0.45, 0.45, 0.45] });
+    }
+
+    text(`PDF genere le ${new Date().toLocaleString('fr-FR')}`, 40, 38, { size: 8, color: [0.45, 0.45, 0.45] });
+    const stream = commands.join('\n');
+    const objects = [
+        '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+        '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+        '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >> endobj',
+        `4 0 obj << /Length ${Buffer.byteLength(stream, 'utf8')} >> stream\n${stream}\nendstream\nendobj`,
+        '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+        '6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj'
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+    objects.forEach(obj => { offsets.push(Buffer.byteLength(pdf, 'utf8')); pdf += `${obj}\n`; });
+    const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    for (let i = 1; i < offsets.length; i += 1) pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return Buffer.from(pdf, 'utf8');
+}
+
+app.get('/api/admin/daily-summary/pdf', (req, res) => {
+    const mdp = req.query.mdp;
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    try {
+        const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '').trim())
+            ? String(req.query.date || '').trim()
+            : getVisitDayKey();
+        const summary = buildDailySummaryData(requestedDate);
+        const pdf = buildDailySummaryPdfBuffer(summary);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="recap-jour-${requestedDate}.pdf"`);
+        res.send(pdf);
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }

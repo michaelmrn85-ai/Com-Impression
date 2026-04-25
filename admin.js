@@ -1482,6 +1482,8 @@
       +'<article class="day-kpi"><strong>Date</strong><span>'+esc(formatDateFr(summary.day||''))+'</span></article>'
       +'<article class="day-kpi"><strong>Commandes du jour</strong><span>'+esc(String(summary.orders||0))+'</span></article>'
       +'<article class="day-kpi"><strong>Total du jour</strong><span>'+esc(formatAmount(Number(summary.total||0)))+'</span></article>'
+      +'<article class="day-kpi"><strong>Remboursements</strong><span>'+esc(String(summary.refunds||0))+'</span><p class="muted">'+esc(formatAmount(Number(summary.refundTotal||0)))+'</p></article>'
+      +'<article class="day-kpi"><strong>Net du jour</strong><span>'+esc(formatAmount(Number(summary.netTotal||0)))+'</span></article>'
       +'<article class="day-kpi"><strong>Marge estimee</strong><span>'+esc(formatPercent(summary.marginRate||0))+'</span></article>'
       +'<article class="day-kpi"><strong>Visites du jour</strong><span>'+esc(String(summary.visitsToday||0))+'</span></article>';
     if(!(summary.byGamme||[]).length){
@@ -1495,6 +1497,13 @@
       }).join('')+'</tbody>'
       +'<tfoot><tr><td>Total visites site</td><td colspan="3">'+esc(String(summary.visitsTotal||0))+'</td></tr></tfoot>'
       +'</table>';
+    if((summary.refundOrders||[]).length){
+      table.innerHTML += '<h3 style="margin-top:18px;">Remboursements du jour</h3><table class="admin-table-mini">'
+        +'<thead><tr><th>Commande</th><th>Client</th><th>Montant</th></tr></thead>'
+        +'<tbody>'+(summary.refundOrders||[]).map(function(row){
+          return '<tr><td>'+esc(row.numero||'--')+'</td><td>'+esc(row.client||'Client')+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td></tr>';
+        }).join('')+'</tbody></table>';
+    }
   }
 
   function loadDailySummary(openAfterLoad){
@@ -1513,6 +1522,12 @@
         renderDailySummary();
         if(openAfterLoad) openModal('modal-day-sheet','jour');
       });
+  }
+
+  function downloadDailySummaryPdf(){
+    var selectedDate=(($('day-summary-date')||{}).value || state.dailySummaryDate || '').trim();
+    var url=api('/api/admin/daily-summary/pdf?mdp='+encodeURIComponent(state.mdp)+(selectedDate?'&date='+encodeURIComponent(selectedDate):''));
+    window.open(url,'_blank');
   }
 
   function renderEmailTemplates(){
@@ -1693,6 +1708,7 @@
     if($('products-search')) $('products-search').addEventListener('input',renderProductsList);
     if($('clients-search')) $('clients-search').addEventListener('input',renderClientsList);
     if($('day-summary-load')) $('day-summary-load').addEventListener('click',function(){ loadDailySummary(false); });
+    if($('day-summary-pdf')) $('day-summary-pdf').addEventListener('click',downloadDailySummaryPdf);
     $('btn-logout').addEventListener('click',function(){
       sessionStorage.removeItem('ci_admin_pwd');
       state.mdp='';
