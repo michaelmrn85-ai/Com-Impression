@@ -256,6 +256,7 @@ function buildCatalogApiPayload() {
             const options = applyOptionOverrides(prod.opts || {}, override);
             if (prod.id === 'impression-doc') {
                 options.Grammage = ['80g', '90g', '100g', '120g', '160g'];
+                options.Format = ['A4', 'A5'];
             }
             const sideOptions = getPricingSideOptions(quantityPricing);
             if (sideOptions.length) {

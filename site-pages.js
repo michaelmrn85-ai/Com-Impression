@@ -111,7 +111,7 @@
   }
 
   function isClientConfigKeyForProduct(product, key) {
-    if (isImpressionDocumentProduct(product) && /couleur|impression|recto|verso/i.test(key)) return true;
+    if (isImpressionDocumentProduct(product) && /grammage|format|couleur|impression|recto|verso/i.test(key)) return true;
     return isClientConfigKey(key);
   }
 
