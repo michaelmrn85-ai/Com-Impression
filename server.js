@@ -255,7 +255,10 @@ function buildCatalogApiPayload() {
             const quantityPricing = normaliseQuantityPricing(override.quantityPricing || []);
             const options = applyOptionOverrides(prod.opts || {}, override);
             const sideOptions = getPricingSideOptions(quantityPricing);
-            if (sideOptions.length) options['Recto / verso'] = sideOptions;
+            if (sideOptions.length) {
+                if (prod.id === 'impression-doc') options.Impression = sideOptions;
+                else options['Recto / verso'] = sideOptions;
+            }
             const optionKeyList = Object.keys(options || {});
             const product = {
                 ref: buildProductRef(refIndex++),
@@ -965,7 +968,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         let responseQuantityOptions = quantityOptions;
         if (productData.quantityPricing && productData.quantityPricing.length) {
             const selectedSideValues = Object.keys(sels)
-                .filter(key => /recto|verso/i.test(key))
+                .filter(key => /recto|verso|impression/i.test(key))
                 .map(key => normaliseOptionKey(sels[key]))
                 .filter(Boolean);
             const parsedQty = parseInt(quantityValue, 10);
