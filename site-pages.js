@@ -112,6 +112,7 @@
     var paperInfo = splitPaperAndWeight(paperRaw);
     var rows = [
       { label: "Reference produit", value: getProductRef(product) },
+      { label: "Taille", value: product.sizeInfo || "-" },
       { label: "Type de papier", value: paperInfo.paper || paperRaw || "-" },
       { label: "Grammage", value: paperInfo.weight || "-" },
       { label: "Finition", value: finishRaw || "-" }
