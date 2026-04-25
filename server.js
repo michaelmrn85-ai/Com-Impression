@@ -805,9 +805,16 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
         files.forEach(f => { try { fs.unlinkSync(f.path); } catch(e) {} });
         cartUploads.forEach(item => removeCartUpload(item.token));
         // Enregistrer dans le suivi de commandes (avec le même code que dans l'email)
-        enregistrerCommande(d, panierTexte, prixTotal, numCmd, codeAcces);
+        const savedCommand = enregistrerCommande(d, panierTexte, prixTotal, numCmd, codeAcces);
+        const loyalty = payeCB && d.email ? ajouterPoints(d.email, prixTotal, numCmd, d.prenom || '', d.nom || '') : null;
         res.status(200).json({
             success: true,
+            numero: numCmd || (savedCommand && savedCommand.numero) || '',
+            codeAcces: codeAcces || (savedCommand && savedCommand.code_acces) || '',
+            suiviUrl: codeAcces ? `${publicBaseUrl}/client` : '',
+            pointsAdded: loyalty ? loyalty.pts : 0,
+            loyaltyTotal: loyalty && loyalty.client ? loyalty.client.points : null,
+            loyaltyCode: loyalty && loyalty.codeGenere ? loyalty.codeGenere : null,
             adminMailSent,
             clientMailSent,
             clientMailError
@@ -839,6 +846,10 @@ app.post('/api/sumup/create-checkout', express.json(), async (req, res) => {
             description: description.slice(0, 120),
             return_url: `${publicBaseUrl}/panier?sumup_return=1`
         };
+        if (req.body.hosted === true || req.body.hosted === 'true') {
+            checkoutBody.redirect_url = req.body.redirect_url || checkoutBody.return_url;
+            checkoutBody.hosted_checkout = { enabled: true };
+        }
         const response = await fetch('https://api.sumup.com/v0.1/checkouts', {
             method: 'POST',
             headers: {
@@ -867,7 +878,8 @@ app.post('/api/sumup/create-checkout', express.json(), async (req, res) => {
             success: true,
             checkoutId: payload.id,
             checkoutReference: payload.checkout_reference || reference,
-            amount: payload.amount
+            amount: payload.amount,
+            hostedCheckoutUrl: payload.hosted_checkout_url || payload.hosted_checkout?.url || payload.checkout_url || payload.redirect_url || ''
         });
     } catch (error) {
         console.error('Erreur SumUp create-checkout:', error.message);
@@ -3068,9 +3080,9 @@ app.post('/api/commandes/rdv-manuel', express.json(), rateLimit({ windowMs: 15 *
 // Enregistrer chaque pré-commande COM'Impression automatiquement
 // (hook appelé depuis /api/devis après succès)
 function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni) {
-    if ((d.source || '').toLowerCase() !== 'com-impression') return;
+    if ((d.source || '').toLowerCase() !== 'com-impression') return null;
     const panierLow = (panierTexte || '').toLowerCase();
-    if (panierLow.startsWith('contact') || panierLow.startsWith('partenariat')) return;
+    if (panierLow.startsWith('contact') || panierLow.startsWith('partenariat')) return null;
     try {
         const commandes = lireCommandes();
         const cmd = {
@@ -3095,7 +3107,8 @@ function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni
         commandes.push(cmd);
         sauvegarderCommandes(commandes);
         console.log('Commande enregistree:', cmd.numero);
-    } catch(e) { console.error('Erreur enregistrement commande:', e.message); }
+        return cmd;
+    } catch(e) { console.error('Erreur enregistrement commande:', e.message); return null; }
 }
 
 // GET /api/commandes — liste toutes les commandes (admin)

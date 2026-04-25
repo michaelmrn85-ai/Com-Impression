@@ -1113,6 +1113,7 @@
     var connectedClient = null;
     var cartValidated = false;
     var appliedPromo = null;
+    var SUMUP_PENDING_KEY = "ci_sumup_pending_checkout";
 
     if (goProducts) {
       goProducts.addEventListener("click", function () {
@@ -1175,10 +1176,6 @@
       }
       clearStatus(sumupStatus);
       updatePayableTotal();
-      ensureSumupWidget().catch(function (error) {
-        setStatus(sumupStatus, "err", error.message || "Impossible de charger le module SumUp.");
-        resetPaymentButton();
-      });
     }
 
     function closePaymentModal() {
@@ -1204,8 +1201,11 @@
       successSummary.innerHTML =
         '<div class="summary-box">'
           + '<div class="split-line"><strong>Client</strong><span>' + esc(orderData.customerName || "") + '</span></div>'
+          + (orderData.numero ? '<div class="split-line"><strong>Commande</strong><span>' + esc(orderData.numero) + '</span></div>' : '')
+          + (orderData.codeAcces ? '<div class="split-line"><strong>Code suivi</strong><span>' + esc(orderData.codeAcces) + '</span></div>' : '')
           + '<div class="split-line"><strong>Email</strong><span>' + esc(orderData.customerEmail || "") + '</span></div>'
           + '<div class="split-line"><strong>Total regle</strong><span class="product-price">' + esc(orderData.totalLabel || "0,00 EUR") + '</span></div>'
+          + '<div class="split-line"><strong>Points fidelite</strong><span>' + esc(String(orderData.pointsAdded || 0)) + ' point(s)' + (orderData.loyaltyTotal != null ? ' · Total : ' + esc(String(orderData.loyaltyTotal)) : '') + '</span></div>'
           + '<div class="split-line"><strong>Email client</strong><span>' + esc(orderData.clientMailSent ? "Envoye" : "Non confirme") + '</span></div>'
           + (orderData.promoCode ? '<div class="split-line"><strong>Code reduction</strong><span>' + esc(orderData.promoCode) + ' · ' + esc(String(orderData.promoDiscount || 0)) + '%</span></div>' : '')
         + '</div>'
@@ -1493,9 +1493,111 @@
         setStatus(targetStatus || validateStatus, "err", "Le paiement CB est disponible uniquement pour les produits a tarif chiffre.");
         return false;
       }
-      openPaymentModal();
-      setStatus(targetStatus || validateStatus, "ok", "Panier valide. La fenetre de paiement SumUp est ouverte.");
+      setStatus(targetStatus || validateStatus, "ok", "Panier valide. Redirection vers SumUp en cours.");
       return true;
+    }
+
+    function startHostedSumupCheckout(targetStatus) {
+      if (!confirmValidatedCheckout(targetStatus || sumupStatus)) return Promise.resolve(false);
+      var totalInfo = getPayableTotalInfo();
+      if (typeof totalInfo.numeric !== "number") {
+        setStatus(targetStatus || sumupStatus, "err", "Le paiement CB est disponible uniquement pour les produits a tarif chiffre.");
+        return Promise.resolve(false);
+      }
+      var pending = {
+        createdAt: Date.now(),
+        amount: totalInfo.numeric,
+        totalLabel: totalInfo.label,
+        promo: appliedPromo,
+        rows: readCart()
+      };
+      setStatus(targetStatus || sumupStatus, "ok", "Ouverture de la page SumUp...");
+      return fetch(API_BASE + "/api/sumup/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: totalInfo.numeric,
+          currency: "EUR",
+          description: "Commande COM' Impression",
+          hosted: true,
+          redirect_url: window.location.origin + resolveAppUrl("/panier?sumup_return=1")
+        })
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok || !json.success) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (json) {
+          if (!json.hostedCheckoutUrl) throw new Error("SumUp n'a pas renvoye de page de paiement.");
+          pending.checkoutId = json.checkoutId || "";
+          sessionStorage.setItem(SUMUP_PENDING_KEY, JSON.stringify(pending));
+          window.location.href = json.hostedCheckoutUrl;
+          return true;
+        })
+        .catch(function (error) {
+          setStatus(targetStatus || sumupStatus, "err", error.message || "Impossible d'ouvrir SumUp.");
+          resetPaymentButton();
+          return false;
+        });
+    }
+
+    function handleHostedSumupReturn() {
+      var query = new URLSearchParams(window.location.search || "");
+      if (!query.get("sumup_return")) return Promise.resolve(false);
+
+      var pending = {};
+      try {
+        pending = JSON.parse(sessionStorage.getItem(SUMUP_PENDING_KEY) || "{}") || {};
+      } catch (error) {
+        pending = {};
+      }
+
+      var checkoutId = query.get("checkout_id") || query.get("checkoutId") || pending.checkoutId || "";
+      if (!checkoutId) {
+        setStatus(validateStatus, "err", "Retour SumUp sans reference de paiement.");
+        return Promise.resolve(false);
+      }
+
+      appliedPromo = pending.promo || null;
+      updatePayableTotal();
+      setStatus(validateStatus, "ok", "Retour SumUp recu. Verification du paiement...");
+
+      return fetch(API_BASE + "/api/sumup/verify-checkout/" + encodeURIComponent(checkoutId))
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok || !json.success) throw new Error(json.error || ("HTTP " + response.status));
+            return json;
+          });
+        })
+        .then(function (payload) {
+          var status = String((payload && payload.status) || "").toUpperCase();
+          if (!payload || !payload.paid) {
+            sessionStorage.removeItem(SUMUP_PENDING_KEY);
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState(null, "", resolveAppUrl("/panier"));
+            }
+            setStatus(validateStatus, "err", status ? ("Paiement refuse ou non valide. Statut SumUp : " + status + ".") : "Paiement refuse ou non valide.");
+            return false;
+          }
+
+          return submitOrder({
+            payment_id: checkoutId,
+            payment_status: "paye"
+          }).then(function () {
+            sessionStorage.removeItem(SUMUP_PENDING_KEY);
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState(null, "", resolveAppUrl("/panier"));
+            }
+            setStatus(validateStatus, "ok", "Paiement accepte et commande enregistree.");
+            return true;
+          });
+        })
+        .catch(function (error) {
+          setStatus(validateStatus, "err", error.message || "Impossible de verifier le paiement SumUp.");
+          return false;
+        });
     }
 
     function submitOrder(paymentMeta) {
@@ -1530,6 +1632,11 @@
           renderCart();
           orderSnapshot.clientMailSent = !!(data && data.clientMailSent);
           orderSnapshot.clientMailError = (data && data.clientMailError) || "";
+          orderSnapshot.numero = (data && data.numero) || "";
+          orderSnapshot.codeAcces = (data && data.codeAcces) || "";
+          orderSnapshot.pointsAdded = Number((data && data.pointsAdded) || 0);
+          orderSnapshot.loyaltyTotal = data && data.loyaltyTotal;
+          orderSnapshot.loyaltyCode = data && data.loyaltyCode;
           renderOrderSuccess(orderSnapshot);
           return true;
         });
@@ -1563,7 +1670,7 @@
 
     if (validateBtn) {
       validateBtn.addEventListener("click", function () {
-        confirmValidatedCheckout(validateStatus);
+        startHostedSumupCheckout(validateStatus);
       });
     }
 
@@ -1686,19 +1793,13 @@
 
     if (sumupBtn) {
       sumupBtn.addEventListener("click", function () {
-        if (!cartValidated && !confirmValidatedCheckout(sumupStatus)) return;
         if (!validateCheckoutBasics(sumupStatus)) return;
         sumupBtn.disabled = true;
-        sumupBtn.textContent = "Chargement SumUp...";
+        sumupBtn.textContent = "Ouverture SumUp...";
         clearStatus(sumupStatus);
-        ensureSumupWidget()
-          .then(function (widget) {
-            sumupBtn.textContent = "Paiement en cours...";
-            widget.submit();
-          })
-          .catch(function (error) {
-            setStatus(sumupStatus, "err", error.message || "Impossible d'ouvrir SumUp.");
-            resetPaymentButton();
+        startHostedSumupCheckout(sumupStatus)
+          .then(function (redirected) {
+            if (!redirected) resetPaymentButton();
           });
       });
     }
@@ -1735,7 +1836,7 @@
     }
 
     renderCart();
-    loadConnectedClient();
+    loadConnectedClient().then(handleHostedSumupReturn);
   }
 
   function initClientPage() {
