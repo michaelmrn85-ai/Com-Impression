@@ -260,8 +260,14 @@ function buildCatalogApiPayload() {
             }
             const sideOptions = getPricingSideOptions(quantityPricing);
             if (sideOptions.length) {
-                if (prod.id === 'impression-doc') options.Impression = sideOptions;
-                else options['Recto / verso'] = sideOptions;
+                if (prod.id === 'impression-doc') {
+                    options.Impression = sideOptions;
+                } else {
+                    Object.keys(options).forEach(key => {
+                        if (/recto|verso|impression/i.test(key)) delete options[key];
+                    });
+                    options['Recto / verso'] = sideOptions;
+                }
             }
             const optionKeyList = Object.keys(options || {});
             const product = {
@@ -1111,8 +1117,15 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         let purchaseValue = null;
         let responseQuantityOptions = quantityOptions;
         if (productData.quantityPricing && productData.quantityPricing.length) {
-            const selectedSideValues = Object.keys(sels)
-                .filter(key => /recto|verso|impression/i.test(key))
+            const exactSideKeys = Object.keys(sels).filter(key => {
+                const normalizedKey = normaliseOptionKey(key);
+                if (productId === 'impression-doc') return normalizedKey === 'impression';
+                return normalizedKey === 'recto verso';
+            });
+            const sideKeys = exactSideKeys.length
+                ? exactSideKeys
+                : Object.keys(sels).filter(key => /recto|verso|impression/i.test(key));
+            const selectedSideValues = sideKeys
                 .map(key => normaliseOptionKey(sels[key]))
                 .filter(Boolean);
             let parsedQty = parseInt(quantityValue, 10);
