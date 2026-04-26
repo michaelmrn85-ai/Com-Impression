@@ -2479,7 +2479,7 @@
         })
         .then(function (data) {
           form.reset();
-          setStatus(status, "ok", data && data.clientMailSent ? "Votre demande de rendez-vous a bien ete envoyee. Un email de confirmation vous a ete adresse." : "Votre demande de rendez-vous a bien ete envoyee. Email client non confirme cote serveur.");
+          setStatus(status, "ok", data && data.clientMailSent ? "Votre demande de rendez-vous a bien ete envoyee. Un email de confirmation vous a ete adresse." : "Votre demande de rendez-vous a bien ete envoyee.");
         })
         .catch(function (error) {
           setStatus(status, "err", error.message || "Impossible d'envoyer votre demande.");
@@ -2614,7 +2614,7 @@
           })
           .then(function (data) {
             partnershipForm.reset();
-            setStatus(partnershipStatus, "ok", data && data.clientMailSent ? "Votre demande de partenariat a bien ete envoyee. Un email de confirmation vous a ete adresse." : "Votre demande de partenariat a bien ete envoyee. Email client non confirme cote serveur.");
+            setStatus(partnershipStatus, "ok", data && data.clientMailSent ? "Votre demande de partenariat a bien ete envoyee. Un email de confirmation vous a ete adresse." : "Votre demande de partenariat a bien ete envoyee.");
           })
           .catch(function (error) {
             setStatus(partnershipStatus, "err", error.message || "Impossible d'envoyer votre demande.");
@@ -2645,8 +2645,8 @@
     function syncPreview() {
       if (!preview) return;
       preview.textContent = wantedPaymentMode() === "Administration Chorus"
-        ? "Paiement demande : Administration Chorus Pro, apres validation admin."
-        : "Paiement demande : virement sous 48h, apres validation admin.";
+        ? "Paiement demande : Administration Chorus Pro."
+        : "Paiement demande : virement sous 48h.";
     }
 
     if (typeInput) typeInput.addEventListener("change", syncPreview);
@@ -2694,7 +2694,7 @@
         .then(function (data) {
           form.reset();
           syncPreview();
-          setStatus(status, "ok", data.message || "Demande envoyee. Elle apparait maintenant dans l'admin.");
+          setStatus(status, "ok", data.message || "Demande envoyee. Nous revenons vers vous rapidement.");
         })
         .catch(function (error) {
           setStatus(status, "err", error.message || "Impossible d'envoyer la demande.");

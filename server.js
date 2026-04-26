@@ -93,7 +93,7 @@ function rateLimit(options) {
 
 function requireAdminPasswordConfigured(res) {
     if (ADMIN_PASSWORD) return true;
-    res.status(503).json({ success: false, error: 'Le mot de passe admin n est pas configure cote serveur.' });
+    res.status(503).json({ success: false, error: 'Configuration admin incomplète.' });
     return false;
 }
 
@@ -103,11 +103,11 @@ function adminPasswordMatches(value) {
 
 function requireSumupConfigured(res) {
     if (!SUMUP_SECRET_API_KEY) {
-        res.status(503).json({ success: false, error: 'SumUp n est pas configure cote serveur.' });
+        res.status(503).json({ success: false, error: 'Le paiement SumUp est temporairement indisponible.' });
         return false;
     }
     if (!SUMUP_MERCHANT_CODE) {
-        res.status(503).json({ success: false, error: 'Le merchant code SumUp est manquant cote serveur.' });
+        res.status(503).json({ success: false, error: 'Le paiement SumUp est temporairement indisponible.' });
         return false;
     }
     return true;
@@ -2533,7 +2533,7 @@ app.post('/api/ouverture-compte', express.json(), rateLimit({ windowMs: 30 * 60 
         res.json({
             success:true,
             client: safeClient(client),
-            message:'Demande envoyée. Elle sera validée depuis l’admin.'
+            message:'Demande envoyée. Nous revenons vers vous rapidement.'
         });
     } catch(e) {
         console.error('Erreur ouverture compte:', e);
