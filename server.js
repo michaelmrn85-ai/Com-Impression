@@ -800,11 +800,18 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
         const adresse        = d.adresse || '';
         const paymentId      = d.payment_id || '';
         const payeCB         = paymentStatus === 'paye';
+        const requestedMode  = String(d.mode_reglement || '').trim();
 
         // Detecter type
         const panierLow = panierTexte.toLowerCase();
         const isContact     = panierLow.startsWith('contact');
         const isPartenariat = panierLow.startsWith('partenariat');
+        if (!isContact && !isPartenariat && !payeCB && ['Virement', 'Administration Chorus'].includes(requestedMode)) {
+            const existingClient = lireClients().find(client => normaliserEmail(client.email) === normaliserEmail(d.email));
+            if (!existingClient || String(existingClient.mode_reglement || 'CB').trim() !== requestedMode) {
+                return res.status(403).json({ success:false, error:'Ce moyen de paiement doit etre active sur votre fiche client.' });
+            }
+        }
 
         // EMAIL ADMIN
         const contenuAdmin = `
@@ -896,7 +903,7 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
             const client = getOuCreerClient(d.email, d.prenom || '', d.nom || '');
             client.telephone = client.telephone || d.tel || '';
             client.type_client = d.type_client || client.type_client || 'Particulier';
-            client.mode_reglement = payeCB ? 'CB' : (d.mode_reglement || client.mode_reglement || 'CB');
+            client.mode_reglement = client.mode_reglement || 'CB';
             client.societe = client.societe || d.societe || '';
             client.siret = client.siret || d.siret || '';
             client.adresse = client.adresse || d.adresse || '';
@@ -2270,6 +2277,18 @@ app.post('/api/client/register', express.json(), rateLimit({ windowMs: 30 * 60 *
         client.adresse = String(req.body.adresse || '').trim();
         client.cp = String(req.body.cp || '').trim();
         client.ville = String(req.body.ville || '').trim();
+        const accountRequested = !!req.body.account_request;
+        if (accountRequested) {
+            client.account_request = {
+                requested: true,
+                status: 'demande',
+                payment_mode: String(req.body.account_payment_mode || '').trim(),
+                contact: String(req.body.account_contact || '').trim(),
+                email: normaliserEmail(req.body.account_email || ''),
+                info: String(req.body.account_info || '').trim(),
+                created_at: new Date().toISOString()
+            };
+        }
         client.password_hash = hashPassword(password);
         client.email_verified = false;
         client.updated_at = new Date().toISOString();
@@ -2294,6 +2313,30 @@ app.post('/api/client/register', express.json(), rateLimit({ windowMs: 30 * 60 *
                 attachments: getBrandingAttachments()
             });
         } catch(e) { console.warn('Email confirmation compte non envoyé:', e.message); }
+
+        if (accountRequested) {
+            try {
+                const t = createTransporter();
+                await t.sendMail({
+                    from: `"COM' Impression" <${process.env.SMTP_USER}>`,
+                    to: process.env.ADMIN_EMAIL || process.env.SMTP_USER,
+                    subject: "Demande d'ouverture de compte client",
+                    html: emailWrapper(`
+                        <h2 style="color:#F47B20;margin:0 0 12px;">Nouvelle demande d'ouverture de compte</h2>
+                        <p><strong>Client :</strong> ${prenom} ${nom}</p>
+                        <p><strong>Email :</strong> ${email}</p>
+                        <p><strong>Profil :</strong> ${client.type_client || 'Particulier'}</p>
+                        <p><strong>Societe / structure :</strong> ${client.societe || '--'}</p>
+                        <p><strong>SIRET :</strong> ${client.siret || '--'}</p>
+                        <p><strong>Moyen souhaite :</strong> ${(client.account_request && client.account_request.payment_mode) || '--'}</p>
+                        <p><strong>Contact facturation :</strong> ${(client.account_request && client.account_request.contact) || '--'}</p>
+                        <p><strong>Email facturation :</strong> ${(client.account_request && client.account_request.email) || '--'}</p>
+                        <p><strong>Infos :</strong><br>${String((client.account_request && client.account_request.info) || '--').replace(/\n/g, '<br>')}</p>
+                    `, '#F47B20', "COM' Impression", publicBaseUrl, 'Ouverture de compte'),
+                    attachments: getBrandingAttachments()
+                });
+            } catch(e) { console.warn('Email demande ouverture compte non envoyé:', e.message); }
+        }
 
         res.json({ success:true, requires_email_confirmation:true, client: safeClient(client) });
     } catch(e) {
@@ -2533,6 +2576,7 @@ function safeClient(c) {
              siret:c.siret||'',
              promo_permanent_code:c.promo_permanent_code||'',
              promo_permanent_remise:Number(c.promo_permanent_remise||0),
+             account_request:c.account_request||null,
              email_verified: !!c.email_verified,
              points:c.points, historique_points:c.historique_points||[],
              codes_promo:c.codes_promo||[] };
@@ -3400,6 +3444,9 @@ function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni
             panier:      panierTexte || '',
             panier_json: d.panier_json || '',
             prix_total:  prixTotal || '--',
+            mode_reglement: d.mode_reglement || (d.payment_status === 'paye' ? 'CB' : ''),
+            payment_status: d.payment_status || '',
+            payment_id: d.payment_id || '',
             code_acces:  codeFourni || genererCode(),
             statut:      'Recue',
             notes:       '',

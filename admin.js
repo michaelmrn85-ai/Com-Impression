@@ -28,7 +28,9 @@
     dailySummary: null,
     selectedProduct: null,
     selectedClient: null,
-    dailySummaryDate: ''
+    dailySummaryDate: '',
+    dailySummaryStart: '',
+    dailySummaryEnd: ''
   };
 
   var CLIENT_TYPE_OPTIONS = [
@@ -1234,6 +1236,13 @@
       +'<div class="field"><label>Code réduction permanent</label><input id="client-edit-promo-code" value="'+esc(current.promo_permanent_code||'')+'" placeholder="Ex : CLIENT10"></div>'
       +'<div class="field"><label>Remise permanente %</label><input id="client-edit-promo-remise" inputmode="decimal" value="'+esc(current.promo_permanent_remise||'')+'" placeholder="10"></div>'
       +'</div>'
+      +(current.account_request ? '<div class="panel"><h3>Demande ouverture de compte</h3><div class="kv">'
+        +'<div><span>Statut</span><strong>'+esc(current.account_request.status||'demande')+'</strong></div>'
+        +'<div><span>Moyen souhaite</span><strong>'+esc(current.account_request.payment_mode||'--')+'</strong></div>'
+        +'<div><span>Contact facturation</span><strong>'+esc(current.account_request.contact||'--')+'</strong></div>'
+        +'<div><span>Email facturation</span><strong>'+esc(current.account_request.email||'--')+'</strong></div>'
+        +'<div><span>Infos</span><strong>'+esc(current.account_request.info||'--')+'</strong></div>'
+      +'</div></div>' : '')
       +'<button class="btn btn-orange" id="client-edit-save" type="button">'+(current.isNew?'Creer le client':'Enregistrer le client')+'</button>'
       +'<div class="status" id="client-edit-status"></div>';
     openModal('modal-client-edit','clients');

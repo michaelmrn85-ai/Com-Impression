@@ -1169,6 +1169,7 @@
     var connectedClient = null;
     var cartValidated = false;
     var appliedPromo = null;
+    var selectedPaymentMethod = "CB";
     var SUMUP_PENDING_KEY = "ci_sumup_pending_checkout";
     var minimumAlert = $("cart-minimum-alert");
     var footerMinimumAlert = $("cart-footer-minimum-alert");
@@ -1209,7 +1210,7 @@
       if (paymentTotal) paymentTotal.textContent = payable.label || "0,00 EUR";
       if (minimumAlert) minimumAlert.hidden = !underSumupMinimum;
       if (footerMinimumAlert) footerMinimumAlert.hidden = !underSumupMinimum;
-      if (validateBtn) validateBtn.disabled = underSumupMinimum;
+      if (validateBtn) validateBtn.disabled = underSumupMinimum && selectedPaymentMethod === "CB";
       if (sumupBtn) sumupBtn.disabled = underSumupMinimum;
     }
 
@@ -1267,8 +1268,9 @@
           + (orderData.numero ? '<div class="split-line"><strong>Commande</strong><span>' + esc(orderData.numero) + '</span></div>' : '')
           + (orderData.codeAcces ? '<div class="split-line"><strong>Code suivi</strong><span>' + esc(orderData.codeAcces) + '</span></div>' : '')
           + '<div class="split-line"><strong>Email</strong><span>' + esc(orderData.customerEmail || "") + '</span></div>'
-          + '<div class="split-line"><strong>Total regle</strong><span class="product-price">' + esc(orderData.totalLabel || "0,00 EUR") + '</span></div>'
-          + '<div class="split-line"><strong>Points fidelite</strong><span>' + esc(String(orderData.pointsAdded || 0)) + ' point(s)' + (orderData.loyaltyTotal != null ? ' · Total : ' + esc(String(orderData.loyaltyTotal)) : '') + '</span></div>'
+          + '<div class="split-line"><strong>' + esc(orderData.paymentStatus === "paye" ? "Total regle" : "Total TTC") + '</strong><span class="product-price">' + esc(orderData.totalLabel || "0,00 EUR") + '</span></div>'
+          + (orderData.paymentMethod ? '<div class="split-line"><strong>Paiement</strong><span>' + esc(orderData.paymentMethod) + '</span></div>' : '')
+          + (orderData.paymentStatus === "paye" ? '<div class="split-line"><strong>Points fidelite</strong><span>' + esc(String(orderData.pointsAdded || 0)) + ' point(s)' + (orderData.loyaltyTotal != null ? ' · Total : ' + esc(String(orderData.loyaltyTotal)) : '') + '</span></div>' : '')
           + '<div class="split-line"><strong>Email client</strong><span>' + esc(orderData.clientMailSent ? "Envoye" : "Non confirme") + '</span></div>'
           + (orderData.promoCode ? '<div class="split-line"><strong>Code reduction</strong><span>' + esc(orderData.promoCode) + ' · ' + esc(String(orderData.promoDiscount || 0)) + '%</span></div>' : '')
         + '</div>'
@@ -1309,6 +1311,31 @@
         clientSummary.innerHTML = "";
         guestFields.hidden = false;
       }
+      renderPaymentMethods();
+    }
+
+    function clientPaymentMode() {
+      return String((connectedClient && connectedClient.mode_reglement) || "CB").trim() || "CB";
+    }
+
+    function isPaymentMethodAllowed(method) {
+      if (method === "CB") return true;
+      return !!connectedClient && clientPaymentMode() === method;
+    }
+
+    function renderPaymentMethods() {
+      var buttons = document.querySelectorAll("[data-payment-method]");
+      if (!buttons.length) return;
+      if (!isPaymentMethodAllowed(selectedPaymentMethod)) selectedPaymentMethod = "CB";
+      buttons.forEach(function (button) {
+        var method = button.getAttribute("data-payment-method") || "CB";
+        var allowed = isPaymentMethodAllowed(method);
+        button.disabled = !allowed;
+        button.classList.toggle("active", selectedPaymentMethod === method);
+        button.title = allowed ? "" : "Ce moyen de paiement doit etre active dans votre fiche client.";
+      });
+      if (validateBtn) validateBtn.textContent = selectedPaymentMethod === "CB" ? "Paiement" : "Valider la commande";
+      updatePayableTotal();
     }
 
     function getCustomerDetails(targetStatus) {
@@ -1610,6 +1637,30 @@
         });
     }
 
+    function submitDeferredPaymentOrder(method, targetStatus) {
+      if (!connectedClient) {
+        openAuthModal();
+        setStatus(targetStatus || validateStatus, "err", "Connectez-vous ou creez votre compte avant de valider le panier.");
+        return Promise.resolve(false);
+      }
+      if (!isPaymentMethodAllowed(method)) {
+        setStatus(targetStatus || validateStatus, "err", "Ce moyen de paiement n'est pas active sur votre fiche client.");
+        return Promise.resolve(false);
+      }
+      if (!validateCheckoutBasics(targetStatus || validateStatus)) return Promise.resolve(false);
+      setStatus(targetStatus || validateStatus, "ok", "Enregistrement de la commande...");
+      return submitOrder({
+        mode_reglement: method,
+        payment_status: method === "Administration Chorus" ? "attente_chorus" : "attente_virement"
+      }).then(function () {
+        setStatus(targetStatus || validateStatus, "ok", "Commande enregistree. Paiement : " + method + ".");
+        return true;
+      }).catch(function (error) {
+        setStatus(targetStatus || validateStatus, "err", error.message || "Impossible d'enregistrer la commande.");
+        return false;
+      });
+    }
+
     function handleHostedSumupReturn() {
       var query = new URLSearchParams(window.location.search || "");
       if (!query.get("sumup_return")) return Promise.resolve(false);
@@ -1674,6 +1725,8 @@
         totalLabel: getPayableTotalInfo().label,
         customerName: (connectedClient ? [connectedClient.prenom, connectedClient.nom].filter(Boolean).join(" ").trim() : [($("checkout-prenom") || {}).value, ($("checkout-nom") || {}).value].join(" ").trim()),
         customerEmail: connectedClient ? (connectedClient.email || "") : ((($("checkout-email") || {}).value) || "").trim(),
+        paymentMethod: (paymentMeta && paymentMeta.mode_reglement) || "CB",
+        paymentStatus: (paymentMeta && paymentMeta.payment_status) || "",
         promoCode: appliedPromo && appliedPromo.code,
         promoDiscount: appliedPromo && appliedPromo.discount
       };
@@ -1732,14 +1785,33 @@
       }
       if (paymentMeta && paymentMeta.payment_id) formData.append("payment_id", paymentMeta.payment_id);
       if (paymentMeta && paymentMeta.payment_status) formData.append("payment_status", paymentMeta.payment_status);
+      if (paymentMeta && paymentMeta.mode_reglement) formData.append("mode_reglement", paymentMeta.mode_reglement);
       return formData;
     }
 
     if (validateBtn) {
       validateBtn.addEventListener("click", function () {
-        startHostedSumupCheckout(validateStatus);
+        if (selectedPaymentMethod === "CB") {
+          startHostedSumupCheckout(validateStatus);
+          return;
+        }
+        submitDeferredPaymentOrder(selectedPaymentMethod, validateStatus);
       });
     }
+
+    document.querySelectorAll("[data-payment-method]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var method = button.getAttribute("data-payment-method") || "CB";
+        if (!isPaymentMethodAllowed(method)) {
+          setStatus(validateStatus, "err", "Ce moyen de paiement doit etre active dans votre fiche client.");
+          renderPaymentMethods();
+          return;
+        }
+        selectedPaymentMethod = method;
+        clearStatus(validateStatus);
+        renderPaymentMethods();
+      });
+    });
 
     if ($("checkout-auth-close")) $("checkout-auth-close").addEventListener("click", closeAuthModal);
     if ($("checkout-open-login")) $("checkout-open-login").addEventListener("click", function () {
@@ -1799,7 +1871,12 @@
             password2: (($("checkout-register-password2") || {}).value || ""),
             adresse: "",
             cp: "",
-            ville: ""
+            ville: "",
+            account_request: !!(($("checkout-register-account-request") || {}).checked),
+            account_payment_mode: (($("checkout-register-account-payment") || {}).value || "").trim(),
+            account_contact: (($("checkout-register-account-contact") || {}).value || "").trim(),
+            account_email: (($("checkout-register-account-email") || {}).value || "").trim(),
+            account_info: (($("checkout-register-account-info") || {}).value || "").trim()
           })
         })
           .then(function (response) {
@@ -2170,7 +2247,12 @@
         password2: $("register-password-2").value,
         adresse: $("register-adresse").value.trim(),
         cp: $("register-cp").value.trim(),
-        ville: $("register-ville").value.trim()
+        ville: $("register-ville").value.trim(),
+        account_request: !!(($("register-account-request") || {}).checked),
+        account_payment_mode: (($("register-account-payment") || {}).value || "").trim(),
+        account_contact: (($("register-account-contact") || {}).value || "").trim(),
+        account_email: (($("register-account-email") || {}).value || "").trim(),
+        account_info: (($("register-account-info") || {}).value || "").trim()
       }, $("register-status"), function () {
         setStatus($("register-status"), "ok", "Compte cree. Confirmez votre email avant connexion.");
       });
