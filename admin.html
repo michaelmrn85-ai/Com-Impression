@@ -236,10 +236,14 @@
       <div class="box-body">
         <div class="toolbar">
           <div class="field" style="margin:0;min-width:220px;">
-            <label for="day-summary-date">Date à consulter</label>
-            <input id="day-summary-date" type="date">
+            <label for="day-summary-start">Date début</label>
+            <input id="day-summary-start" type="date">
           </div>
-          <button class="btn btn-dark btn-small" id="day-summary-load" type="button">Voir cette date</button>
+          <div class="field" style="margin:0;min-width:220px;">
+            <label for="day-summary-end">Date fin</label>
+            <input id="day-summary-end" type="date">
+          </div>
+          <button class="btn btn-dark btn-small" id="day-summary-load" type="button">Voir cette période</button>
           <button class="btn btn-orange btn-small" id="day-summary-pdf" type="button">Télécharger le PDF</button>
         </div>
         <div class="day-kpis" id="day-kpis"></div>

@@ -134,6 +134,34 @@
                 <input id="register-ville" type="text">
               </div>
             </div>
+            <div class="account-opening-box">
+              <strong>Ouverture de compte</strong>
+              <label class="check-row" for="register-account-request">
+                <input id="register-account-request" type="checkbox">
+                Demander un compte pro, association ou administration
+              </label>
+              <div class="field">
+                <label for="register-account-payment">Moyen de paiement souhaite</label>
+                <select id="register-account-payment">
+                  <option>Virement</option>
+                  <option>Administration Chorus</option>
+                </select>
+              </div>
+              <div class="inline-fields">
+                <div class="field">
+                  <label for="register-account-contact">Contact facturation</label>
+                  <input id="register-account-contact" type="text">
+                </div>
+                <div class="field">
+                  <label for="register-account-email">Email facturation</label>
+                  <input id="register-account-email" type="email">
+                </div>
+              </div>
+              <div class="field">
+                <label for="register-account-info">Informations complementaires</label>
+                <textarea id="register-account-info" placeholder="Service, bon de commande, Chorus, conditions internes..."></textarea>
+              </div>
+            </div>
             <button class="btn" type="submit">Creer mon compte</button>
             <div class="status" id="register-status"></div>
           </form>

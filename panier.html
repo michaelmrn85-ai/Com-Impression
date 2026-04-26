@@ -125,6 +125,20 @@
         <div class="cart-minimum-alert" id="cart-minimum-alert" hidden>
           Paiement SumUp disponible a partir de 1,00 EUR. Ajoutez un produit ou augmentez la quantite pour payer par carte.
         </div>
+        <div class="payment-methods" id="checkout-payment-methods">
+          <button class="payment-method active" data-payment-method="CB" type="button">
+            <strong>CB</strong>
+            <span>Carte bancaire SumUp</span>
+          </button>
+          <button class="payment-method" data-payment-method="Virement" type="button" disabled>
+            <strong>Virement</strong>
+            <span>Active depuis votre fiche client</span>
+          </button>
+          <button class="payment-method" data-payment-method="Administration Chorus" type="button" disabled>
+            <strong>Administration Chorus</strong>
+            <span>Reserve aux comptes valides</span>
+          </button>
+        </div>
         <button class="btn" id="cart-validate" type="button">Paiement</button>
         <div class="status" id="cart-validate-status"></div>
       </div>
@@ -199,6 +213,34 @@
           <div class="field">
             <label for="checkout-register-password2">Confirmation</label>
             <input id="checkout-register-password2" type="password">
+          </div>
+        </div>
+        <div class="account-opening-box">
+          <strong>Ouverture de compte</strong>
+          <label class="check-row" for="checkout-register-account-request">
+            <input id="checkout-register-account-request" type="checkbox">
+            Demander un compte pro, association ou administration
+          </label>
+          <div class="field">
+            <label for="checkout-register-account-payment">Moyen de paiement souhaite</label>
+            <select id="checkout-register-account-payment">
+              <option>Virement</option>
+              <option>Administration Chorus</option>
+            </select>
+          </div>
+          <div class="inline-fields">
+            <div class="field">
+              <label for="checkout-register-account-contact">Contact facturation</label>
+              <input id="checkout-register-account-contact" type="text">
+            </div>
+            <div class="field">
+              <label for="checkout-register-account-email">Email facturation</label>
+              <input id="checkout-register-account-email" type="email">
+            </div>
+          </div>
+          <div class="field">
+            <label for="checkout-register-account-info">Informations complementaires</label>
+            <textarea id="checkout-register-account-info" placeholder="Service, bon de commande, Chorus, conditions internes..."></textarea>
           </div>
         </div>
         <button class="btn" id="checkout-register-btn" type="button">Creer mon compte</button>

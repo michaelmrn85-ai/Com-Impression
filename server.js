@@ -505,7 +505,39 @@ function isRefundedCommand(cmd) {
     );
 }
 
-function buildDailySummaryData(requestedDate) {
+function isIsoDay(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
+}
+
+function normalizeDayPeriod(query) {
+    let start = isIsoDay(query.start) ? String(query.start).trim() : '';
+    let end = isIsoDay(query.end) ? String(query.end).trim() : '';
+    const date = isIsoDay(query.date) ? String(query.date).trim() : '';
+    if (!start) start = date || getVisitDayKey();
+    if (!end) end = start;
+    if (end < start) {
+        const tmp = start;
+        start = end;
+        end = tmp;
+    }
+    return { start, end };
+}
+
+function dayInPeriod(value, start, end) {
+    const day = String(value || '').slice(0, 10);
+    return isIsoDay(day) && day >= start && day <= end;
+}
+
+function sumVisitsForPeriod(visits, start, end) {
+    const byDay = (visits && visits.byDay) || {};
+    return Object.keys(byDay).reduce((sum, day) => {
+        return dayInPeriod(day, start, end) ? sum + Number(byDay[day] || 0) : sum;
+    }, 0);
+}
+
+function buildDailySummaryData(requestedDate, requestedEnd) {
+    const start = isIsoDay(requestedDate) ? String(requestedDate).trim() : getVisitDayKey();
+    const end = isIsoDay(requestedEnd) ? String(requestedEnd).trim() : start;
     const commandes = lireCommandes();
     const visits = lireVisits();
     const catalog = buildCatalogApiPayload();
@@ -522,8 +554,8 @@ function buildDailySummaryData(requestedDate) {
         });
     });
 
-    const todayOrders = commandes.filter(cmd => String(cmd.created_at || '').slice(0, 10) === requestedDate && cmd.statut !== 'Annulee');
-    const refundOrders = commandes.filter(cmd => isRefundedCommand(cmd) && String(cmd.updated_at || cmd.created_at || '').slice(0, 10) === requestedDate);
+    const todayOrders = commandes.filter(cmd => dayInPeriod(cmd.created_at, start, end) && cmd.statut !== 'Annulee');
+    const refundOrders = commandes.filter(cmd => isRefundedCommand(cmd) && dayInPeriod(cmd.updated_at || cmd.created_at, start, end));
     const byGamme = {};
     let dayTotal = 0;
     let dayMargin = 0;
@@ -568,7 +600,10 @@ function buildDailySummaryData(requestedDate) {
     });
 
     return {
-        day: requestedDate,
+        day: start,
+        start,
+        end,
+        periodLabel: start === end ? start : `${start} - ${end}`,
         orders: todayOrders.length,
         refunds: refundOrders.length,
         refundTotal: Math.round(refundTotal * 100) / 100,
@@ -576,7 +611,7 @@ function buildDailySummaryData(requestedDate) {
         total: Math.round(dayTotal * 100) / 100,
         margin: Math.round(dayMargin * 100) / 100,
         marginRate: dayTotal > 0 ? Math.round(((dayMargin / dayTotal) * 100) * 100) / 100 : 0,
-        visitsToday: Number((visits.byDay || {})[requestedDate] || 0),
+        visitsToday: sumVisitsForPeriod(visits, start, end),
         visitsTotal: Number(visits.total || 0),
         refundOrders: refundOrders.map(cmd => ({
             numero: cmd.numero || cmd.id || '',
@@ -1650,12 +1685,10 @@ app.get('/api/admin/daily-summary', (req, res) => {
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
-        const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '').trim())
-            ? String(req.query.date || '').trim()
-            : getVisitDayKey();
+        const period = normalizeDayPeriod(req.query || {});
         res.json({
             success: true,
-            summary: buildDailySummaryData(requestedDate)
+            summary: buildDailySummaryData(period.start, period.end)
         });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
@@ -1684,15 +1717,18 @@ function buildDailySummaryPdfBuffer(summary) {
 
     rect(0, 760, pageW, 82, orange);
     text("COM' Impression", 40, 805, { font: 'F2', size: 22, color: [1, 1, 1] });
-    text('Recapitulatif de journee', 40, 785, { size: 11, color: [1, 1, 1] });
+    text('Recapitulatif de periode', 40, 785, { size: 11, color: [1, 1, 1] });
     rect(374, 782, 165, 36, [1, 1, 1], null);
-    text(formatDate(new Date(summary.day || new Date())), 392, 796, { font: 'F2', size: 13, color: orange });
+    const periodText = summary.start === summary.end
+        ? formatDate(new Date(summary.start || new Date()))
+        : `${formatDate(new Date(summary.start))} - ${formatDate(new Date(summary.end))}`;
+    text(periodText, 392, 796, { font: 'F2', size: 11, color: orange });
 
     const kpis = [
         ['Commandes', String(summary.orders || 0)],
-        ['Total du jour', money(summary.total)],
+        ['Total periode', money(summary.total)],
         ['Remboursements', `${summary.refunds || 0} / ${money(summary.refundTotal)}`],
-        ['Net jour', money(summary.netTotal)],
+        ['Net periode', money(summary.netTotal)],
         ['Marge estimee', `${Number(summary.marginRate || 0).toFixed(2).replace('.', ',')} %`],
         ['Visites', String(summary.visitsToday || 0)]
     ];
@@ -1723,7 +1759,7 @@ function buildDailySummaryPdfBuffer(summary) {
         y -= 22;
     });
     if (!(summary.byGamme || []).length) {
-        text('Aucune commande classee sur cette date.', 52, y, { size: 9, color: [0.45, 0.45, 0.45] });
+        text('Aucune commande classee sur cette periode.', 52, y, { size: 9, color: [0.45, 0.45, 0.45] });
         y -= 26;
     }
 
@@ -1740,7 +1776,7 @@ function buildDailySummaryPdfBuffer(summary) {
             y -= 22;
         });
     } else {
-        text('Aucun remboursement sur cette date.', 52, y, { size: 9, color: [0.45, 0.45, 0.45] });
+        text('Aucun remboursement sur cette periode.', 52, y, { size: 9, color: [0.45, 0.45, 0.45] });
     }
 
     text(`PDF genere le ${new Date().toLocaleString('fr-FR')}`, 40, 38, { size: 8, color: [0.45, 0.45, 0.45] });
@@ -1768,13 +1804,11 @@ app.get('/api/admin/daily-summary/pdf', (req, res) => {
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
-        const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '').trim())
-            ? String(req.query.date || '').trim()
-            : getVisitDayKey();
-        const summary = buildDailySummaryData(requestedDate);
+        const period = normalizeDayPeriod(req.query || {});
+        const summary = buildDailySummaryData(period.start, period.end);
         const pdf = buildDailySummaryPdfBuffer(summary);
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="recap-jour-${requestedDate}.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="recap-periode-${period.start}-${period.end}.pdf"`);
         res.send(pdf);
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });

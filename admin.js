@@ -1217,7 +1217,7 @@
     $('client-edit-body').innerHTML=
       '<div class="site-grid">'
       +'<div class="field"><label>Profil client</label><select id="client-edit-type">'+typeOptions+'</select></div>'
-      +'<div class="field"><label>Mode de reglement</label><select id="client-edit-payment"><option '+(current.mode_reglement==='CB'?'selected':'')+'>CB</option><option '+(current.mode_reglement==='Virement'?'selected':'')+'>Virement</option></select></div>'
+      +'<div class="field"><label>Mode de reglement</label><select id="client-edit-payment"><option '+(current.mode_reglement==='CB'?'selected':'')+'>CB</option><option '+(current.mode_reglement==='Virement'?'selected':'')+'>Virement</option><option '+(current.mode_reglement==='Administration Chorus'?'selected':'')+'>Administration Chorus</option></select></div>'
       +'<div class="field"><label>Prenom</label><input id="client-edit-prenom" value="'+esc(current.prenom||'')+'"></div>'
       +'<div class="field"><label>Nom</label><input id="client-edit-nom" value="'+esc(current.nom||'')+'"></div>'
       +'<div class="field"><label>Societe / structure</label><input id="client-edit-societe" value="'+esc(current.societe||'')+'"></div>'
@@ -1466,6 +1466,17 @@
     return match ? match[3]+'/'+match[2]+'/'+match[1] : String(value||'');
   }
 
+  function getDailySummaryPeriod(){
+    var start=(($('day-summary-start')||{}).value || state.dailySummaryStart || state.dailySummaryDate || '').trim();
+    var end=(($('day-summary-end')||{}).value || state.dailySummaryEnd || start || '').trim();
+    if(start && end && end < start){
+      var tmp=start;
+      start=end;
+      end=tmp;
+    }
+    return { start:start, end:end || start };
+  }
+
   function formatPercent(value){
     return formatPlainNumber(Number(value || 0))+' %';
   }
@@ -1481,15 +1492,15 @@
       return;
     }
     kpis.innerHTML=''
-      +'<article class="day-kpi"><strong>Date</strong><span>'+esc(formatDateFr(summary.day||''))+'</span></article>'
-      +'<article class="day-kpi"><strong>Commandes du jour</strong><span>'+esc(String(summary.orders||0))+'</span></article>'
-      +'<article class="day-kpi"><strong>Total du jour</strong><span>'+esc(formatAmount(Number(summary.total||0)))+'</span></article>'
+      +'<article class="day-kpi"><strong>Période</strong><span>'+esc(summary.start===summary.end ? formatDateFr(summary.start||summary.day||'') : formatDateFr(summary.start||'')+' au '+formatDateFr(summary.end||''))+'</span></article>'
+      +'<article class="day-kpi"><strong>Commandes période</strong><span>'+esc(String(summary.orders||0))+'</span></article>'
+      +'<article class="day-kpi"><strong>Total période</strong><span>'+esc(formatAmount(Number(summary.total||0)))+'</span></article>'
       +'<article class="day-kpi"><strong>Remboursements</strong><span>'+esc(String(summary.refunds||0))+'</span><p class="muted">'+esc(formatAmount(Number(summary.refundTotal||0)))+'</p></article>'
-      +'<article class="day-kpi"><strong>Net du jour</strong><span>'+esc(formatAmount(Number(summary.netTotal||0)))+'</span></article>'
+      +'<article class="day-kpi"><strong>Net période</strong><span>'+esc(formatAmount(Number(summary.netTotal||0)))+'</span></article>'
       +'<article class="day-kpi"><strong>Marge estimee</strong><span>'+esc(formatPercent(summary.marginRate||0))+'</span></article>'
-      +'<article class="day-kpi"><strong>Visites du jour</strong><span>'+esc(String(summary.visitsToday||0))+'</span></article>';
+      +'<article class="day-kpi"><strong>Visites période</strong><span>'+esc(String(summary.visitsToday||0))+'</span></article>';
     if(!(summary.byGamme||[]).length){
-      table.innerHTML='<div class="empty">Aucune commande classee aujourd hui.</div>';
+      table.innerHTML='<div class="empty">Aucune commande classee sur cette période.</div>';
       return;
     }
     table.innerHTML='<table class="admin-table-mini">'
@@ -1500,7 +1511,7 @@
       +'<tfoot><tr><td>Total visites site</td><td colspan="3">'+esc(String(summary.visitsTotal||0))+'</td></tr></tfoot>'
       +'</table>';
     if((summary.refundOrders||[]).length){
-      table.innerHTML += '<h3 style="margin-top:18px;">Remboursements du jour</h3><table class="admin-table-mini">'
+      table.innerHTML += '<h3 style="margin-top:18px;">Remboursements de la période</h3><table class="admin-table-mini">'
         +'<thead><tr><th>Commande</th><th>Client</th><th>Mode</th><th>Montant</th></tr></thead>'
         +'<tbody>'+(summary.refundOrders||[]).map(function(row){
           return '<tr><td>'+esc(row.numero||'--')+'</td><td>'+esc(row.client||'Client')+'</td><td>'+esc(row.mode||'--')+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td></tr>';
@@ -1509,17 +1520,21 @@
   }
 
   function loadDailySummary(openAfterLoad){
-    var selectedDate=(($('day-summary-date')||{}).value || state.dailySummaryDate || '').trim();
-    state.dailySummaryDate=selectedDate;
+    var period=getDailySummaryPeriod();
+    state.dailySummaryStart=period.start;
+    state.dailySummaryEnd=period.end;
     var endpoint='/api/admin/daily-summary?mdp='+encodeURIComponent(state.mdp);
-    if(selectedDate) endpoint+='&date='+encodeURIComponent(selectedDate);
+    if(period.start) endpoint+='&start='+encodeURIComponent(period.start);
+    if(period.end) endpoint+='&end='+encodeURIComponent(period.end);
     return fetch(api(endpoint))
       .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Fiche du jour indisponible'); return d; }); })
       .then(function(data){
         state.dailySummary = data.summary || null;
-        if($('day-summary-date') && data.summary && data.summary.day){
-          $('day-summary-date').value = data.summary.day;
-          state.dailySummaryDate = data.summary.day;
+        if(data.summary){
+          if($('day-summary-start')) $('day-summary-start').value = data.summary.start || data.summary.day || '';
+          if($('day-summary-end')) $('day-summary-end').value = data.summary.end || data.summary.start || data.summary.day || '';
+          state.dailySummaryStart = data.summary.start || data.summary.day || '';
+          state.dailySummaryEnd = data.summary.end || data.summary.start || data.summary.day || '';
         }
         renderDailySummary();
         if(openAfterLoad) openModal('modal-day-sheet','jour');
@@ -1527,8 +1542,8 @@
   }
 
   function downloadDailySummaryPdf(){
-    var selectedDate=(($('day-summary-date')||{}).value || state.dailySummaryDate || '').trim();
-    var url=api('/api/admin/daily-summary/pdf?mdp='+encodeURIComponent(state.mdp)+(selectedDate?'&date='+encodeURIComponent(selectedDate):''));
+    var period=getDailySummaryPeriod();
+    var url=api('/api/admin/daily-summary/pdf?mdp='+encodeURIComponent(state.mdp)+(period.start?'&start='+encodeURIComponent(period.start):'')+(period.end?'&end='+encodeURIComponent(period.end):''));
     window.open(url,'_blank');
   }
 
