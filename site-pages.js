@@ -200,9 +200,17 @@
     });
   }
 
+  function matchesSelectedFormat(row, selections) {
+    var format = normaliseOptionKey((row && row.format) || "");
+    if (!format) return true;
+    return Object.keys(selections || {}).some(function (key) {
+      return normaliseOptionKey(key) === "format" && normaliseOptionKey(selections[key]) === format;
+    });
+  }
+
   function getLotQuantityOptions(product, selections) {
     return uniqueValues(getProductPricingRows(product).filter(function (row) {
-      return row.type === "lot" && matchesSelectedSide(row, selections);
+      return row.type === "lot" && matchesSelectedSide(row, selections) && matchesSelectedFormat(row, selections);
     }).map(function (row) {
       return row.quantity;
     }));

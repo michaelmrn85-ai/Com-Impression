@@ -252,6 +252,10 @@ function buildCatalogApiPayload() {
                 options.Grammage = ['80g', '90g', '100g', '120g', '160g'];
                 options.Format = ['A4', 'A5'];
             }
+            const pricingFormatOptions = getPricingFormatOptions(quantityPricing);
+            if (pricingFormatOptions.length) {
+                options.Format = pricingFormatOptions;
+            }
             const sideOptions = getPricingSideOptions(quantityPricing);
             if (sideOptions.length) {
                 if (prod.id === 'impression-doc') {
@@ -317,6 +321,8 @@ function buildCatalogApiPayload() {
                 if (finishOptions.length) options.Finition = finishOptions;
                 const sideOptions = getPricingSideOptions(quantityPricing);
                 if (sideOptions.length) options['Recto / verso'] = sideOptions;
+                const pricingFormatOptions = getPricingFormatOptions(quantityPricing);
+                if (pricingFormatOptions.length) options.Format = pricingFormatOptions;
                 normaliseFreeOptions(item.freeOptions).forEach(option => {
                     if (!options[option.nom]) options[option.nom] = [];
                     if (!options[option.nom].includes(option.valeur)) options[option.nom].push(option.valeur);
@@ -1118,6 +1124,10 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             const selectedSideValues = sideKeys
                 .map(key => normaliseOptionKey(sels[key]))
                 .filter(Boolean);
+            const formatKeys = Object.keys(sels).filter(key => normaliseOptionKey(key) === 'format');
+            const selectedFormatValues = formatKeys
+                .map(key => normaliseOptionKey(sels[key]))
+                .filter(Boolean);
             let parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
@@ -1127,6 +1137,10 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (!selectedSideValues.length) return true;
                 if (!item.finish) return false;
                 return selectedSideValues.includes(normaliseOptionKey(item.finish));
+            }).filter(item => {
+                if (!selectedFormatValues.length) return true;
+                if (!item.format) return false;
+                return selectedFormatValues.includes(normaliseOptionKey(item.format));
             });
             if (lotTiersForOption.length) {
                 responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
@@ -1154,9 +1168,11 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (quantityMode === 'lot' || quantityMode === 'unitaire') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
-                const optionTiers = selectedSideValues.length
-                    ? quantityTiers.filter(item => item.finish && selectedSideValues.includes(normaliseOptionKey(item.finish)))
-                    : [];
+                const optionTiers = quantityTiers.filter(item => {
+                    const sideOk = !selectedSideValues.length || (item.finish && selectedSideValues.includes(normaliseOptionKey(item.finish)));
+                    const formatOk = !selectedFormatValues.length || (item.format && selectedFormatValues.includes(normaliseOptionKey(item.format)));
+                    return sideOk && formatOk;
+                });
                 if (optionTiers.length) quantityTiers = optionTiers;
                 const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
                 const effectiveQty = quantityMode === 'lot' && lotTiersForOption.length && !lotTiersForOption.some(item => item.quantity === parsedQty)
@@ -1416,6 +1432,7 @@ function normaliseQuantityPricing(list) {
         const height = parseNumberValue(item.height);
         const total = parseNumberValue(item.total != null ? item.total : (item.salePrice != null ? item.salePrice : (item.priceValue != null ? item.priceValue : item.price)));
         const finish = String(item.finish || '').trim();
+        const format = String(item.format || '').trim();
         const purchasePrice = parseNumberValue(item.purchasePrice != null ? item.purchasePrice : item.prixAchat);
         const optionsLibres = normaliseFreeOptions(item.optionsLibres);
         return {
@@ -1424,6 +1441,7 @@ function normaliseQuantityPricing(list) {
             width,
             height,
             finish,
+            format,
             purchasePrice,
             total,
             optionsLibres
@@ -1445,6 +1463,17 @@ function getPricingSideOptions(pricing) {
     const values = [];
     (Array.isArray(pricing) ? pricing : []).forEach(item => {
         const value = String((item && item.finish) || '').trim();
+        if (value && !values.some(existing => existing.toLowerCase() === value.toLowerCase())) {
+            values.push(value);
+        }
+    });
+    return values;
+}
+
+function getPricingFormatOptions(pricing) {
+    const values = [];
+    (Array.isArray(pricing) ? pricing : []).forEach(item => {
+        const value = String((item && item.format) || '').trim();
         if (value && !values.some(existing => existing.toLowerCase() === value.toLowerCase())) {
             values.push(value);
         }

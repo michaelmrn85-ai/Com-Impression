@@ -1115,7 +1115,6 @@
     $('product-edit-title').textContent=(state.selectedProduct.isNew?'Creation produit':'Edition produit')+' — '+((state.selectedProduct.product && state.selectedProduct.product.title)||'Produit');
     var entryRef = state.selectedProduct;
     var paperOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /papier|grammage/i.test(k); })]||[]);
-    var formatOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /format/i.test(k); })]||[]);
     var finishOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /finit|pellic|vernis|soft/i.test(k); })]||[]);
     var gammeOptions = getAdminGammeOptions().map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
@@ -1132,7 +1131,6 @@
       +'<div class="field"><label>Apercu photo</label><div id="product-edit-image-preview" style="min-height:180px;border:1px solid #eee3d9;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+(entryRef.product.imageUrl?'<img src="'+esc(entryRef.product.imageUrl)+'" alt="Apercu produit" style="width:100%;height:180px;object-fit:cover;display:block;">':'<span class="muted">Aucune image</span>')+'</div></div>'
       +'</div>'
       +'<div class="field"><label>Taille affichée (information fixe)</label><input id="product-edit-size" placeholder="A4, 10x15, 8,5x5,4..." value="'+esc(entryRef.product.sizeInfo||'')+'"></div>'
-      +'<div class="field"><label>Formats papier disponibles pour le client</label><textarea id="product-edit-formats" placeholder="A4, A5, 10x15, 8,5x5,4">'+esc(formatOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
@@ -1194,6 +1192,7 @@
       return {
         type:row.type,
         quantity:row.quantity,
+        format:row.format,
         width:row.width,
         height:row.height,
         finish:row.finish,
@@ -1221,7 +1220,7 @@
         purchasePrice:(firstRow.purchasePrice||'').trim(),
         salePrice:(firstRow.salePrice||'').trim(),
         quantityOptions:quantityOptions,
-        formatOptions:($('product-edit-formats').value||'').trim(),
+        formatOptions:pricingRows.map(function(row){ return row.format; }).filter(Boolean).join(','),
         paperOptions:($('product-edit-paper').value||'').trim(),
         finishOptions:($('product-edit-finish').value||'').trim(),
         deliveryDelayDays:($('product-edit-delivery-delay').value||'').trim(),
@@ -1493,6 +1492,7 @@
         return {
           type:row.type === 'dimensions' ? 'dimensions' : (row.type === 'unitaire' ? 'unitaire' : 'lot'),
           quantity:row.quantity == null ? '' : String(row.quantity).trim(),
+          format:row.format == null ? '' : String(row.format).trim(),
           width:row.width == null ? '' : String(row.width).trim(),
           height:row.height == null ? '' : String(row.height).trim(),
           finish:row.finish == null ? '' : String(row.finish).trim(),
@@ -1521,7 +1521,7 @@
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Prix d achat TTC</th><th>Prix de vente TTC</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type</th><th>Quantite</th><th>Format</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Prix d achat TTC</th><th>Prix de vente TTC</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
         var isDimensions = row.type === 'dimensions';
         var optionsHtml = (Array.isArray(row.optionsLibres) ? row.optionsLibres : []).map(function(option){
@@ -1534,6 +1534,7 @@
         return '<tr class="product-pricing-row">'
           +'<td><select class="product-pricing-type"><option value="lot" '+(row.type==='lot'?'selected':'')+'>Quantite lot</option><option value="unitaire" '+(row.type==='unitaire'?'selected':'')+'>Quantite unitaire</option><option value="dimensions" '+(row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></td>'
           +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></td>'
+          +'<td><input class="product-pricing-format" placeholder="A4, A5, 10x15..." value="'+esc(row.format||'')+'"></td>'
           +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"'+(isDimensions?'':' disabled')+'></td>'
           +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"'+(isDimensions?'':' disabled')+'></td>'
           +'<td><input class="product-pricing-finish" placeholder="Recto, recto-verso..." value="'+esc(row.finish||'')+'"></td>'
@@ -1542,7 +1543,7 @@
           +'<td><span class="pricing-margin">0,00</span></td>'
           +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
         +'</tr>'
-        +'<tr class="product-pricing-options"><td colspan="9"><div class="product-pricing-options-box">'
+        +'<tr class="product-pricing-options"><td colspan="10"><div class="product-pricing-options-box">'
           +'<div class="product-pricing-options-head"><strong>Options libres de cette ligne</strong><button class="btn btn-light btn-small product-pricing-option-add" type="button">+ Ajouter une option</button></div>'
           +'<div class="product-pricing-options-list">'+optionsHtml+'</div>'
         +'</div></td></tr>';
@@ -1632,6 +1633,7 @@
       return {
         type:((row.querySelector('.product-pricing-type')||{}).value || 'lot').trim(),
         quantity:((row.querySelector('.product-pricing-qty')||{}).value || '').trim(),
+        format:((row.querySelector('.product-pricing-format')||{}).value || '').trim(),
         width:((row.querySelector('.product-pricing-width')||{}).value || '').trim(),
         height:((row.querySelector('.product-pricing-height')||{}).value || '').trim(),
         finish:((row.querySelector('.product-pricing-finish')||{}).value || '').trim(),
@@ -1640,7 +1642,7 @@
         optionsLibres:optionsLibres
       };
     }).filter(function(row){
-      return row.quantity || row.width || row.height || row.finish || row.purchasePrice || row.salePrice || row.optionsLibres.length;
+      return row.quantity || row.format || row.width || row.height || row.finish || row.purchasePrice || row.salePrice || row.optionsLibres.length;
     });
   }
 
@@ -2030,6 +2032,7 @@
             '<tr class="product-pricing-row">'
             +'<td><select class="product-pricing-type"><option value="lot" selected>Quantite lot</option><option value="unitaire">Quantite unitaire</option><option value="dimensions">Dimensions</option></select></td>'
             +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
+            +'<td><input class="product-pricing-format" placeholder="A4, A5, 10x15..." value=""></td>'
             +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="" disabled></td>'
             +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="" disabled></td>'
             +'<td><input class="product-pricing-finish" placeholder="Recto, recto-verso..." value=""></td>'
@@ -2038,7 +2041,7 @@
             +'<td><span class="pricing-margin">0,00</span></td>'
             +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
             +'</tr>'
-            +'<tr class="product-pricing-options"><td colspan="9"><div class="product-pricing-options-box">'
+            +'<tr class="product-pricing-options"><td colspan="10"><div class="product-pricing-options-box">'
             +'<div class="product-pricing-options-head"><strong>Options libres de cette ligne</strong><button class="btn btn-light btn-small product-pricing-option-add" type="button">+ Ajouter une option</button></div>'
             +'<div class="product-pricing-options-list"></div>'
             +'</div></td></tr>'
@@ -2073,6 +2076,7 @@
       if(e.target && e.target.classList && e.target.classList.contains('manual-amount')) refreshManualTotal();
       if(e.target && e.target.classList && (
         e.target.classList.contains('product-pricing-qty') ||
+        e.target.classList.contains('product-pricing-format') ||
         e.target.classList.contains('product-pricing-width') ||
         e.target.classList.contains('product-pricing-height') ||
         e.target.classList.contains('product-pricing-finish') ||
