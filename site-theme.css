@@ -1293,8 +1293,8 @@ body[data-page="client"] #client-dashboard-view .section-head {
 
 .footer-top {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(180px, 1fr));
-  gap: 24px;
+  grid-template-columns: minmax(260px, 1.3fr) repeat(2, minmax(180px, 1fr));
+  gap: 34px;
   padding-bottom: 10px;
 }
 
@@ -1316,6 +1316,10 @@ body[data-page="client"] #client-dashboard-view .section-head {
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.7;
   font-size: 0.94rem;
+}
+
+.footer-brand p {
+  max-width: 40ch;
 }
 
 .footer-col {
@@ -1439,10 +1443,7 @@ body[data-page="client"] #client-dashboard-view .section-head {
 }
 
 .footer-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
+  display: none;
 }
 
 .footer-tag {
@@ -1465,7 +1466,7 @@ body[data-page="client"] #client-dashboard-view .section-head {
 
 .payment-strip {
   width: 100%;
-  display: flex;
+  display: none;
   justify-content: center;
 }
 

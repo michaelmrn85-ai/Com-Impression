@@ -893,8 +893,8 @@
 
     .footer-top {
       display: grid;
-      grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(180px, 1fr));
-      gap: 24px;
+      grid-template-columns: minmax(260px, 1.3fr) repeat(2, minmax(180px, 1fr));
+      gap: 34px;
       padding-bottom: 10px;
     }
 
@@ -912,6 +912,7 @@
     .footer-brand p {
       color: rgba(255, 255, 255, 0.72);
       margin-top: 8px;
+      max-width: 40ch;
     }
 
     .footer-col h4 {
@@ -961,12 +962,7 @@
       max-width: 34ch;
     }
 
-    .footer-payments {
-      margin-top: 0;
-      padding-top: 0;
-      display: grid;
-      gap: 0;
-    }
+    .footer-payments { display: none; }
 
     .payment-strip {
       width: 100%;
@@ -988,12 +984,7 @@
       letter-spacing: 0.01em;
     }
 
-    .footer-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 14px;
-    }
+    .footer-tags { display: none; }
 
     .footer-bottom {
       display: flex;
@@ -1404,15 +1395,9 @@
           <div>
             <strong>COM' Impression</strong>
             <p>
-              Les supports numeriques sont crees en Vendee (85) a Montreverd, imprimes dans le Sud-Ouest,
-              puis livres directement chez le client.
+              Création et suivi depuis la Vendée. Impression assurée par un partenaire dans le Sud-Ouest,
+              puis livraison chez le client.
             </p>
-            <div class="footer-tags">
-              <span class="footer-tag">Cree en Vendee (85)</span>
-              <span class="footer-tag">Montreverd</span>
-              <span class="footer-tag">Imprime dans le Sud-Ouest</span>
-              <span class="footer-tag">Livre chez le client</span>
-            </div>
           </div>
         </div>
 
@@ -1421,37 +1406,20 @@
           <a href="./mentions-legales.html">Mentions legales</a>
           <a href="./cgv.html">CGV</a>
           <a href="./faq.html">FAQ</a>
-          <a href="./ouverture-compte.html">Ouverture de compte</a>
-          <a href="./rendez-vous.html">Prendre rendez-vous</a>
         </div>
 
         <div class="footer-col">
-          <h4>Paiement securise</h4>
-          <p class="payment-note">
-            Paiement securise par carte bancaire via SumUp, ou reglement par virement bancaire selon votre commande.
-          </p>
-        </div>
-
-        <div class="footer-col">
-          <h4>COM' Impression</h4>
-          <a href="./produits.html">Nos gammes</a>
-          <a href="#avis">Avis clients</a>
-          <a href="./rendez-vous.html">Prise de rendez-vous</a>
+          <h4>Contact</h4>
           <a href="tel:+33743695641">07 43 69 56 41</a>
           <a href="mailto:michael@com-impression.fr">michael@com-impression.fr</a>
-          <p>Com'Pro, Com'Exterieur, Com'Evenementiel, Com'Personnalisee, Com'Services et bientot Com'Gourmand.</p>
-        </div>
-      </div>
-
-      <div class="footer-payments">
-        <div class="payment-strip" aria-label="Paiement securise avec SumUp">
-          <span class="payment-badge">Paiement securise avec SumUp et virement bancaire</span>
+          <a href="./rendez-vous.html">Prendre rendez-vous</a>
+          <a href="./ouverture-compte.html">Ouverture de compte pro</a>
         </div>
       </div>
 
       <div class="footer-bottom">
         <span>© 2026 COM' Impression. Tous droits reserves.</span>
-        <span>Conception, impression et expedition realisees en Vendee.</span>
+        <span>Création en Vendée, impression partenaire dans le Sud-Ouest.</span>
       </div>
     </div>
   </footer>
