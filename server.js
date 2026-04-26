@@ -308,9 +308,11 @@ function buildCatalogApiPayload() {
             .filter(item => item && item.legacyCat === group.legacy)
             .map(item => {
                 const paperOptions = normaliseCsvList(item.paperOptions);
+                const formatOptions = normaliseCsvList(item.formatOptions);
                 const finishOptions = normaliseCsvList(item.finishOptions);
                 const quantityPricing = normaliseQuantityPricing(Array.isArray(item.quantityPricing) ? item.quantityPricing : []);
                 const options = {};
+                if (formatOptions.length) options.Format = formatOptions;
                 if (paperOptions.length) options.Papier = paperOptions;
                 if (finishOptions.length) options.Finition = finishOptions;
                 const sideOptions = getPricingSideOptions(quantityPricing);
@@ -1522,8 +1524,12 @@ function trackVisit(req) {
 
 function applyOptionOverrides(optionMap, override) {
     const map = Object.assign({}, optionMap || {});
+    const formatKey = Object.keys(map).find(key => /format/i.test(key));
     const paperKey = Object.keys(map).find(key => /papier|grammage/i.test(key));
     const finishKey = Object.keys(map).find(key => /finit|pellic|vernis|soft/i.test(key));
+    if (override.formatOptions && override.formatOptions.length) {
+        map[formatKey || 'Format'] = override.formatOptions.slice();
+    }
     if (override.paperOptions && override.paperOptions.length) {
         map[paperKey || 'Papier'] = override.paperOptions.slice();
     }
@@ -1997,6 +2003,7 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             salePrice: parseNumberValue(body.salePrice),
             image: String(body.image || '').trim(),
             quantityOptions: uniquePositiveNumbers(body.quantityOptions),
+            formatOptions: normaliseCsvList(body.formatOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
             freeOptions: normaliseFreeOptions(body.freeOptions),
@@ -2064,6 +2071,7 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             salePrice: parseNumberValue(body.salePrice),
             image: String(body.image || '').trim(),
             quantityOptions: uniquePositiveNumbers(body.quantityOptions),
+            formatOptions: normaliseCsvList(body.formatOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
             freeOptions: normaliseFreeOptions(body.freeOptions),

@@ -1097,6 +1097,7 @@
         id:'',
         title:'',
         sizeInfo:'',
+        formatOptions:[],
         priceLabel:'',
         summary:'',
         image:'',
@@ -1114,6 +1115,7 @@
     $('product-edit-title').textContent=(state.selectedProduct.isNew?'Creation produit':'Edition produit')+' — '+((state.selectedProduct.product && state.selectedProduct.product.title)||'Produit');
     var entryRef = state.selectedProduct;
     var paperOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /papier|grammage/i.test(k); })]||[]);
+    var formatOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /format/i.test(k); })]||[]);
     var finishOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /finit|pellic|vernis|soft/i.test(k); })]||[]);
     var gammeOptions = getAdminGammeOptions().map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
@@ -1129,7 +1131,8 @@
       +'<div class="field"><label>Photo principale du produit</label><input id="product-edit-image-file" type="file" accept=".jpg,.jpeg,.png,.webp"><input id="product-edit-image" type="hidden" value="'+esc(entryRef.product.image||'')+'"><div class="muted" id="product-edit-image-name">'+esc(entryRef.product.image||'Aucune image')+'</div></div>'
       +'<div class="field"><label>Apercu photo</label><div id="product-edit-image-preview" style="min-height:180px;border:1px solid #eee3d9;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+(entryRef.product.imageUrl?'<img src="'+esc(entryRef.product.imageUrl)+'" alt="Apercu produit" style="width:100%;height:180px;object-fit:cover;display:block;">':'<span class="muted">Aucune image</span>')+'</div></div>'
       +'</div>'
-      +'<div class="field"><label>Taille</label><input id="product-edit-size" placeholder="A4, 10x15, 8,5x5,4..." value="'+esc(entryRef.product.sizeInfo||'')+'"></div>'
+      +'<div class="field"><label>Taille affichée (information fixe)</label><input id="product-edit-size" placeholder="A4, 10x15, 8,5x5,4..." value="'+esc(entryRef.product.sizeInfo||'')+'"></div>'
+      +'<div class="field"><label>Formats papier disponibles pour le client</label><textarea id="product-edit-formats" placeholder="A4, A5, 10x15, 8,5x5,4">'+esc(formatOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Papiers / grammages</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
       +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
@@ -1218,6 +1221,7 @@
         purchasePrice:(firstRow.purchasePrice||'').trim(),
         salePrice:(firstRow.salePrice||'').trim(),
         quantityOptions:quantityOptions,
+        formatOptions:($('product-edit-formats').value||'').trim(),
         paperOptions:($('product-edit-paper').value||'').trim(),
         finishOptions:($('product-edit-finish').value||'').trim(),
         deliveryDelayDays:($('product-edit-delivery-delay').value||'').trim(),
