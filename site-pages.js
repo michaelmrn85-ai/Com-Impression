@@ -823,6 +823,8 @@
     var currentQuantityOptions = Array.isArray(product.quantityOptions) ? product.quantityOptions.slice() : [];
     var quantityModes = getProductQuantityModes(product);
     var selectedQuantityMode = isImpressionDocumentProduct(product) ? "unitaire" : (quantityModes[0] || "lot");
+    var documentPageCount = 1;
+    var documentCopies = 1;
 
     if (configWrap) {
       configWrap.className = "product-config-grid";
@@ -839,6 +841,16 @@
 
     function renderQuantityField(selectedValue) {
       if (!quantityField) return;
+      if (isImpressionDocumentProduct(product)) {
+        documentPageCount = parseInt(selectedValue || documentPageCount || 1, 10);
+        if (isNaN(documentPageCount) || documentPageCount < 1) documentPageCount = 1;
+        quantityField.innerHTML = '<label>Quantite</label>'
+          + '<div class="inline-fields">'
+            + '<div class="field"><label for="product-doc-pages">Pages detectees</label><input id="product-doc-pages" type="number" min="1" value="' + esc(String(documentPageCount)) + '" disabled><p>Calcule automatiquement depuis le PDF.</p></div>'
+            + '<div class="field"><label for="product-doc-copies">Nombre d exemplaires</label><input id="product-doc-copies" type="number" min="1" value="' + esc(String(documentCopies || 1)) + '"><p>Indiquez combien d exemplaires imprimer.</p></div>'
+          + '</div>';
+        return;
+      }
       var modeHtml = quantityModes.length > 1
         ? '<div class="quantity-mode-grid">' + quantityModes.map(function (mode) {
             var label = mode === "unitaire" ? "Unitaire" : (mode === "dimensions" ? "Dimensions" : "Quantite lot");
@@ -866,6 +878,9 @@
     }
 
     function readSelectedQuantity() {
+      if (isImpressionDocumentProduct(product)) {
+        return String(documentPageCount || 1);
+      }
       var qtySelect = $("product-qty-select");
       var qtyInput = $("product-qty-input");
       return qtySelect ? qtySelect.value : ((qtyInput && qtyInput.value) || "1");
@@ -885,12 +900,8 @@
       countPdfPagesFromFile(files[0])
         .then(function (pageCount) {
           selectedQuantityMode = "unitaire";
-          var qtyInput = $("product-qty-input");
-          if (!qtyInput) {
-            renderQuantityField(String(pageCount));
-            qtyInput = $("product-qty-input");
-          }
-          if (qtyInput) qtyInput.value = String(pageCount);
+          documentPageCount = pageCount;
+          renderQuantityField(String(pageCount));
           requestPricing(String(pageCount)).then(function () {
             setStatus(priceStatus, "ok", "PDF detecte : " + pageCount + " page" + (pageCount > 1 ? "s" : "") + ".");
           });
@@ -904,12 +915,18 @@
       refreshSelectionsFromDom();
       clearStatus(priceStatus);
       var selectedQuantity = keepQuantity || readSelectedQuantity();
+      var copiesInput = $("product-doc-copies");
+      if (isImpressionDocumentProduct(product)) {
+        documentCopies = parseInt((copiesInput && copiesInput.value) || documentCopies || 1, 10);
+        if (isNaN(documentCopies) || documentCopies < 1) documentCopies = 1;
+      }
       var payload = {
         legacyCat: productLegacyCat,
         productId: product.id,
         selections: selections,
         quantityMode: selectedQuantityMode,
         quantity: selectedQuantity,
+        copies: isImpressionDocumentProduct(product) ? String(documentCopies || 1) : "",
         width: (($("product-width") || {}).value || ""),
         height: (($("product-height") || {}).value || "")
       };
@@ -934,6 +951,7 @@
           if (totalSummary) totalSummary.textContent = currentPriceValue != null ? euro(currentPriceValue) : normalizePriceLabel(currentPriceLabel);
           var qtySelect = $("product-qty-select");
           var qtyInput = $("product-qty-input");
+          var docCopiesInput = $("product-doc-copies");
           if (qtySelect) {
             quantityField.querySelectorAll("[data-qty-choice]").forEach(function (button) {
               button.addEventListener("click", function () {
@@ -943,6 +961,7 @@
             });
           }
           if (qtyInput) qtyInput.oninput = function () { requestPricing(qtyInput.value); };
+          if (docCopiesInput) docCopiesInput.oninput = function () { requestPricing(readSelectedQuantity()); };
           quantityField.querySelectorAll("[data-qty-mode]").forEach(function (button) {
             button.addEventListener("click", function () {
               selectedQuantityMode = button.getAttribute("data-qty-mode") || selectedQuantityMode;
@@ -984,6 +1003,9 @@
         var selectionSummary = Object.keys(selections).map(function (key) {
           return key + ": " + selections[key];
         }).join(" • ");
+        if (isImpressionDocumentProduct(product)) {
+          selectionSummary = [selectionSummary, "Pages: " + String(documentPageCount || 1), "Exemplaires: " + String(documentCopies || 1)].filter(Boolean).join(" • ");
+        }
         var paperFinish = extractPaperFinishFromSelections(selections);
         var productFiles = ($("product-files") || {}).files || [];
         addButton.disabled = true;
@@ -993,7 +1015,7 @@
             addToCart(
               product,
               { title: entry.gammeTitle },
-              readSelectedQuantity(),
+              isImpressionDocumentProduct(product) ? String(documentCopies || 1) : readSelectedQuantity(),
               $("product-notes").value.trim(),
               selectionSummary,
               paperFinish,

@@ -1098,6 +1098,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         const sels = body.selections && typeof body.selections === 'object' ? body.selections : {};
         const quantityMode = String(body.quantityMode || '').trim().toLowerCase();
         const quantity = body.quantity == null ? '' : String(body.quantity);
+        const copies = body.copies == null ? '' : String(body.copies);
         const width = body.width == null ? '' : String(body.width);
         const height = body.height == null ? '' : String(body.height);
         const resolved = resolveLegacyProduct(legacyCat, productId);
@@ -1182,14 +1183,23 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             if (chosen) {
                 const safeQty = isNaN(parsedQty) || parsedQty < 1 ? 1 : parsedQty;
-                numeric = chosen.type === 'unitaire' ? chosen.total * safeQty : chosen.total;
-                purchaseValue = chosen.purchasePrice == null ? null : (chosen.type === 'unitaire' ? chosen.purchasePrice * safeQty : chosen.purchasePrice);
+                const parsedCopies = parseInt(copies, 10);
+                const safeCopies = productId === 'impression-doc' && !isNaN(parsedCopies) && parsedCopies > 0 ? parsedCopies : 1;
+                const unitMultiplier = productId === 'impression-doc' ? safeQty * safeCopies : safeQty;
+                numeric = chosen.type === 'unitaire' ? chosen.total * unitMultiplier : chosen.total;
+                purchaseValue = chosen.purchasePrice == null ? null : (chosen.type === 'unitaire' ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
                 priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
                 if (chosen.type === 'unitaire') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
             }
         } else if (productData.priceLabel && numeric == null) {
             priceLabel = String(productData.priceLabel).replace(/€/g, 'EUR');
             numeric = parseEuroLabel(priceLabel);
+        }
+        if (productId === 'impression-doc' && !(productData.quantityPricing && productData.quantityPricing.length) && numeric != null) {
+            const parsedCopies = parseInt(copies, 10);
+            const safeCopies = !isNaN(parsedCopies) && parsedCopies > 0 ? parsedCopies : 1;
+            numeric = numeric * safeCopies;
+            priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
         }
         res.json({
             success: true,
@@ -1198,6 +1208,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             priceValue: numeric,
             purchaseValue,
             quantityValue,
+            copiesValue: copies,
             width,
             height
         });
