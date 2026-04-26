@@ -171,9 +171,9 @@
         <button class="admin-tab" data-open-scope="rdv" type="button">Rendez-vous <span class="admin-tab-count" id="count-rdv">0</span></button>
         <button class="admin-tab" data-open-scope="manual" type="button">Commande manuelle</button>
         <button class="admin-tab" data-open-scope="avis" type="button">Avis <span class="admin-tab-count" id="count-avis">0</span></button>
+        <button class="admin-tab" data-open-scope="gammes" type="button">Gammes</button>
         <button class="admin-tab" data-open-scope="produits" type="button">Produits <span class="admin-tab-count" id="count-produits">0</span></button>
         <button class="admin-tab" data-open-scope="clients" type="button">Clients <span class="admin-tab-count" id="count-clients">0</span></button>
-        <button class="admin-tab" data-open-scope="emails" type="button">Modeles de mail</button>
         <button class="admin-tab" data-open-scope="site" type="button">Accueil et contenu</button>
       </div>
       <div class="admin-summary">
@@ -292,14 +292,23 @@
     </div>
   </section>
 
-  <section class="admin-section" id="modal-email-templates">
+  <section class="admin-section" id="modal-gammes">
     <div class="box">
       <div class="box-head">
-        <h2>Modeles de mail</h2>
+        <h2>Gammes</h2>
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
-        <div class="site-grid" id="email-templates-grid"></div>
+        <div class="toolbar">
+          <div>
+            <strong>Gestion des gammes du site</strong>
+            <div class="muted">Modifie l'ordre, le nom, la description, masque une gamme ou ajoute une nouvelle gamme.</div>
+          </div>
+          <button class="btn btn-light btn-small" id="gamme-add" type="button">+ Ajouter une gamme</button>
+        </div>
+        <div class="list" id="gammes-list"></div>
+        <button class="btn btn-orange" id="gammes-save" type="button">Enregistrer les gammes</button>
+        <div class="status" id="gammes-status"></div>
       </div>
     </div>
   </section>
@@ -307,17 +316,17 @@
   <section class="admin-section" id="site-editor-section" style="width:min(1180px,calc(100% - 32px));margin:0 auto 40px;padding:0 0 28px;">
     <div class="box" style="max-height:none;">
       <div class="box-head">
-        <h2>Gestion du site</h2>
+        <h2>Accueil et contenu</h2>
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
         <div class="site-grid">
           <div class="panel">
-            <h3>1. Bandeau tout en haut</h3>
+            <h3>1. Bandeau haut du site</h3>
             <div class="field"><label>Message du bandeau</label><input id="site-top-banner" placeholder="Ex : Livraison offerte des 150 EUR"></div>
           </div>
           <div class="panel">
-            <h3>2. Grand bandeau d’accueil</h3>
+            <h3>2. En-tête accueil</h3>
             <div class="field"><label>Badge au-dessus du titre</label><input id="site-hero-badge" placeholder="Ex : Communication visuelle qui vend mieux"></div>
             <div class="field"><label>Sous-titre</label><input id="site-hero-slogan" placeholder="Ex : Vos vraies gammes COM' Impression"></div>
             <div class="field"><label>Ligne 1</label><input id="site-hero-line1" placeholder="Ex : L'impression"></div>
@@ -337,13 +346,13 @@
             </div>
           </div>
           <div class="panel">
-            <h3>3. Bloc sous le bandeau</h3>
+            <h3>3. Bloc d'information accueil</h3>
             <div class="field"><label>Titre du bloc</label><input id="site-panel-title" placeholder="Ex : Un accueil plus complet et plus utile"></div>
             <div class="field"><label>Texte du bloc</label><textarea id="site-panel-text" placeholder="Texte de presentation du bloc accueil"></textarea></div>
             <div class="field" style="display:none;"><label>Liste interne</label><textarea id="site-panel-items"></textarea></div>
           </div>
           <div class="panel">
-            <h3>4. Produits mis en avant</h3>
+            <h3>4. Produits mis en avant accueil</h3>
             <div class="field"><label>Titre section</label><input id="site-products-title" placeholder="Ex : Tout ce qu'il faut pour"></div>
             <div class="field"><label>Mot accent</label><input id="site-products-accent" placeholder="Ex : communiquer"></div>
             <div class="field"><label>Sous-titre section</label><textarea id="site-products-subtitle" placeholder="Texte d'introduction de la section"></textarea></div>
@@ -351,10 +360,10 @@
               <label>Produits mis en avant</label>
               <div class="season-list" id="site-products-list"></div>
             </div>
-            <p class="muted">Choisis les produits à afficher dans la zone saisonnière. Tu n’as plus besoin d’écrire les IDs à la main.</p>
+            <p class="muted">La liste vient du catalogue actuel, pas de l’ancien site.</p>
           </div>
           <div class="panel">
-            <h3>5. Message client</h3>
+            <h3>5. Popup information client</h3>
             <div class="field"><label>Popup incident / information</label><textarea id="site-popup-message" placeholder="Message visible par les clients"></textarea></div>
             <p class="muted">La sauvegarde publie directement les réglages sur le site public.</p>
           </div>
@@ -369,7 +378,7 @@
             <div class="list" id="promo-list" style="margin-top:12px;"></div>
           </div>
           <div class="panel">
-            <h3>7. FAQ et pages légales</h3>
+            <h3>7. Pages de contenu</h3>
             <div class="field"><label>FAQ</label><textarea id="site-faq-content" placeholder="Questions et réponses de la FAQ"></textarea></div>
             <div class="field"><label>Conditions générales de vente</label><textarea id="site-cgv-content" placeholder="Texte des CGV"></textarea></div>
             <div class="field"><label>Mentions légales</label><textarea id="site-legal-content" placeholder="Texte des mentions légales"></textarea></div>

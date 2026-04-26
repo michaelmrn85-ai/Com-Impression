@@ -24,6 +24,7 @@
     siteConfig: null,
     promoCodes: [],
     catalog: [],
+    gammes: [],
     clients: [],
     dailySummary: null,
     selectedProduct: null,
@@ -47,26 +48,6 @@
     { value:'comevt', label:"Com'Evenementiel" },
     { value:'comperso', label:"Com'Personnalisee" },
     { value:'comservices', label:"Com'Services" }
-  ];
-
-  var SITE_PRODUCT_OPTIONS = [
-    { id:'fairepart-a5', label:'Faire-part A5', meta:'Mariage, baptême, invitation' },
-    { id:'fairepart-a6', label:'Faire-part A6', meta:'Petit format événementiel' },
-    { id:'carte-invit', label:'Carte invitation', meta:'Invitations et cartons RSVP' },
-    { id:'menu-evt-carte', label:'Menu événementiel', meta:'Mariage, réception, dîner' },
-    { id:'plan-table', label:'Plan de table', meta:'Organisation des invités' },
-    { id:'panneau-bienv', label:'Panneau de bienvenue', meta:'Accueil événement' },
-    { id:'carte-remerci', label:'Carte de remerciement', meta:'Suite de mariage ou baptême' },
-    { id:'gobelet-evt', label:'Gobelet personnalisé', meta:'Événement, fête, mariage' },
-    { id:'flyer-a5', label:'Flyer A5', meta:'Communication saisonnière' },
-    { id:'flyer-a6', label:'Flyer A6', meta:'Petit format promo' },
-    { id:'affiche', label:'Affiche', meta:'Visibilité en vitrine ou salle' },
-    { id:'menu-resto', label:'Menu restaurant', meta:'Carte ou menu de saison' },
-    { id:'totebag', label:'Tote bag', meta:'Goodies et cadeau invité' },
-    { id:'bache-av-oe', label:'Bâche avec œillets', meta:'Signalétique extérieure' },
-    { id:'impression-doc', label:'Impression document', meta:'Service rapide du quotidien' },
-    { id:'plastif-a4', label:'Plastification A4', meta:'Menus, panneaux, affichage' },
-    { id:'photo-10x15-bri', label:'Photos 10x15', meta:'Souvenirs et tirages photo' }
   ];
 
   function $(id){ return document.getElementById(id); }
@@ -766,7 +747,18 @@
     var wrap = $('site-products-list');
     if(!wrap) return;
     var selected = Array.isArray(selectedIds) ? selectedIds : [];
-    wrap.innerHTML = SITE_PRODUCT_OPTIONS.map(function(item){
+    var options = state.catalog.map(function(entry){
+      return {
+        id: entry.product.id,
+        label: entry.product.title || entry.product.id,
+        meta: (entry.gammeTitle || '') + (entry.product.ref ? ' • ' + entry.product.ref : '')
+      };
+    });
+    if(!options.length){
+      wrap.innerHTML = '<div class="empty">Charge le catalogue pour choisir les produits mis en avant.</div>';
+      return;
+    }
+    wrap.innerHTML = options.map(function(item){
       var checked = selected.indexOf(item.id) !== -1 ? 'checked' : '';
       return '<label class="season-item">'
         +'<input type="checkbox" class="site-product-check" value="'+esc(item.id)+'" '+checked+'>'
@@ -967,11 +959,19 @@
     }, []);
   }
 
+  function getAdminGammeOptions(){
+    var fromCatalog = (state.gammes || []).map(function(gamme){
+      return { value: gamme.legacyCat || gamme.legacy || gamme.slug, label: gamme.title || gamme.legacyCat || gamme.slug };
+    }).filter(function(item){ return item.value && item.label; });
+    return fromCatalog.length ? fromCatalog : PRODUCT_GAMME_OPTIONS;
+  }
+
   function loadProductsAdmin(openAfterLoad){
     return fetch(api('/api/admin/catalog?mdp='+encodeURIComponent(state.mdp)))
       .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Catalogue indisponible'); return d; }); })
       .then(function(data){
-        state.catalog = flattenCatalog((data.catalog && data.catalog.gammes) || []);
+        state.gammes = (data.catalog && data.catalog.gammes) || [];
+        state.catalog = flattenCatalog(state.gammes);
         updateCounts();
         renderProductsList();
         if(openAfterLoad) openModal('modal-products','produits');
@@ -999,6 +999,85 @@
         +'<button class="btn btn-orange btn-small" data-edit-product="'+esc(entry.legacyCat)+'::'+esc(entry.product.id)+'" type="button">Modifier</button>'
         +'</div>';
     }).join('');
+  }
+
+  function loadGammesAdmin(openAfterLoad){
+    return fetch(api('/api/admin/gammes?mdp='+encodeURIComponent(state.mdp)))
+      .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Gammes indisponibles'); return d; }); })
+      .then(function(data){
+        state.gammesAdmin = Array.isArray(data.gammes) ? data.gammes : [];
+        renderGammesList();
+        if(openAfterLoad) openModal('modal-gammes','gammes');
+      });
+  }
+
+  function renderGammesList(){
+    var list=$('gammes-list');
+    if(!list) return;
+    var gammes=Array.isArray(state.gammesAdmin) ? state.gammesAdmin : [];
+    if(!gammes.length){
+      list.innerHTML='<div class="empty">Aucune gamme.</div>';
+      return;
+    }
+    list.innerHTML=gammes.map(function(gamme, index){
+      return '<div class="panel gamme-editor" data-gamme-index="'+index+'">'
+        +'<div class="site-grid">'
+          +'<div class="field"><label>Nom de la gamme</label><input class="gamme-title" value="'+esc(gamme.title||'')+'"></div>'
+          +'<div class="field"><label>Identifiant</label><input class="gamme-legacy" value="'+esc(gamme.legacy||'')+'" '+(gamme.builtin?'disabled':'')+'></div>'
+        +'</div>'
+        +'<div class="field"><label>Description</label><textarea class="gamme-description">'+esc(gamme.description||'')+'</textarea></div>'
+        +'<div class="template-actions">'
+          +'<button class="btn btn-light btn-small gamme-up" type="button">Monter</button>'
+          +'<button class="btn btn-light btn-small gamme-down" type="button">Descendre</button>'
+          +'<label style="display:flex;align-items:center;gap:8px;font-weight:800;"><input class="gamme-hidden" type="checkbox" style="width:auto;" '+(gamme.hidden?'checked':'')+'> Masquer la gamme</label>'
+          +(!gamme.builtin ? '<button class="btn-icon gamme-delete" type="button" title="Supprimer">×</button>' : '')
+        +'</div>'
+      +'</div>';
+    }).join('');
+  }
+
+  function readGammesEditor(){
+    return Array.prototype.slice.call(document.querySelectorAll('.gamme-editor')).map(function(row){
+      return {
+        legacy: ((row.querySelector('.gamme-legacy')||{}).value || '').trim(),
+        title: ((row.querySelector('.gamme-title')||{}).value || '').trim(),
+        description: ((row.querySelector('.gamme-description')||{}).value || '').trim(),
+        hidden: !!((row.querySelector('.gamme-hidden')||{}).checked),
+        builtin: !!((state.gammesAdmin || [])[Number(row.getAttribute('data-gamme-index'))] || {}).builtin,
+        comingSoon: !!((state.gammesAdmin || [])[Number(row.getAttribute('data-gamme-index'))] || {}).comingSoon
+      };
+    }).filter(function(gamme){ return gamme.title; });
+  }
+
+  function saveGammesAdmin(){
+    var gammes=readGammesEditor();
+    fetch(api('/api/admin/gammes'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mdp:state.mdp,gammes:gammes})
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Sauvegarde impossible'); return d; }); })
+    .then(function(data){
+      state.gammesAdmin = Array.isArray(data.gammes) ? data.gammes : gammes;
+      state.gammes = (data.catalog && data.catalog.gammes) || state.gammes;
+      state.catalog = flattenCatalog(state.gammes);
+      renderGammesList();
+      renderProductsList();
+      setStatus('gammes-status','ok','Gammes enregistrées.');
+    })
+    .catch(function(err){ setStatus('gammes-status','err',err.message||'Erreur gammes.'); });
+  }
+
+  function addGammeAdmin(){
+    state.gammesAdmin = Array.isArray(state.gammesAdmin) ? state.gammesAdmin : [];
+    state.gammesAdmin.push({
+      legacy:'gamme-'+Date.now(),
+      title:'Nouvelle gamme',
+      description:'',
+      builtin:false,
+      hidden:false
+    });
+    renderGammesList();
   }
 
   function findAdminProduct(key){
@@ -1035,7 +1114,7 @@
     var entryRef = state.selectedProduct;
     var paperOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /papier|grammage/i.test(k); })]||[]);
     var finishOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /finit|pellic|vernis|soft/i.test(k); })]||[]);
-    var gammeOptions = PRODUCT_GAMME_OPTIONS.map(function(item){
+    var gammeOptions = getAdminGammeOptions().map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
     }).join('');
     var pricingRows = buildProductPricingRows(entryRef.product || {});
@@ -1236,6 +1315,22 @@
       +'<div class="field"><label>Code réduction permanent</label><input id="client-edit-promo-code" value="'+esc(current.promo_permanent_code||'')+'" placeholder="Ex : CLIENT10"></div>'
       +'<div class="field"><label>Remise permanente %</label><input id="client-edit-promo-remise" inputmode="decimal" value="'+esc(current.promo_permanent_remise||'')+'" placeholder="10"></div>'
       +'</div>'
+      +(!current.isNew ? '<div class="panel"><h3>Documents archivés</h3>'
+        +'<div class="site-grid">'
+          +'<div class="field"><label>Type de document</label><select id="client-doc-type"><option>Devis</option><option>Commande</option><option>Facture</option><option>Avoir</option></select></div>'
+          +'<div class="field"><label>Nom du document</label><input id="client-doc-name" placeholder="Ex : Facture ancienne 2025"></div>'
+        +'</div>'
+        +'<div class="field"><label>PDF à ajouter</label><input id="client-doc-file" type="file" accept="application/pdf,.pdf"></div>'
+        +'<button class="btn btn-light btn-small" id="client-doc-upload" type="button">Ajouter le document</button>'
+        +'<div class="list" style="margin-top:12px;">'+((current.documents||[]).length ? (current.documents||[]).map(function(doc){
+          return '<div class="order" style="grid-template-columns:1fr .5fr auto;">'
+            +'<div><div class="num">'+esc(doc.nom||'Document')+'</div><div class="muted">'+esc(doc.date||'')+'</div></div>'
+            +'<div><span class="badge b-rec">'+esc(doc.type||'Document')+'</span></div>'
+            +'<a class="btn btn-light btn-small" href="'+esc(api('/api/admin/clients/'+encodeURIComponent(current.id)+'/document/'+encodeURIComponent(doc.id)+'?mdp='+encodeURIComponent(state.mdp)))+'" target="_blank">Ouvrir</a>'
+          +'</div>';
+        }).join('') : '<div class="empty">Aucun document archivé.</div>')+'</div>'
+        +'<div class="status" id="client-doc-status"></div>'
+      +'</div>' : '')
       +(current.account_request ? '<div class="panel"><h3>Demande ouverture de compte</h3><div class="kv">'
         +'<div><span>Statut</span><strong>'+esc(current.account_request.status||'demande')+'</strong></div>'
         +'<div><span>Moyen souhaite</span><strong>'+esc(current.account_request.payment_mode||'--')+'</strong></div>'
@@ -1277,6 +1372,29 @@
       return loadClientsAdmin(false);
     })
     .catch(function(err){ setStatus('client-edit-status','err',err.message||'Erreur sauvegarde client.'); });
+  }
+
+  function uploadClientDocument(){
+    var client=state.selectedClient;
+    if(!client || client.isNew) return;
+    var fileInput=$('client-doc-file');
+    var file=fileInput && fileInput.files && fileInput.files[0];
+    if(!file){ setStatus('client-doc-status','err','Ajoute un PDF.'); return; }
+    var fd=new FormData();
+    fd.append('mdp',state.mdp);
+    fd.append('type_doc',(($('client-doc-type')||{}).value||'Facture').trim());
+    fd.append('nom_doc',(($('client-doc-name')||{}).value||file.name).trim());
+    fd.append('document',file,file.name);
+    fetch(api('/api/admin/clients/'+encodeURIComponent(client.id)+'/document'),{
+      method:'POST',
+      body:fd
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Upload impossible'); return d; }); })
+    .then(function(){
+      setStatus('client-doc-status','ok','Document ajouté.');
+      return loadClientsAdmin(false).then(function(){ openClientEditor(client.id); });
+    })
+    .catch(function(err){ setStatus('client-doc-status','err',err.message||'Erreur upload document.'); });
   }
 
   function parseAmount(value){
@@ -1751,7 +1869,7 @@
         }
         if(scope==='jour'){ loadDailySummary(true); return; }
         if(scope==='rdv'){ renderAppointments(); openModal('modal-rdv','rdv'); return; }
-        if(scope==='emails'){ renderEmailTemplates(); openModal('modal-email-templates','emails'); return; }
+        if(scope==='gammes'){ loadGammesAdmin(true); return; }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }
         if(scope==='produits'){ loadProductsAdmin(true); return; }
@@ -1797,6 +1915,7 @@
         if(pricingOption) pricingOption.remove();
       }
       if(e.target && e.target.id==='client-edit-save') saveClientEditor();
+      if(e.target && e.target.id==='client-doc-upload') uploadClientDocument();
       if(e.target && e.target.id==='promo-create') createPromoCode();
       var promoDelete=e.target.closest ? e.target.closest('[data-delete-promo]') : null;
       if(promoDelete){ deletePromoCode(promoDelete.getAttribute('data-delete-promo')); return; }
@@ -1809,6 +1928,28 @@
           copyTemplateBtn.textContent='Copie';
           setTimeout(function(){ copyTemplateBtn.textContent='Copier'; },1200);
         }
+      }
+      if(e.target && e.target.id==='gamme-add'){ addGammeAdmin(); return; }
+      if(e.target && e.target.id==='gammes-save'){ saveGammesAdmin(); return; }
+      if(e.target && e.target.classList && e.target.classList.contains('gamme-delete')){
+        var deleteRow=e.target.closest('.gamme-editor');
+        if(deleteRow) deleteRow.remove();
+        state.gammesAdmin = readGammesEditor();
+        renderGammesList();
+        return;
+      }
+      if(e.target && e.target.classList && (e.target.classList.contains('gamme-up') || e.target.classList.contains('gamme-down'))){
+        var gammeRow=e.target.closest('.gamme-editor');
+        var gammeRows=Array.prototype.slice.call(document.querySelectorAll('.gamme-editor'));
+        var gammeIndex=gammeRows.indexOf(gammeRow);
+        state.gammesAdmin = readGammesEditor();
+        var targetIndex=e.target.classList.contains('gamme-up') ? gammeIndex-1 : gammeIndex+1;
+        if(targetIndex>=0 && targetIndex<state.gammesAdmin.length){
+          var moved=state.gammesAdmin.splice(gammeIndex,1)[0];
+          state.gammesAdmin.splice(targetIndex,0,moved);
+          renderGammesList();
+        }
+        return;
       }
       var avisBtn = e.target.closest ? e.target.closest('[data-avis-id]') : null;
       if(avisBtn){

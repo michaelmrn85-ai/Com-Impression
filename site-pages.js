@@ -2140,11 +2140,14 @@
       });
       var docs = commandes.reduce(function (items, cmd) {
         return items.concat((cmd.documents || []).map(function (doc) {
-          return { cmd: cmd, doc: doc };
+          return { numero: cmd.numero, doc: doc, href: "/api/commandes/" + encodeURIComponent(cmd.numero) + "/document/" + encodeURIComponent(doc.id) };
         }));
       }, []);
+      (client.documents || []).forEach(function (doc) {
+        docs.push({ numero: "Archive client", doc: doc, href: "/api/client/document/" + encodeURIComponent(doc.id) });
+      });
       var billingDocs = docs.filter(function (item) {
-        return /devis|facture|avoir/i.test(String((item.doc && item.doc.type) || ""));
+        return /devis|commande|facture|avoir/i.test(String((item.doc && item.doc.type) || ""));
       });
       var regularOrders = commandes.filter(function (cmd) {
         return !/^Rendez-vous/i.test(String(cmd.panier || ""));
@@ -2168,8 +2171,8 @@
       if (docList) {
         docList.innerHTML = billingDocs.length ? billingDocs.map(function (item) {
           return '<article class="order-row">'
-            + '<div class="split-line"><strong>' + esc(item.cmd.numero) + '</strong><span class="tag">' + esc(item.doc.type || "Document") + '</span></div>'
-            + '<a class="tag" href="/api/commandes/' + encodeURIComponent(item.cmd.numero) + '/document/' + encodeURIComponent(item.doc.id) + '" target="_blank" rel="noopener">Ouvrir le document</a>'
+            + '<div class="split-line"><strong>' + esc(item.numero) + '</strong><span class="tag">' + esc(item.doc.type || "Document") + '</span></div>'
+            + '<a class="tag" href="' + esc(item.href) + '" target="_blank" rel="noopener">Ouvrir le document</a>'
           + '</article>';
         }).join("") : '<div class="empty-state">Aucun devis ou facture disponible.</div>';
       }

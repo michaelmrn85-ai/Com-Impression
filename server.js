@@ -235,13 +235,7 @@ function buildCatalogApiPayload() {
     const cat = ctx.CAT || {};
     const overrides = lireProductOverrides();
     const customProducts = lireCustomProducts();
-    const order = [
-        { legacy: 'compro', slug: 'com-pro', title: "Com'Pro", description: "Supports print pour entreprises, commerces et activites pro." },
-        { legacy: 'comext', slug: 'com-exterieur', title: "Com'Exterieur", description: "Supports grand format et visibilite exterieure." },
-        { legacy: 'comevt', slug: 'com-evenementiel', title: "Com'Evenementiel", description: "Supports pour mariages, salons, receptions et evenements." },
-        { legacy: 'comperso', slug: 'com-personnalisee', title: "Com'Personnalisee", description: "Textile, goodies et objets personnalises." },
-        { legacy: 'comservices', slug: 'com-services', title: "Com'Services", description: "Impression, plastification, photo et services du quotidien." }
-    ];
+    const order = lireGammesConfig().filter(group => !group.hidden);
 
     let refIndex = 1;
     const gammes = order.map(group => {
@@ -369,17 +363,10 @@ function buildCatalogApiPayload() {
             legacyCat: group.legacy,
             title: group.title,
             description: group.description,
+            builtin: !!group.builtin,
+            comingSoon: !!group.comingSoon,
             products: legacyProducts.concat(extraProducts)
         };
-    });
-
-    gammes.push({
-        slug: 'com-gourmand',
-        legacyCat: 'com-gourmand',
-        title: "Com'Gourmand",
-        description: "Une future gamme de gourmandises personnalisees pour vos evenements et cadeaux clients.",
-        comingSoon: true,
-        products: []
     });
 
     return { gammes };
@@ -1289,6 +1276,7 @@ const SITE_CONFIG_FILE = path.join(INCIDENT_DATA_DIR, 'site-config.json');
 const PROMO_CODES_FILE = path.join(INCIDENT_DATA_DIR, 'promo-codes.json');
 const PRODUCT_OVERRIDES_FILE = path.join(INCIDENT_DATA_DIR, 'product-overrides.json');
 const CUSTOM_PRODUCTS_FILE = path.join(INCIDENT_DATA_DIR, 'custom-products.json');
+const GAMMES_CONFIG_FILE = path.join(INCIDENT_DATA_DIR, 'gammes-config.json');
 const VISITS_FILE = path.join(INCIDENT_DATA_DIR, 'visits.json');
 const CART_UPLOADS_DIR = path.join(INCIDENT_DATA_DIR, 'cart-uploads');
 const PRODUCT_IMAGES_DIR = path.join(INCIDENT_DATA_DIR, 'product-images');
@@ -1301,6 +1289,63 @@ function buildProductRef(index) {
 
 function buildProductOverrideKey(legacyCat, productId) {
     return String(legacyCat || '') + '::' + String(productId || '');
+}
+
+function defaultGammesConfig() {
+    return [
+        { legacy: 'compro', slug: 'com-pro', title: "Com'Pro", description: "Supports print pour entreprises, commerces et activites pro.", builtin: true, hidden: false },
+        { legacy: 'comext', slug: 'com-exterieur', title: "Com'Exterieur", description: "Supports grand format et visibilite exterieure.", builtin: true, hidden: false },
+        { legacy: 'comevt', slug: 'com-evenementiel', title: "Com'Evenementiel", description: "Supports pour mariages, salons, receptions et evenements.", builtin: true, hidden: false },
+        { legacy: 'comperso', slug: 'com-personnalisee', title: "Com'Personnalisee", description: "Textile, goodies et objets personnalises.", builtin: true, hidden: false },
+        { legacy: 'comservices', slug: 'com-services', title: "Com'Services", description: "Impression, plastification, photo et services du quotidien.", builtin: true, hidden: false },
+        { legacy: 'com-gourmand', slug: 'com-gourmand', title: "Com'Gourmand", description: "Une future gamme de gourmandises personnalisees pour vos evenements et cadeaux clients.", builtin: true, hidden: false, comingSoon: true }
+    ];
+}
+
+function normaliseGammeConfig(item, fallback) {
+    const base = fallback || {};
+    const title = String((item && item.title) || base.title || '').trim();
+    const rawSlug = String((item && (item.slug || item.legacy)) || base.slug || base.legacy || title || '').trim();
+    const slug = slugifyLegacyLabel(rawSlug) || slugifyLegacyLabel(title) || ('gamme-' + Date.now());
+    return {
+        legacy: String((item && item.legacy) || base.legacy || slug).trim() || slug,
+        slug,
+        title: title || slug,
+        description: String((item && item.description) || base.description || '').trim(),
+        builtin: !!base.builtin || !!(item && item.builtin),
+        hidden: !!(item && item.hidden),
+        comingSoon: !!base.comingSoon || !!(item && item.comingSoon)
+    };
+}
+
+function lireGammesConfig() {
+    const defaults = defaultGammesConfig();
+    let saved = [];
+    try {
+        saved = JSON.parse(fs.readFileSync(GAMMES_CONFIG_FILE, 'utf8'));
+        if (!Array.isArray(saved)) saved = [];
+    } catch (e) {
+        saved = [];
+    }
+    const byLegacy = {};
+    saved.forEach(item => { if (item && item.legacy) byLegacy[String(item.legacy)] = item; });
+    const merged = defaults.map(base => normaliseGammeConfig(Object.assign({}, base, byLegacy[base.legacy] || {}), base));
+    saved.forEach(item => {
+        if (!item || !item.legacy || defaults.some(base => base.legacy === item.legacy)) return;
+        merged.push(normaliseGammeConfig(item));
+    });
+    return merged;
+}
+
+function sauvegarderGammesConfig(list) {
+    const defaults = defaultGammesConfig();
+    const next = (Array.isArray(list) ? list : []).map(item => {
+        const legacy = String((item && item.legacy) || '').trim();
+        const base = defaults.find(defaultItem => defaultItem.legacy === legacy);
+        return normaliseGammeConfig(item, base);
+    });
+    fs.writeFileSync(GAMMES_CONFIG_FILE, JSON.stringify(next, null, 2));
+    return next;
 }
 
 function lireProductOverrides() {
@@ -1715,6 +1760,31 @@ app.get('/api/admin/catalog', (req, res) => {
     if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
         res.json({ success: true, catalog: buildCatalogApiPayload(), overrides: lireProductOverrides() });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/admin/gammes', (req, res) => {
+    const mdp = req.query.mdp;
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    res.json({ success: true, gammes: lireGammesConfig() });
+});
+
+app.post('/api/admin/gammes', express.json(), (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    try {
+        const incoming = Array.isArray(body.gammes) ? body.gammes : [];
+        const normalised = incoming.map(item => {
+            const title = String((item && item.title) || '').trim();
+            const legacy = String((item && item.legacy) || '').trim() || slugifyLegacyLabel(title);
+            return Object.assign({}, item, { legacy });
+        }).filter(item => item.legacy && String(item.title || '').trim());
+        const saved = sauvegarderGammesConfig(normalised);
+        res.json({ success: true, gammes: saved, catalog: buildCatalogApiPayload() });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
@@ -2610,6 +2680,7 @@ function safeClient(c) {
              promo_permanent_code:c.promo_permanent_code||'',
              promo_permanent_remise:Number(c.promo_permanent_remise||0),
              account_request:c.account_request||null,
+             documents:Array.isArray(c.documents) ? c.documents : [],
              email_verified: !!c.email_verified,
              points:c.points, historique_points:c.historique_points||[],
              codes_promo:c.codes_promo||[] };
@@ -2629,7 +2700,7 @@ app.get('/api/client/me', authClient, (req, res) => {
         documents: c.documents || [],
         date_livraison: c.date_livraison || ''
     }));
-    res.json({ success: true, client: safeClient(client), commandes });
+    res.json({ success: true, client: safeClient(client), commandes, documents: Array.isArray(client.documents) ? client.documents : [] });
 });
 
 app.get('/api/admin/clients', (req, res) => {
@@ -2821,6 +2892,56 @@ app.post('/api/commandes/:id/document', rateLimit({ windowMs: 15 * 60 * 1000, ma
     }
 
     res.json({ success:true, doc });
+});
+
+// POST /api/admin/clients/:id/document — déposer un ancien document sur une fiche client
+app.post('/api/admin/clients/:id/document', rateLimit({ windowMs: 15 * 60 * 1000, max: 25, prefix: 'admin-client-document' }), uploadDoc.single('document'), (req, res) => {
+    const { mdp } = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(403).json({ success:false, error:'Non autorisé' });
+    if (!req.file) return res.status(400).json({ success:false, error:'Fichier manquant' });
+
+    const clients = lireClients();
+    const idx = clients.findIndex(client => String(client.id) === String(req.params.id));
+    if (idx < 0) return res.status(404).json({ success:false, error:'Client introuvable' });
+
+    const doc = {
+        id: Date.now(),
+        nom: String(req.body.nom_doc || req.file.originalname || 'Document').trim(),
+        fichier: req.file.filename,
+        type: String(req.body.type_doc || 'Facture').trim(),
+        date: new Date().toLocaleDateString('fr-FR'),
+        archive: true
+    };
+    if (!Array.isArray(clients[idx].documents)) clients[idx].documents = [];
+    clients[idx].documents.unshift(doc);
+    clients[idx].updated_at = new Date().toISOString();
+    sauvegarderClients(clients);
+    res.json({ success:true, doc, client: safeClient(clients[idx]) });
+});
+
+// GET /api/client/document/:docId — télécharger un ancien document client
+app.get('/api/client/document/:docId', authClient, (req, res) => {
+    const client = lireClients().find(c => c.email === req.clientEmail);
+    if (!client) return res.status(404).json({ success:false });
+    const doc = (client.documents || []).find(d => String(d.id) === String(req.params.docId));
+    if (!doc) return res.status(404).json({ success:false });
+    const filePath = path.join(DOCS_DIR, doc.fichier);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ success:false });
+    res.download(filePath, String(doc.nom || 'document').toLowerCase().endsWith('.pdf') ? doc.nom : doc.nom + '.pdf');
+});
+
+// GET /api/admin/clients/:id/document/:docId — télécharger un ancien document client côté admin
+app.get('/api/admin/clients/:id/document/:docId', (req, res) => {
+    if (!ADMIN_PASSWORD) return res.status(503).send('Mot de passe admin non configure');
+    if (!adminPasswordMatches(req.query.mdp)) return res.status(403).send('Non autorisé');
+    const client = lireClients().find(c => String(c.id) === String(req.params.id));
+    if (!client) return res.status(404).send('Client introuvable');
+    const doc = (client.documents || []).find(d => String(d.id) === String(req.params.docId));
+    if (!doc) return res.status(404).send('Document introuvable');
+    const filePath = path.join(DOCS_DIR, doc.fichier);
+    if (!fs.existsSync(filePath)) return res.status(404).send('Fichier introuvable');
+    res.download(filePath, String(doc.nom || 'document').toLowerCase().endsWith('.pdf') ? doc.nom : doc.nom + '.pdf');
 });
 
 // GET /api/commandes/:id/document/:docId — télécharger un document (client authentifié)
