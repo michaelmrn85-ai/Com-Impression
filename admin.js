@@ -1870,6 +1870,7 @@
         e.target.classList.contains('product-pricing-qty') ||
         e.target.classList.contains('product-pricing-width') ||
         e.target.classList.contains('product-pricing-height') ||
+        e.target.classList.contains('product-pricing-finish') ||
         e.target.classList.contains('product-pricing-purchase') ||
         e.target.classList.contains('product-pricing-sale')
       )) refreshProductPricingTable();

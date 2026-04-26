@@ -1105,7 +1105,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         const quantityOptions = productData.quantityOptions && productData.quantityOptions.length
             ? uniquePositiveNumbers(productData.quantityOptions)
             : (resolved ? resolveQuantityOptions(resolved.ctx, resolved.prod, sels) : []);
-        const quantityValue = quantity || (quantityOptions[0] != null ? String(quantityOptions[0]) : '');
+        let quantityValue = quantity || (quantityOptions[0] != null ? String(quantityOptions[0]) : '');
         let priceLabel = resolved ? resolved.ctx.calcPrix(resolved.prod, sels, quantityValue, width, height) : String(customProduct.priceLabel || 'Sur devis');
         let numeric = parseEuroLabel(priceLabel);
         let purchaseValue = null;
@@ -1115,7 +1115,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 .filter(key => /recto|verso|impression/i.test(key))
                 .map(key => normaliseOptionKey(sels[key]))
                 .filter(Boolean);
-            const parsedQty = parseInt(quantityValue, 10);
+            let parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
             const tiers = normaliseQuantityPricing(productData.quantityPricing);
@@ -1125,7 +1125,13 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (!item.finish) return false;
                 return selectedSideValues.includes(normaliseOptionKey(item.finish));
             });
-            if (lotTiersForOption.length) responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
+            if (lotTiersForOption.length) {
+                responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
+                if (quantityMode === 'lot' && !responseQuantityOptions.includes(parseInt(quantityValue, 10))) {
+                    quantityValue = String(responseQuantityOptions[0]);
+                    parsedQty = parseInt(quantityValue, 10);
+                }
+            }
             let chosen = null;
             if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
                 const dimensionalTiers = tiers.filter(item => item.type === 'dimensions');
@@ -1150,12 +1156,15 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                     : [];
                 if (optionTiers.length) quantityTiers = optionTiers;
                 const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
+                const effectiveQty = quantityMode === 'lot' && lotTiersForOption.length && !lotTiersForOption.some(item => item.quantity === parsedQty)
+                    ? lotTiersForOption[0].quantity
+                    : parsedQty;
                 if (quantityMode === 'lot') {
-                    chosen = quantityTiers.find(item => item.quantity === parsedQty) || null;
+                    chosen = quantityTiers.find(item => item.quantity === effectiveQty) || null;
                 } else if (unitTiers.length) {
                     chosen = unitTiers[0];
                 } else {
-                    chosen = quantityTiers.find(item => item.quantity === parsedQty) || quantityTiers.find(item => item.quantity >= parsedQty) || quantityTiers[quantityTiers.length - 1];
+                    chosen = quantityTiers.find(item => item.quantity === effectiveQty) || quantityTiers.find(item => item.quantity >= effectiveQty) || quantityTiers[quantityTiers.length - 1];
                 }
             }
             if (chosen) {
