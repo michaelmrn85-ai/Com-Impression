@@ -1251,6 +1251,7 @@ app.get('/produits', (req, res) => { try { trackVisit(req); } catch(e) {} res.se
 app.get('/produit', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'produit.html')); });
 app.get('/panier', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'panier.html')); });
 app.get('/client', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'client.html')); });
+app.get('/ouverture-compte', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'ouverture-compte.html')); });
 app.get('/rendez-vous', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'rendez-vous.html')); });
 app.get('/mentions-legales', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'mentions-legales.html')); });
 app.get('/cgv', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'cgv.html')); });
@@ -1498,6 +1499,7 @@ function trackVisit(req) {
         '/produit.html': '/produit',
         '/panier.html': '/panier',
         '/client.html': '/client',
+        '/ouverture-compte.html': '/ouverture-compte',
         '/rendez-vous.html': '/rendez-vous',
         '/mentions-legales.html': '/mentions-legales',
         '/cgv.html': '/cgv',
@@ -1506,7 +1508,7 @@ function trackVisit(req) {
     pathname = htmlAliases[pathname] || pathname;
     if (req.method !== 'GET') return;
     if (pathname.startsWith('/api') || pathname.startsWith('/admin') || pathname.includes('.')) return;
-    const tracked = ['/', '/produits', '/produit', '/panier', '/client', '/rendez-vous', '/mentions-legales', '/cgv', '/faq'];
+    const tracked = ['/', '/produits', '/produit', '/panier', '/client', '/ouverture-compte', '/rendez-vous', '/mentions-legales', '/cgv', '/faq'];
     if (tracked.indexOf(pathname) === -1) return;
     const visits = lireVisits();
     const dayKey = getVisitDayKey();
@@ -2448,6 +2450,97 @@ app.post('/api/client/register', express.json(), rateLimit({ windowMs: 30 * 60 *
     }
 });
 
+// POST /api/ouverture-compte — demande de paiement pro/admin avant validation
+app.post('/api/ouverture-compte', express.json(), rateLimit({ windowMs: 30 * 60 * 1000, max: 10, prefix: 'ouverture-compte' }), async (req, res) => {
+    try {
+        const body = req.body || {};
+        const email = normaliserEmail(body.email);
+        const prenom = String(body.prenom || '').trim();
+        const nom = String(body.nom || '').trim();
+        const societe = String(body.societe || '').trim();
+        const siret = String(body.siret || '').replace(/\D/g, '').trim();
+        const typeClient = String(body.type_client || 'Professionnel').trim() || 'Professionnel';
+        const paymentMode = /administration/i.test(typeClient) ? 'Administration Chorus' : 'Virement';
+        if (!email || !email.includes('@')) return res.status(400).json({ success:false, error:'Email invalide' });
+        if (!prenom || !nom || !societe || !siret) {
+            return res.status(400).json({ success:false, error:'Société, SIRET, prénom, nom et email obligatoires' });
+        }
+        if (siret.length !== 14) return res.status(400).json({ success:false, error:'SIRET invalide : 14 chiffres attendus' });
+
+        const clients = lireClients();
+        let client = clients.find(c => normaliserEmail(c.email) === email);
+        if (!client) {
+            client = {
+                id: CRYPTO.randomBytes(8).toString('hex'),
+                email,
+                points: 0,
+                historique_points: [],
+                codes_promo: [],
+                mode_reglement: 'CB',
+                email_verified: false,
+                created_at: new Date().toISOString()
+            };
+            clients.push(client);
+        }
+        client.prenom = prenom;
+        client.nom = nom;
+        client.type_client = typeClient;
+        client.societe = societe;
+        client.siret = siret;
+        client.telephone = String(body.telephone || '').trim();
+        client.adresse = String(body.adresse || '').trim();
+        client.cp = String(body.cp || '').trim();
+        client.ville = String(body.ville || '').trim();
+        client.account_request = {
+            requested: true,
+            status: 'demande',
+            payment_mode: paymentMode,
+            contact: String(body.account_contact || '').trim(),
+            email: normaliserEmail(body.account_email || '') || email,
+            info: String(body.account_info || '').trim(),
+            source: 'ouverture-compte',
+            created_at: new Date().toISOString()
+        };
+        client.updated_at = new Date().toISOString();
+        sauvegarderClients(clients);
+
+        try {
+            const publicBaseUrl = getPublicBaseUrl(req);
+            const t = createTransporter();
+            await t.sendMail({
+                from: `"COM' Impression" <${process.env.SMTP_USER}>`,
+                to: process.env.ADMIN_EMAIL || process.env.SMTP_USER,
+                subject: "Demande d'ouverture de compte à valider",
+                html: emailWrapper(`
+                    <h2 style="color:#F47B20;margin:0 0 12px;">Nouvelle demande d'ouverture de compte</h2>
+                    <p><strong>Client :</strong> ${escapeHtml(prenom)} ${escapeHtml(nom)}</p>
+                    <p><strong>Email :</strong> ${escapeHtml(email)}</p>
+                    <p><strong>Profil :</strong> ${escapeHtml(typeClient)}</p>
+                    <p><strong>Societe / structure :</strong> ${escapeHtml(societe)}</p>
+                    <p><strong>SIRET :</strong> ${escapeHtml(siret)}</p>
+                    <p><strong>Moyen a valider :</strong> ${escapeHtml(paymentMode)}</p>
+                    <p><strong>Contact facturation :</strong> ${escapeHtml(client.account_request.contact || '--')}</p>
+                    <p><strong>Email facturation :</strong> ${escapeHtml(client.account_request.email || '--')}</p>
+                    <p><strong>Infos :</strong><br>${escapeHtml(client.account_request.info || '--').replace(/\n/g, '<br>')}</p>
+                    <p style="margin-top:18px;">La demande est disponible dans l'onglet Clients de l'admin.</p>
+                `, '#F47B20', "COM' Impression", publicBaseUrl, 'Ouverture de compte'),
+                attachments: getBrandingAttachments()
+            });
+        } catch(e) {
+            console.warn('Email admin ouverture compte non envoyé:', e.message);
+        }
+
+        res.json({
+            success:true,
+            client: safeClient(client),
+            message:'Demande envoyée. Elle sera validée depuis l’admin.'
+        });
+    } catch(e) {
+        console.error('Erreur ouverture compte:', e);
+        res.status(500).json({ success:false, error:e.message });
+    }
+});
+
 // POST /api/client/password-login — connexion email + mot de passe
 app.post('/api/client/password-login', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, prefix: 'client-password-login' }), (req, res) => {
     const email = normaliserEmail(req.body.email);
@@ -2738,6 +2831,60 @@ app.post('/api/admin/clients/:id', express.json(), (req, res) => {
     res.json({ success: true, client: safeClient(clients[idx]) });
 });
 
+app.post('/api/admin/clients/:id/account-request', express.json(), async (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    const action = String(body.action || '').trim();
+    if (!['valider', 'refuser', 'attente'].includes(action)) {
+        return res.status(400).json({ success: false, error: 'Action invalide' });
+    }
+    const clients = lireClients();
+    const idx = clients.findIndex(client => String(client.id) === String(req.params.id));
+    if (idx < 0) return res.status(404).json({ success: false, error: 'Client introuvable' });
+    const client = clients[idx];
+    client.account_request = client.account_request || { requested:true, payment_mode:String(body.payment_mode || '').trim() || 'Virement' };
+    if (action === 'valider') {
+        const requestedMode = String(client.account_request.payment_mode || body.payment_mode || 'Virement').trim();
+        client.mode_reglement = /chorus/i.test(requestedMode) ? 'Administration Chorus' : 'Virement';
+        client.account_request.status = 'validee';
+        client.account_request.validated_at = new Date().toISOString();
+    } else if (action === 'refuser') {
+        client.account_request.status = 'refusee';
+        client.account_request.refused_at = new Date().toISOString();
+    } else {
+        client.account_request.status = 'demande';
+    }
+    client.updated_at = new Date().toISOString();
+    sauvegarderClients(clients);
+
+    if (client.email && action !== 'attente') {
+        try {
+            const publicBaseUrl = getPublicBaseUrl(req);
+            const isAccepted = action === 'valider';
+            const t = createTransporter();
+            await t.sendMail({
+                from: `"COM' Impression" <${process.env.SMTP_USER}>`,
+                to: client.email,
+                subject: isAccepted ? "Ouverture de compte COM' Impression validée" : "Demande d'ouverture de compte COM' Impression",
+                html: emailWrapper(`
+                    <h2 style="color:#F47B20;margin:0 0 12px;">${isAccepted ? 'Votre ouverture de compte est validée' : 'Votre demande a été étudiée'}</h2>
+                    <p>Bonjour ${escapeHtml(client.prenom || client.nom || 'Client')},</p>
+                    <p>${isAccepted
+                        ? `Votre compte est maintenant autorisé au paiement par <strong>${escapeHtml(client.mode_reglement)}</strong>.`
+                        : `Votre demande d'ouverture de compte n'a pas été validée pour le moment.`}</p>
+                    <p>Vous pouvez retrouver votre espace client depuis le site COM' Impression.</p>
+                `, '#F47B20', "COM' Impression", publicBaseUrl, 'Ouverture de compte'),
+                attachments: getBrandingAttachments()
+            });
+        } catch(e) {
+            console.warn('Email validation ouverture compte non envoyé:', e.message);
+        }
+    }
+
+    res.json({ success: true, client: safeClient(client) });
+});
+
 app.post('/api/admin/clients', express.json(), (req, res) => {
     const body = req.body || {};
     if (!requireAdminPasswordConfigured(res)) return;
@@ -2826,6 +2973,42 @@ Object.values(MANUAL_DOC_DIRS).forEach(dir => {
     if (!fs.existsSync(dir)) {
         try { fs.mkdirSync(dir, { recursive:true }); } catch (e) {}
     }
+});
+
+app.get('/api/admin/diagnostic', (req, res) => {
+    const mdp = req.query.mdp;
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    const checks = [];
+    const addCheck = (key, label, ok, detail, warn) => {
+        checks.push({ key, label, status: ok ? 'ok' : (warn ? 'warn' : 'err'), detail: detail || '' });
+    };
+    addCheck('admin_pwd', 'Mot de passe admin', !!process.env.ADMIN_PWD, process.env.ADMIN_PWD ? 'Configuré' : 'ADMIN_PWD manquant');
+    addCheck('admin_email', 'Email admin', !!process.env.ADMIN_EMAIL, process.env.ADMIN_EMAIL || 'ADMIN_EMAIL manquant', true);
+    addCheck('public_url', 'URL publique', !!(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL), process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'URL publique non définie', true);
+    addCheck('smtp', 'SMTP', !!(process.env.SMTP_USER && process.env.SMTP_PASS), `Host: ${process.env.SMTP_HOST || 'smtp.ionos.fr'} / Port: ${process.env.SMTP_PORT || '465'}`);
+    addCheck('sumup', 'SumUp', !!(process.env.SUMUP_PUBLIC_API_KEY && process.env.SUMUP_SECRET_API_KEY && process.env.SUMUP_MERCHANT_CODE), 'Clés publique, secrète et merchant code');
+    try {
+        const probe = path.join(INCIDENT_DATA_DIR, `.diagnostic-${Date.now()}.txt`);
+        fs.writeFileSync(probe, 'ok');
+        const content = fs.readFileSync(probe, 'utf8');
+        fs.unlinkSync(probe);
+        addCheck('storage', 'Stockage /var/data', content === 'ok', INCIDENT_DATA_DIR);
+    } catch(e) {
+        addCheck('storage', 'Stockage /var/data', false, e.message);
+    }
+    const foldersOk = Object.values(MANUAL_DOC_DIRS).every(dir => {
+        try {
+            fs.mkdirSync(dir, { recursive:true });
+            fs.accessSync(dir, fs.constants.W_OK);
+            return true;
+        } catch(e) {
+            return false;
+        }
+    });
+    addCheck('pdf_folders', 'Dossiers PDF', foldersOk, Object.keys(MANUAL_DOC_DIRS).join(', '));
+    addCheck('logo', 'Logo et favicon', fs.existsSync(BRAND_LOGO_PATH) && fs.existsSync(path.join(__dirname, 'favicon.png')), 'com-logo.png / favicon.png', true);
+    res.json({ success:true, checks });
 });
 
 const uploadDoc = multer({

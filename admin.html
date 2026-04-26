@@ -175,6 +175,7 @@
         <button class="admin-tab" data-open-scope="produits" type="button">Produits <span class="admin-tab-count" id="count-produits">0</span></button>
         <button class="admin-tab" data-open-scope="clients" type="button">Clients <span class="admin-tab-count" id="count-clients">0</span></button>
         <button class="admin-tab" data-open-scope="site" type="button">Accueil et contenu</button>
+        <button class="admin-tab" data-open-scope="diagnostic" type="button">Diagnostic</button>
       </div>
       <div class="admin-summary">
         <article class="admin-summary-card">
@@ -517,6 +518,22 @@
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body" id="client-edit-body"></div>
+    </div>
+  </section>
+
+  <section class="admin-section" id="modal-diagnostic">
+    <div class="box">
+      <div class="box-head">
+        <h2>Diagnostic</h2>
+        <div class="actions">
+          <button class="btn btn-dark btn-small" id="diagnostic-reload" type="button">Actualiser</button>
+          <button class="btn btn-light btn-small" data-close type="button">Retour</button>
+        </div>
+      </div>
+      <div class="box-body">
+        <div class="list" id="diagnostic-list"></div>
+        <div class="status" id="diagnostic-status"></div>
+      </div>
     </div>
   </section>
 

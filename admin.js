@@ -26,6 +26,7 @@
     catalog: [],
     gammes: [],
     clients: [],
+    diagnostic: [],
     dailySummary: null,
     selectedProduct: null,
     selectedClient: null,
@@ -1251,15 +1252,17 @@
     var q=(($('clients-search')||{}).value||'').toLowerCase().trim();
     var items=state.clients.filter(function(client){
       if(!q) return true;
-      return [client.prenom, client.nom, client.email, client.societe, client.siret, client.mode_reglement, client.type_client].join(' ').toLowerCase().indexOf(q)!==-1;
+      return [client.prenom, client.nom, client.email, client.societe, client.siret, client.mode_reglement, client.type_client, client.account_request && client.account_request.status].join(' ').toLowerCase().indexOf(q)!==-1;
     });
     if(!items.length){
       list.innerHTML='<div class="empty">Aucun client trouvé.</div>';
       return;
     }
     list.innerHTML=items.map(function(client){
+      var request = client.account_request || null;
+      var requestBadge = request && request.status === 'demande' ? '<span class="badge b-ann" style="margin-left:8px;">Demande compte</span>' : '';
       return '<div class="order">'
-        +'<div><div class="num">'+esc(((client.prenom||'')+' '+(client.nom||'')).trim()||client.email||'Client')+'</div><div class="muted">'+esc(client.email||'')+'</div></div>'
+        +'<div><div class="num">'+esc(((client.prenom||'')+' '+(client.nom||'')).trim()||client.email||'Client')+requestBadge+'</div><div class="muted">'+esc(client.email||'')+'</div></div>'
         +'<div><strong>'+esc(client.type_client||'Particulier')+'</strong><div class="muted">'+esc(client.societe||client.siret||'')+'</div></div>'
         +'<div><span class="badge b-bat">'+esc(client.mode_reglement||'CB')+'</span><div class="muted">'+esc(String(client.commandes_count||0))+' commande(s)</div></div>'
         +'<button class="btn btn-orange btn-small" data-edit-client="'+esc(client.id)+'" type="button">Modifier</button>'
@@ -1337,7 +1340,12 @@
         +'<div><span>Contact facturation</span><strong>'+esc(current.account_request.contact||'--')+'</strong></div>'
         +'<div><span>Email facturation</span><strong>'+esc(current.account_request.email||'--')+'</strong></div>'
         +'<div><span>Infos</span><strong>'+esc(current.account_request.info||'--')+'</strong></div>'
-      +'</div></div>' : '')
+      +'</div>'
+      +(!current.isNew ? '<div class="actions" style="margin-top:14px;">'
+        +'<button class="btn btn-orange btn-small" data-account-action="valider" type="button">Valider l’ouverture</button>'
+        +'<button class="btn btn-light btn-small" data-account-action="refuser" type="button">Refuser</button>'
+      +'</div><div class="status" id="client-account-status"></div>' : '')
+      +'</div>' : '')
       +'<button class="btn btn-orange" id="client-edit-save" type="button">'+(current.isNew?'Creer le client':'Enregistrer le client')+'</button>'
       +'<div class="status" id="client-edit-status"></div>';
     openModal('modal-client-edit','clients');
@@ -1395,6 +1403,54 @@
       return loadClientsAdmin(false).then(function(){ openClientEditor(client.id); });
     })
     .catch(function(err){ setStatus('client-doc-status','err',err.message||'Erreur upload document.'); });
+  }
+
+  function updateAccountRequest(action){
+    var client=state.selectedClient;
+    if(!client || client.isNew) return;
+    setStatus('client-account-status','ok','Mise à jour en cours...');
+    fetch(api('/api/admin/clients/'+encodeURIComponent(client.id)+'/account-request'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ mdp:state.mdp, action:action })
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Action impossible'); return d; }); })
+    .then(function(){
+      setStatus('client-account-status','ok',action==='valider'?'Ouverture validée.':'Demande mise à jour.');
+      return loadClientsAdmin(false).then(function(){ openClientEditor(client.id); });
+    })
+    .catch(function(err){ setStatus('client-account-status','err',err.message||'Erreur ouverture de compte.'); });
+  }
+
+  function loadDiagnostic(openAfterLoad){
+    return fetch(api('/api/admin/diagnostic?mdp='+encodeURIComponent(state.mdp)))
+      .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Diagnostic indisponible'); return d; }); })
+      .then(function(data){
+        state.diagnostic = Array.isArray(data.checks) ? data.checks : [];
+        renderDiagnostic();
+        if(openAfterLoad) openModal('modal-diagnostic','diagnostic');
+      })
+      .catch(function(err){
+        if(openAfterLoad) openModal('modal-diagnostic','diagnostic');
+        setStatus('diagnostic-status','err',err.message||'Diagnostic indisponible.');
+      });
+  }
+
+  function renderDiagnostic(){
+    var list=$('diagnostic-list');
+    if(!list) return;
+    if(!state.diagnostic.length){
+      list.innerHTML='<div class="empty">Aucun diagnostic chargé.</div>';
+      return;
+    }
+    list.innerHTML=state.diagnostic.map(function(item){
+      var cls = item.status === 'ok' ? 'b-rec' : (item.status === 'warn' ? 'b-bat' : 'b-ann');
+      var label = item.status === 'ok' ? 'OK' : (item.status === 'warn' ? 'A vérifier' : 'Pas OK');
+      return '<div class="order" style="grid-template-columns:1fr auto;">'
+        +'<div><div class="num">'+esc(item.label||'Controle')+'</div><div class="muted">'+esc(item.detail||'')+'</div></div>'
+        +'<span class="badge '+cls+'">'+label+'</span>'
+      +'</div>';
+    }).join('');
   }
 
   function parseAmount(value){
@@ -1845,6 +1901,7 @@
     if($('rdv-reload')) $('rdv-reload').addEventListener('click',loadCommandes);
     if($('products-reload')) $('products-reload').addEventListener('click',function(){ loadProductsAdmin(false); });
     if($('clients-reload')) $('clients-reload').addEventListener('click',function(){ loadClientsAdmin(false); });
+    if($('diagnostic-reload')) $('diagnostic-reload').addEventListener('click',function(){ loadDiagnostic(false); });
     if($('products-create')) $('products-create').addEventListener('click',function(){ openProductEditor(); });
     if($('clients-create')) $('clients-create').addEventListener('click',function(){ openClientEditor(); });
     $('orders-search').addEventListener('input',renderOrders);
@@ -1874,6 +1931,7 @@
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }
         if(scope==='produits'){ loadProductsAdmin(true); return; }
         if(scope==='clients'){ loadClientsAdmin(true); return; }
+        if(scope==='diagnostic'){ loadDiagnostic(true); return; }
         openOrders(scope);
       });
     });
@@ -1916,6 +1974,8 @@
       }
       if(e.target && e.target.id==='client-edit-save') saveClientEditor();
       if(e.target && e.target.id==='client-doc-upload') uploadClientDocument();
+      var accountBtn=e.target.closest ? e.target.closest('[data-account-action]') : null;
+      if(accountBtn){ updateAccountRequest(accountBtn.getAttribute('data-account-action')); return; }
       if(e.target && e.target.id==='promo-create') createPromoCode();
       var promoDelete=e.target.closest ? e.target.closest('[data-delete-promo]') : null;
       if(promoDelete){ deletePromoCode(promoDelete.getAttribute('data-delete-promo')); return; }

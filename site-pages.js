@@ -19,6 +19,7 @@
       "/produit": "./produit.html",
       "/panier": "./panier.html",
       "/client": "./client.html",
+      "/ouverture-compte": "./ouverture-compte.html",
       "/rendez-vous": "./rendez-vous.html",
       "/mentions-legales": "./mentions-legales.html",
       "/cgv": "./cgv.html",
@@ -2628,6 +2629,85 @@
     }
   }
 
+  function initOuvertureComptePage() {
+    var form = $("account-opening-form");
+    var status = $("account-opening-status");
+    if (!form || !status) return;
+
+    var typeInput = $("account-type-client");
+    var preview = $("account-payment-preview");
+
+    function wantedPaymentMode() {
+      var type = ((typeInput || {}).value || "").trim();
+      return /administration/i.test(type) ? "Administration Chorus" : "Virement";
+    }
+
+    function syncPreview() {
+      if (!preview) return;
+      preview.textContent = wantedPaymentMode() === "Administration Chorus"
+        ? "Paiement demande : Administration Chorus Pro, apres validation admin."
+        : "Paiement demande : virement sous 48h, apres validation admin.";
+    }
+
+    if (typeInput) typeInput.addEventListener("change", syncPreview);
+    syncPreview();
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      clearStatus(status);
+      var payload = {
+        type_client: (($("account-type-client") || {}).value || "").trim(),
+        societe: (($("account-societe") || {}).value || "").trim(),
+        siret: (($("account-siret") || {}).value || "").trim(),
+        prenom: (($("account-prenom") || {}).value || "").trim(),
+        nom: (($("account-nom") || {}).value || "").trim(),
+        email: (($("account-email") || {}).value || "").trim(),
+        telephone: (($("account-telephone") || {}).value || "").trim(),
+        adresse: (($("account-adresse") || {}).value || "").trim(),
+        cp: (($("account-cp") || {}).value || "").trim(),
+        ville: (($("account-ville") || {}).value || "").trim(),
+        account_contact: (($("account-contact") || {}).value || "").trim(),
+        account_email: (($("account-email-facturation") || {}).value || "").trim(),
+        account_info: (($("account-info") || {}).value || "").trim(),
+        account_payment_mode: wantedPaymentMode()
+      };
+      if (!payload.societe || !payload.siret || !payload.prenom || !payload.nom || !payload.email) {
+        setStatus(status, "err", "Societe, SIRET, prenom, nom et email sont obligatoires.");
+        return;
+      }
+      var submit = $("account-opening-submit");
+      if (submit) {
+        submit.disabled = true;
+        submit.textContent = "Envoi en cours...";
+      }
+      fetch(API_BASE + "/api/ouverture-compte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok || !json.success) throw new Error(json.error || "Demande impossible");
+            return json;
+          });
+        })
+        .then(function (data) {
+          form.reset();
+          syncPreview();
+          setStatus(status, "ok", data.message || "Demande envoyee. Elle apparait maintenant dans l'admin.");
+        })
+        .catch(function (error) {
+          setStatus(status, "err", error.message || "Impossible d'envoyer la demande.");
+        })
+        .finally(function () {
+          if (submit) {
+            submit.disabled = false;
+            submit.textContent = "Envoyer la demande";
+          }
+        });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     bindShell();
     var page = document.body.getAttribute("data-page");
@@ -2636,6 +2716,7 @@
     if (page === "produit") initProductPage();
     if (page === "panier") initCartPage();
     if (page === "client") initClientPage();
+    if (page === "ouverture-compte") initOuvertureComptePage();
     if (page === "rendez-vous") initRendezVousPage();
   });
 })();
