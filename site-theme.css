@@ -775,6 +775,18 @@ body[data-page="client"] #client-dashboard-view .section-head {
   padding: 12px;
 }
 
+.product-step-tab.is-nav {
+  cursor: pointer;
+}
+
+.product-step-tab.is-nav:hover {
+  background: #fff7ef;
+}
+
+.product-step-tab:disabled {
+  cursor: default;
+}
+
 #product-final-layout[hidden],
 #product-final-fields[hidden] {
   display: none !important;

@@ -972,9 +972,16 @@
       configWrap.className = "product-stepper";
       configWrap.addEventListener("click", function (event) {
         var button = event.target && event.target.closest ? event.target.closest(".product-step-choice") : null;
-        if (!button || !configWrap.contains(button)) return;
-        event.preventDefault();
-        chooseConfigStep(button);
+        if (button && configWrap.contains(button)) {
+          event.preventDefault();
+          chooseConfigStep(button);
+          return;
+        }
+        var tab = event.target && event.target.closest ? event.target.closest(".product-step-tab.is-nav") : null;
+        if (tab && configWrap.contains(tab)) {
+          event.preventDefault();
+          goToConfigStep(tab);
+        }
       });
     }
 
@@ -994,8 +1001,9 @@
         var done = selections[step.key] ? " done" : "";
         var active = index === currentStepIndex && !isFinal ? " active" : "";
         var selected = selections[step.key] ? '<span>' + esc(selections[step.key]) + '</span>' : '';
-        return '<div class="product-step-tab' + done + active + '"><strong>' + esc(step.title || step.key) + '</strong>' + selected + '</div>';
-      }).join("") + '<div class="product-step-tab' + (isFinal ? ' active' : '') + '"><strong>Quantite & fichiers</strong></div>';
+        var canGoBack = index < currentStepIndex || !!selections[step.key];
+        return '<button type="button" class="product-step-tab' + done + active + (canGoBack ? ' is-nav' : '') + '" data-step-index="' + esc(String(index)) + '"' + (canGoBack ? '' : ' disabled') + '><strong>' + esc(step.title || step.key) + '</strong>' + selected + '</button>';
+      }).join("") + '<button type="button" class="product-step-tab' + (isFinal ? ' active' : '') + '" disabled><strong>Quantite & fichiers</strong></button>';
       if (isFinal) {
         configWrap.classList.add("is-final");
         configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>';
@@ -1035,6 +1043,17 @@
           finalLayout.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       }
+    }
+
+    function goToConfigStep(button) {
+      var index = parseInt(button && button.getAttribute("data-step-index"), 10);
+      if (isNaN(index) || index < 0 || index >= configSteps.length) return;
+      currentStepIndex = index;
+      configSteps.slice(index + 1).forEach(function (step) {
+        delete selections[step.key];
+      });
+      updateSelectionSummary();
+      renderConfigStep();
     }
 
     function renderQuantityField(selectedValue) {

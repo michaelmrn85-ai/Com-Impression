@@ -1164,10 +1164,10 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                     const selected = sels[key];
                     return !selected || normaliseOptionKey(selected) === normaliseOptionKey(item.config[key]);
                 });
-                const sideOk = !selectedSideValues.length || (item.finish && selectedSideValues.includes(normaliseOptionKey(item.finish)));
-                const formatOk = !selectedFormatValues.length || (item.format && selectedFormatValues.includes(normaliseOptionKey(item.format)));
-                const paperOk = !selectedPaperValues.length || (item.paper && selectedPaperValues.includes(normaliseOptionKey(item.paper)));
-                const finishingOk = !selectedFinishingValues.length || (item.finishing && selectedFinishingValues.includes(normaliseOptionKey(item.finishing)));
+                const sideOk = !item.finish || !selectedSideValues.length || selectedSideValues.includes(normaliseOptionKey(item.finish));
+                const formatOk = !item.format || !selectedFormatValues.length || selectedFormatValues.includes(normaliseOptionKey(item.format));
+                const paperOk = !item.paper || !selectedPaperValues.length || selectedPaperValues.includes(normaliseOptionKey(item.paper));
+                const finishingOk = !item.finishing || !selectedFinishingValues.length || selectedFinishingValues.includes(normaliseOptionKey(item.finishing));
                 return subProductOk && configOk && sideOk && formatOk && paperOk && finishingOk;
             };
             let parsedQty = parseInt(quantityValue, 10);
@@ -1186,9 +1186,13 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
                 const dimensionalTiers = tiers.filter(item => item.type === 'dimensions');
                 if (dimensionalTiers.length) {
-                    chosen = dimensionalTiers.find(item => item.width === parsedWidth && item.height === parsedHeight);
+                    chosen = dimensionalTiers.find(item => item.width === parsedWidth && item.height === parsedHeight && matchesPricingSelections(item));
                     if (!chosen) {
-                        chosen = dimensionalTiers.slice().sort((a, b) => {
+                        chosen = dimensionalTiers.filter(matchesPricingSelections).slice().sort((a, b) => {
+                            const deltaA = Math.abs((a.width * a.height) - (parsedWidth * parsedHeight));
+                            const deltaB = Math.abs((b.width * b.height) - (parsedWidth * parsedHeight));
+                            return deltaA - deltaB;
+                        })[0] || dimensionalTiers.slice().sort((a, b) => {
                             const deltaA = Math.abs((a.width * a.height) - (parsedWidth * parsedHeight));
                             const deltaB = Math.abs((b.width * b.height) - (parsedWidth * parsedHeight));
                             return deltaA - deltaB;
