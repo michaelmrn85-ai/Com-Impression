@@ -968,7 +968,7 @@
   }
 
   function loadProductsAdmin(openAfterLoad){
-    return fetch(api('/api/admin/catalog?mdp='+encodeURIComponent(state.mdp)))
+    return fetch(api('/api/admin/catalog?mdp='+encodeURIComponent(state.mdp)+'&_='+Date.now()), { cache:'no-store' })
       .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Catalogue indisponible'); return d; }); })
       .then(function(data){
         state.gammes = (data.catalog && data.catalog.gammes) || [];

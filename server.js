@@ -301,10 +301,10 @@ function buildCatalogApiPayload() {
                 salePrice: override.salePrice == null || override.salePrice === '' ? (override.priceValue != null ? parseNumberValue(override.priceValue) : parseEuroLabel(prod.prix)) : parseNumberValue(override.salePrice),
                 requiresQuantityInput: (override.requiresQuantityInput != null ? !!override.requiresQuantityInput : !!(prod.prixUnit || prod.id === 'impression-doc')) || hasUnitPricing(quantityPricing),
                 deliveryDelayDays: override.deliveryDelayDays == null || override.deliveryDelayDays === '' ? null : Number(override.deliveryDelayDays),
-                hasDimensions: !!(prod.dims || prod.dimsLibres),
-                dimsLibres: !!prod.dimsLibres,
-                minDimensionsCm: prod.dimsLibres ? { width: 50, height: 50 } : null,
-                unit: prod.unite || '',
+            hasDimensions: override.hasDimensions != null ? !!override.hasDimensions : !!(prod.dims || prod.dimsLibres),
+            dimsLibres: override.hasDimensions != null ? !!override.hasDimensions : !!prod.dimsLibres,
+            minDimensionsCm: (override.hasDimensions != null ? !!override.hasDimensions : !!prod.dimsLibres) ? { width: Number(override.minWidth) || 50, height: Number(override.minHeight) || 50 } : null,
+                unit: override.unit || prod.unite || '',
                 uploadEnabled: override.uploadEnabled !== false,
                 image: override.image || '',
                 imageUrl: getProductImageUrl(override.image || ''),
@@ -1098,6 +1098,7 @@ app.get('/api/sumup/verify-checkout/:id', async (req, res) => {
 
 app.get('/api/catalog-config', (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.json({ success: true, catalog: buildCatalogApiPayload() });
     } catch (error) {
         console.error('Erreur /api/catalog-config:', error);
@@ -1908,6 +1909,7 @@ app.get('/api/admin/catalog', (req, res) => {
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.json({ success: true, catalog: buildCatalogApiPayload(), overrides: lireProductOverrides() });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
@@ -2175,10 +2177,6 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
         const key = buildProductOverrideKey(req.params.legacyCat, productId);
         delete next.legacyCat;
         delete next.id;
-        delete next.hasDimensions;
-        delete next.minWidth;
-        delete next.minHeight;
-        delete next.unit;
         overrides[key] = next;
         sauvegarderProductOverrides(overrides);
         res.json({ success: true, override: next });

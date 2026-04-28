@@ -696,7 +696,7 @@
 
   function loadCatalogFromApi() {
     if (catalogLoadPromise) return catalogLoadPromise;
-    catalogLoadPromise = fetch(API_BASE + "/api/catalog-config")
+    catalogLoadPromise = fetch(API_BASE + "/api/catalog-config?_=" + Date.now(), { cache: "no-store" })
       .then(function (response) {
         return response.json().catch(function () { return {}; }).then(function (json) {
           if (!response.ok) throw new Error(json.error || ("HTTP " + response.status));
