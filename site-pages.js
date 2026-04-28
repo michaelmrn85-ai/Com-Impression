@@ -1231,8 +1231,8 @@
       addButton.addEventListener("click", function () {
         refreshSelectionsFromDom();
         var selectionSummary = Object.keys(selections).map(function (key) {
-          return key + ": " + selections[key];
-        }).join(" • ");
+          return selections[key] ? key + ": " + selections[key] : "";
+        }).filter(Boolean).join(" • ");
         if (isImpressionDocumentProduct(product)) {
           selectionSummary = [selectionSummary, "Pages: " + String(documentPageCount || 1), "Exemplaires: " + String(documentCopies || 1)].filter(Boolean).join(" • ");
         }
@@ -1673,7 +1673,7 @@
             + '<div class="cart-table-body">'
               + cart.map(function (item) {
                 return '<div class="cart-table-row">'
-                  + '<div class="cart-label"><span class="cart-mobile-label">Produit</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.ref || getProductRef(item)) + '</div>' + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.paperFinish ? '<div class="muted">' + esc(item.paperFinish) + '</div>' : '') + (item.deliveryDate ? '<div class="muted">Livraison estimee: ' + esc(item.deliveryDate) + '</div>' : '') + '</div></div>'
+                  + '<div class="cart-label"><span class="cart-mobile-label">Produit</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.ref || getProductRef(item)) + '</div>' + (item.configuration ? '<div class="muted">Choix: ' + esc(item.configuration) + '</div>' : '') + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.paperFinish ? '<div class="muted">' + esc(item.paperFinish) + '</div>' : '') + (item.deliveryDate ? '<div class="muted">Livraison estimee: ' + esc(item.deliveryDate) + '</div>' : '') + '</div></div>'
                   + '<div class="cart-file-cell"><span class="cart-mobile-label">Fichier</span><span class="cart-cell-value">' + esc(((item.uploadNames || []).length ? item.uploadNames.join(", ") : "Aucun fichier")) + '</span></div>'
                   + '<div class="cart-total-cell product-price"><span class="cart-mobile-label">Total TTC</span><span class="cart-cell-value">' + esc(item.priceValue != null ? euro(item.priceValue) : item.priceLabel || "-") + '</span></div>'
                   + '<div class="cart-action"><span class="cart-mobile-label">Action</span><span class="cart-cell-value"><button class="cart-remove-btn" type="button" data-remove-cart="' + esc(item.id) + '" aria-label="Supprimer">×</button></span></div>'

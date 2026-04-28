@@ -1312,15 +1312,8 @@
     rows.forEach(function(row){
       var steps = [];
       var used = {};
-      if(row.subProductType){
-        steps.push({
-          title:'Sous produit',
-          label:row.subProductType,
-          image:getProductChoiceImage(product, 'Sous produit', row.subProductType)
-        });
-        used['Sous produit'] = true;
-      }
       Object.keys(row.config || {}).forEach(function(title){
+        if(String(title || '').trim().toLowerCase() === 'sous produit') return;
         if(!title || used[title]) return;
         steps.push({
           title:title,
@@ -1370,8 +1363,9 @@
       +'</div>'
       +'<button class="btn btn-light btn-small product-path-step-add" type="button">+ Ajouter une étape dans ce chemin</button>'
       +'<div class="product-path-tariffs">'
-        +'<div class="product-path-tariffs-head"><strong>Tarifs de ce cheminement</strong><button class="btn btn-light btn-small product-path-tariff-add" type="button">+ Ajouter un tarif</button></div>'
+        +'<div class="product-path-tariffs-head"><strong>Tarifs de ce cheminement</strong></div>'
         +'<div class="product-path-tariff-list">'+tariffs.map(renderProductPathTariffRow).join('')+'</div>'
+        +'<button class="btn btn-light btn-small product-path-tariff-add" type="button">+ Ajouter un tarif</button>'
       +'</div>'
     +'</div>';
   }
@@ -1453,7 +1447,7 @@
           label:((row.querySelector('.product-path-step-label')||{}).value || '').trim(),
           image:((row.querySelector('.product-path-step-image')||{}).value || '').trim()
         };
-      }).filter(function(step){ return step.title && step.label; });
+      }).filter(function(step){ return step.title && step.label && step.title.toLowerCase() !== 'sous produit'; });
       if(steps[0] && steps[0].label && subProductTypes.indexOf(steps[0].label) === -1){
         subProductTypes.push(steps[0].label);
       }
@@ -1479,7 +1473,7 @@
         }).filter(function(option){ return option.nom || option.valeur; });
         pricingRows.push({
           type:((row.querySelector('.product-path-tariff-type')||{}).value || 'lot').trim(),
-          subProductType:steps[0] ? steps[0].label : '',
+          subProductType:'',
           config:config,
           quantity:((row.querySelector('.product-path-tariff-qty')||{}).value || '').trim(),
           format:'',
@@ -1552,7 +1546,7 @@
         formatOptions:pricingRows.map(function(row){ return row.format; }).filter(Boolean).join(','),
         paperOptions:(($('product-edit-paper')||{}).value||'').trim(),
         finishOptions:(($('product-edit-finish')||{}).value||'').trim(),
-        subProductTypes:pathData ? pathData.subProductTypes : (($('product-edit-subtypes')||{}).value||'').split(/\n|,/).map(function(value){ return value.trim(); }).filter(Boolean),
+        subProductTypes:pathData ? [] : (($('product-edit-subtypes')||{}).value||'').split(/\n|,/).map(function(value){ return value.trim(); }).filter(Boolean),
         configSteps:pathData ? pathData.configSteps : readProductConfigStepsEditor(),
         deliveryDelayDays:($('product-edit-delivery-delay').value||'').trim(),
         quantityPricing:pricing,
@@ -1567,6 +1561,25 @@
       return loadProductsAdmin(false);
     })
     .catch(function(err){ setStatus('product-edit-status','err',err.message||'Erreur sauvegarde produit.'); });
+  }
+
+  function deleteProduct(key){
+    var entry=findAdminProduct(key);
+    if(!entry) return;
+    var label=(entry.product && entry.product.title) || 'ce produit';
+    if(!window.confirm('Supprimer définitivement "'+label+'" ?')) return;
+    fetch(api('/api/admin/products/'+encodeURIComponent(entry.legacyCat)+'/'+encodeURIComponent(entry.product.id)),{
+      method:'DELETE',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ mdp:state.mdp })
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Suppression impossible'); return d; }); })
+    .then(function(){
+      return loadProductsAdmin(false);
+    })
+    .catch(function(err){
+      alert(err.message || 'Erreur suppression produit.');
+    });
   }
 
   function loadClientsAdmin(openAfterLoad){
@@ -2336,7 +2349,7 @@
         var pathList=document.querySelector('#product-path-editor .product-path-list');
         if(pathList){
           pathList.insertAdjacentHTML('beforeend', renderProductPathCard({
-            steps:[{ title:'Sous produit', label:'', image:'' }],
+            steps:[{ title:'', label:'', image:'' }],
             tariffs:[{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }]
           }));
           refreshProductPathEditor();
@@ -2358,7 +2371,7 @@
         if(pathStep) pathStep.remove();
         if(pathCardForStep && !pathCardForStep.querySelector('.product-path-step-row')){
           var targetSteps=pathCardForStep.querySelector('.product-path-steps');
-          if(targetSteps) targetSteps.insertAdjacentHTML('beforeend', renderProductPathStepRow({ title:'Sous produit', label:'', image:'' }));
+          if(targetSteps) targetSteps.insertAdjacentHTML('beforeend', renderProductPathStepRow({ title:'', label:'', image:'' }));
         }
       }
       if(e.target && e.target.classList && e.target.classList.contains('product-path-tariff-add')){
@@ -2454,6 +2467,8 @@
       }
       var productBtn = e.target.closest ? e.target.closest('[data-edit-product]') : null;
       if(productBtn) openProductEditor(productBtn.getAttribute('data-edit-product'));
+      var productDeleteBtn = e.target.closest ? e.target.closest('[data-delete-product]') : null;
+      if(productDeleteBtn){ deleteProduct(productDeleteBtn.getAttribute('data-delete-product')); return; }
       var clientBtn = e.target.closest ? e.target.closest('[data-edit-client]') : null;
       if(clientBtn) openClientEditor(clientBtn.getAttribute('data-edit-client'));
       if(e.target && e.target.id==='product-pricing-add'){

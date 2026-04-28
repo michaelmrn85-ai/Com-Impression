@@ -239,7 +239,10 @@ function buildCatalogApiPayload() {
 
     let refIndex = 1;
     const gammes = order.map(group => {
-        const legacyProducts = (cat[group.legacy] || []).map(prod => {
+        const legacyProducts = (cat[group.legacy] || []).filter(prod => {
+            const override = overrides[buildProductOverrideKey(group.legacy, prod.id)] || {};
+            return !override.deleted;
+        }).map(prod => {
             const optionKeys = Object.keys(prod.opts || {});
             const defaultSelections = {};
             optionKeys.forEach(key => {
@@ -2187,6 +2190,29 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
         overrides[key] = next;
         sauvegarderProductOverrides(overrides);
         res.json({ success: true, override: next });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.delete('/api/admin/products/:legacyCat/:productId', express.json(), (req, res) => {
+    const body = req.body || {};
+    if (!requireAdminPasswordConfigured(res)) return;
+    if (!adminPasswordMatches(body.mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
+    try {
+        const legacyCat = String(req.params.legacyCat || '').trim();
+        const productId = String(req.params.productId || '').trim();
+        const customProducts = lireCustomProducts();
+        const filteredCustomProducts = customProducts.filter(item => !(item && String(item.legacyCat || '') === legacyCat && String(item.id || '') === productId));
+        if (filteredCustomProducts.length !== customProducts.length) {
+            sauvegarderCustomProducts(filteredCustomProducts);
+            return res.json({ success: true, deleted: true, type: 'custom' });
+        }
+        const overrides = lireProductOverrides();
+        const key = buildProductOverrideKey(legacyCat, productId);
+        overrides[key] = Object.assign({}, overrides[key] || {}, { deleted: true, updated_at: new Date().toISOString() });
+        sauvegarderProductOverrides(overrides);
+        res.json({ success: true, deleted: true, type: 'legacy' });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
