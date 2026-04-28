@@ -980,9 +980,11 @@
         return '<div class="product-step-tab' + done + active + '"><strong>' + esc(step.title || step.key) + '</strong>' + selected + '</div>';
       }).join("") + '<div class="product-step-tab' + (isFinal ? ' active' : '') + '"><strong>Quantite & fichiers</strong></div>';
       if (isFinal) {
+        configWrap.classList.add("is-final");
         configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>';
         return;
       }
+      configWrap.classList.remove("is-final");
       var step = configSteps[currentStepIndex];
       var values = getAvailableStepValues(product, configSteps, currentStepIndex, selections);
       configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>'
