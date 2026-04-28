@@ -872,11 +872,15 @@ body[data-page="client"] #client-dashboard-view .section-head {
 .product-fixed-row {
   display: grid;
   gap: 5px;
-  min-height: 74px;
+  min-height: 0;
   padding: 14px 16px;
   border: 1px solid #efdfd1;
   border-radius: 16px;
   background: #fffaf5;
+}
+
+.product-fixed-row.is-empty {
+  color: var(--muted);
 }
 
 .product-fixed-row strong {

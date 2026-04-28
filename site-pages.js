@@ -919,7 +919,7 @@
           + '<aside class="summary-box product-side-summary">'
             + '<div class="pill">Votre selection</div>'
             + '<div class="product-side-current"><strong>' + esc(product.title) + '</strong><span>' + esc(entry.gammeTitle) + '</span></div>'
-            + renderFixedProductInfo(product)
+            + '<div class="product-fixed-info" id="product-selection-summary"></div>'
             + '<div class="product-side-meta"><strong>Reference</strong><span>' + esc(getProductRef(product)) + '</span></div>'
             + (getEstimatedDeliveryDate(product) ? '<div class="product-side-meta"><strong>Livraison estimee</strong><span>' + esc(getEstimatedDeliveryDate(product)) + '</span></div>' : '')
             + '<div class="product-side-meta"><strong>Fichier</strong><span id="product-upload-summary">Aucun fichier</span></div>'
@@ -941,6 +941,7 @@
     var priceStatus = $("product-price-status");
     var totalSummary = $("product-total-summary");
     var uploadSummary = $("product-upload-summary");
+    var selectionSummaryBox = $("product-selection-summary");
     var currentPriceLabel = product.priceLabel;
     var currentPriceValue = product.priceValue;
     var currentPurchaseValue = null;
@@ -951,6 +952,21 @@
     var documentCopies = 1;
     var configSteps = getProductConfigSteps(product);
     var currentStepIndex = 0;
+
+    function updateSelectionSummary() {
+      if (!selectionSummaryBox) return;
+      var rows = [];
+      configSteps.forEach(function (step) {
+        var value = selections[step.key];
+        if (value) rows.push({ label: step.title || step.key, value: value });
+      });
+      if (!rows.length && product.sizeInfo) {
+        rows.push({ label: "Taille", value: product.sizeInfo });
+      }
+      selectionSummaryBox.innerHTML = rows.length ? rows.map(function (row) {
+        return '<div class="product-fixed-row"><strong>' + esc(row.label) + '</strong><span>' + esc(row.value) + '</span></div>';
+      }).join("") : '<div class="product-fixed-row is-empty"><span>Selection en cours</span></div>';
+    }
 
     if (configWrap) {
       configWrap.className = "product-stepper";
@@ -968,6 +984,7 @@
         configWrap.innerHTML = "";
         if (finalFields) finalFields.hidden = false;
         if (finalLayout) finalLayout.hidden = false;
+        updateSelectionSummary();
         return;
       }
       var isFinal = currentStepIndex >= configSteps.length;
@@ -1008,6 +1025,7 @@
       configSteps.slice(currentStepIndex + 1).forEach(function (nextStep) {
         delete selections[nextStep.key];
       });
+      updateSelectionSummary();
       currentQuantityOptions = getLotQuantityOptions(product, selections);
       currentStepIndex = Math.min(currentStepIndex + 1, configSteps.length);
       renderConfigStep();
@@ -1164,6 +1182,7 @@
     }
 
     renderConfigStep();
+    updateSelectionSummary();
     renderQuantityField(selectedQuantityMode === "unitaire" ? "1" : (product.quantityOptions && product.quantityOptions.length ? String(product.quantityOptions[0]) : "1"));
     document.querySelectorAll("[data-product-option]").forEach(function (select) {
       select.addEventListener("change", function () {
