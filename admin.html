@@ -105,6 +105,22 @@
     .product-step-choice-row{display:grid;grid-template-columns:1fr 1fr 120px auto;gap:8px;align-items:end;border-top:1px solid #f5ebe4;padding-top:10px}
     .product-step-choice-preview{height:74px;border:1px solid #eee0d6;border-radius:12px;background:#fff7ef;display:flex;align-items:center;justify-content:center;overflow:hidden}
     .product-step-choice-preview img{width:100%;height:100%;object-fit:contain;display:block}
+    .product-path-editor{border:1px solid #eee0d6;border-radius:22px;background:#fffdfa;padding:14px;display:grid;gap:14px}
+    .product-path-list{display:grid;gap:18px}
+    .product-path-card{border:2px solid #f0e4dc;border-radius:22px;background:#fff;padding:14px;display:grid;gap:12px;box-shadow:0 12px 26px rgba(23,19,16,.04)}
+    .product-path-head,.product-path-tariffs-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .product-path-head strong,.product-path-tariffs-head strong{font-family:'Baloo 2',cursive;font-size:1.05rem}
+    .product-path-steps{display:grid;gap:10px}
+    .product-path-step-row{display:grid;grid-template-columns:36px 1fr 1fr 1fr 120px auto;gap:8px;align-items:end;padding:12px;border:1px solid #f2e5da;border-radius:18px;background:#fffaf5}
+    .product-path-connector{font-size:2rem;line-height:1;color:#171310;text-align:center;font-weight:300}
+    .product-path-step-row:first-child .product-path-connector{color:transparent}
+    .product-path-step-preview{height:74px;border:1px solid #eee0d6;border-radius:12px;background:#fff7ef;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .product-path-step-preview img{width:100%;height:100%;object-fit:contain;display:block}
+    .product-path-tariffs{border-top:1px solid #f0e4dc;padding-top:12px;display:grid;gap:10px}
+    .product-path-tariff-list{display:grid;gap:10px}
+    .product-path-tariff-row{display:grid;grid-template-columns:1fr .85fr .85fr .85fr 1fr 1fr .75fr auto;gap:8px;align-items:end;border:1px dashed #efd8c0;border-radius:18px;padding:12px;background:#fffdfa}
+    .product-path-tariff-row .field{margin:0}
+    .product-path-options-box{grid-column:1/-1;border-top:1px solid #f4e7dc;margin-top:4px;padding-top:10px;display:grid;gap:8px}
     .btn-icon{width:40px;height:40px;border-radius:50%;border:2px solid #f0e4dc;background:#fff;color:#dc2626;font-weight:900;cursor:pointer}
     .upload-box{border:2px dashed #f0d6bf;border-radius:18px;padding:14px;background:#fffdfa}
     .upload-preview{margin-top:12px;border:2px solid #f0e4dc;border-radius:18px;background:#fff;min-height:140px;display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -132,7 +148,7 @@
     .day-kpi strong{display:block;font-family:'Baloo 2',cursive;font-size:1rem;line-height:1}
     .day-kpi span{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:1.8rem;color:var(--or)}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:1px dashed var(--line);border-radius:20px}
-    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
+    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
     @media(max-width:560px){.admin-summary,.day-kpis{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
   </style>
 </head>

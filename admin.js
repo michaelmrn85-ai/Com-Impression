@@ -1117,30 +1117,26 @@
     var gammeOptions = getAdminGammeOptions().map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
     }).join('');
-    var pricingRows = buildProductPricingRows(entryRef.product || {});
-    var subProductTypesText = (entryRef.product.subProductTypes || []).join('\n');
     $('product-edit-body').innerHTML=
       '<div class="product-meta-grid">'
       +'<div class="field"><label>Gamme</label><select id="product-edit-gamme">'+gammeOptions+'</select></div>'
       +'<div class="field"><label>Reference</label><input value="'+esc(entryRef.product.ref||'')+'" disabled></div>'
       +'<div class="field"><label>Libelle</label><input id="product-edit-name" value="'+esc(entryRef.product.title||'')+'"></div>'
       +'</div>'
-      +'<div class="field"><label>Étapes du parcours client</label>'+renderProductConfigStepsEditor(entryRef.product.configSteps || [])+'</div>'
       +'<div class="site-grid" style="margin-top:8px;padding:16px;border:1px solid #eee3d9;border-radius:20px;background:#fffaf5;">'
       +'<div class="field"><label>Photo principale du produit</label><input id="product-edit-image-file" type="file" accept=".jpg,.jpeg,.png,.webp"><input id="product-edit-image" type="hidden" value="'+esc(entryRef.product.image||'')+'"><div class="muted" id="product-edit-image-name">'+esc(entryRef.product.image||'Aucune image')+'</div></div>'
       +'<div class="field"><label>Apercu photo</label><div id="product-edit-image-preview" style="min-height:180px;border:1px solid #eee3d9;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+(entryRef.product.imageUrl?'<img src="'+esc(entryRef.product.imageUrl)+'" alt="Apercu produit" style="width:100%;height:180px;object-fit:cover;display:block;">':'<span class="muted">Aucune image</span>')+'</div></div>'
       +'</div>'
       +'<div class="field"><label>Taille affichée (information fixe)</label><input id="product-edit-size" placeholder="A4, 10x15, 8,5x5,4..." value="'+esc(entryRef.product.sizeInfo||'')+'"></div>'
-      +'<div class="field"><label>Types de sous-produit</label><textarea id="product-edit-subtypes" placeholder="Flyer standard&#10;Flyer plié&#10;Brochure">'+esc(subProductTypesText)+'</textarea></div>'
       +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
-      +'<div class="field"><label>Tarification / dimensions</label>'+renderProductPricingEditor(pricingRows)+'</div>'
+      +'<div class="field"><label>Cheminements et tarifs</label>'+renderProductPathEditor(entryRef.product || {})+'</div>'
       +'<div class="site-grid">'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-upload" type="checkbox" style="width:auto;" '+(entryRef.product.uploadEnabled!==false?'checked':'')+'> Upload actif sur la fiche produit</label>'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-dimensions" type="checkbox" style="width:auto;" '+(entryRef.product.hasDimensions?'checked':'')+'> Produit avec dimensions libres</label>'
       +'</div>'
       +'<button class="btn btn-orange" id="product-edit-save" type="button">'+(entryRef.isNew?'Creer le produit':'Enregistrer le produit')+'</button>'
       +'<div class="status" id="product-edit-status"></div>';
-    refreshProductPricingTable();
+    refreshProductPathEditor();
     bindProductImageUpload();
     openModal('modal-product-edit','produits');
   }
@@ -1183,7 +1179,7 @@
   function uploadProductStepChoiceImage(input){
     var file=input && input.files && input.files[0];
     if(!file) return;
-    var row=input.closest('.product-step-choice-row');
+    var row=input.closest('.product-step-choice-row') || input.closest('.product-path-step-row');
     var fd=new FormData();
     fd.append('mdp',state.mdp);
     fd.append('image',file,file.name);
@@ -1192,9 +1188,9 @@
       .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Upload image impossible'); return d; }); })
       .then(function(data){
         if(row){
-          var hidden=row.querySelector('.product-step-choice-image');
-          var name=row.querySelector('.product-step-choice-image-name');
-          var preview=row.querySelector('.product-step-choice-preview');
+          var hidden=row.querySelector('.product-step-choice-image') || row.querySelector('.product-path-step-image');
+          var name=row.querySelector('.product-step-choice-image-name') || row.querySelector('.product-path-step-image-name');
+          var preview=row.querySelector('.product-step-choice-preview') || row.querySelector('.product-path-step-preview');
           if(hidden) hidden.value=data.image || '';
           if(name) name.textContent=data.image || file.name;
           if(preview) preview.innerHTML=data.imageUrl ? '<img src="'+esc(data.imageUrl)+'" alt="Apercu choix">' : '<span class="muted">Apercu</span>';
@@ -1284,9 +1280,229 @@
     }).join('; ');
   }
 
+  function getProductChoiceImage(product, title, label){
+    var wantedTitle = String(title || '').trim();
+    var wantedLabel = String(label || '').trim();
+    var steps = Array.isArray(product && product.configSteps) ? product.configSteps : [];
+    for(var i=0;i<steps.length;i++){
+      var stepTitle = String(steps[i].title || steps[i].key || '').trim();
+      if(stepTitle !== wantedTitle) continue;
+      var values = Array.isArray(steps[i].values) ? steps[i].values : [];
+      for(var j=0;j<values.length;j++){
+        var value = normalizeStepValue(values[j]);
+        if(value.label === wantedLabel) return value.image || '';
+      }
+    }
+    return '';
+  }
+
+  function productPathKey(steps){
+    return JSON.stringify((steps || []).map(function(step){
+      return { title:String(step.title || '').trim(), label:String(step.label || '').trim() };
+    }).filter(function(step){ return step.title || step.label; }));
+  }
+
+  function buildProductPathGroups(product){
+    var rows = buildProductPricingRows(product || {});
+    var groups = [];
+    var map = {};
+    rows.forEach(function(row){
+      var steps = [];
+      var used = {};
+      if(row.subProductType){
+        steps.push({
+          title:'Sous produit',
+          label:row.subProductType,
+          image:getProductChoiceImage(product, 'Sous produit', row.subProductType)
+        });
+        used['Sous produit'] = true;
+      }
+      Object.keys(row.config || {}).forEach(function(title){
+        if(!title || used[title]) return;
+        steps.push({
+          title:title,
+          label:String(row.config[title] || '').trim(),
+          image:getProductChoiceImage(product, title, row.config[title])
+        });
+      });
+      if(!steps.length){
+        steps = [{ title:'Sous produit', label:'', image:'' }];
+      }
+      var key = productPathKey(steps);
+      if(!map[key]){
+        map[key] = { steps:steps, tariffs:[] };
+        groups.push(map[key]);
+      }
+      map[key].tariffs.push(row);
+    });
+    if(!groups.length){
+      groups.push({
+        steps:[{ title:'Sous produit', label:'', image:'' }],
+        tariffs:[{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }]
+      });
+    }
+    return groups;
+  }
+
+  function renderProductPathEditor(product){
+    var groups = buildProductPathGroups(product || {});
+    return '<div class="product-path-editor" id="product-path-editor">'
+      +'<div class="product-path-list">'
+        +groups.map(renderProductPathCard).join('')
+      +'</div>'
+      +'<button class="btn btn-light btn-small" id="product-path-add" type="button">+ Ajouter un cheminement</button>'
+    +'</div>';
+  }
+
+  function renderProductPathCard(group){
+    var steps = group && Array.isArray(group.steps) && group.steps.length ? group.steps : [{ title:'Sous produit', label:'', image:'' }];
+    var tariffs = group && Array.isArray(group.tariffs) && group.tariffs.length ? group.tariffs : [{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }];
+    return '<div class="product-path-card">'
+      +'<div class="product-path-head">'
+        +'<strong>Cheminement</strong>'
+        +'<button class="btn-icon product-path-remove" type="button" title="Supprimer le cheminement">×</button>'
+      +'</div>'
+      +'<div class="product-path-steps">'
+        +steps.map(renderProductPathStepRow).join('')
+      +'</div>'
+      +'<button class="btn btn-light btn-small product-path-step-add" type="button">+ Ajouter une étape dans ce chemin</button>'
+      +'<div class="product-path-tariffs">'
+        +'<div class="product-path-tariffs-head"><strong>Tarifs de ce cheminement</strong><button class="btn btn-light btn-small product-path-tariff-add" type="button">+ Ajouter un tarif</button></div>'
+        +'<div class="product-path-tariff-list">'+tariffs.map(renderProductPathTariffRow).join('')+'</div>'
+      +'</div>'
+    +'</div>';
+  }
+
+  function renderProductPathStepRow(step){
+    var image = String((step && step.image) || '').trim();
+    var imageUrl = image ? (image.indexOf('/media/') === 0 || /^https?:/i.test(image) ? image : '/media/products/'+encodeURIComponent(image)) : '';
+    return '<div class="product-path-step-row">'
+      +'<div class="product-path-connector">+</div>'
+      +'<div class="field"><label>Nom de l étape</label><input class="product-path-step-title" placeholder="Ex: Format, Papier, Recto verso..." value="'+esc(step && step.title || '')+'"></div>'
+      +'<div class="field"><label>Choix dans cette étape</label><input class="product-path-step-label" placeholder="Ex: A5, 135g, Recto..." value="'+esc(step && step.label || '')+'"></div>'
+      +'<div class="field"><label>Image du choix</label><input class="product-step-choice-image-file product-path-step-image-file" type="file" accept=".jpg,.jpeg,.png,.webp"><input class="product-path-step-image" type="hidden" value="'+esc(image)+'"><div class="muted product-path-step-image-name">'+esc(image || 'Aucune image')+'</div></div>'
+      +'<div class="product-path-step-preview">'+(imageUrl ? '<img src="'+esc(imageUrl)+'" alt="Apercu choix">' : '<span class="muted">Apercu</span>')+'</div>'
+      +'<button class="btn-icon product-path-step-remove" type="button" title="Supprimer l étape">×</button>'
+    +'</div>';
+  }
+
+  function renderProductPathTariffRow(row){
+    var isDimensions = row && row.type === 'dimensions';
+    var optionsHtml = (Array.isArray(row && row.optionsLibres) ? row.optionsLibres : []).map(function(option){
+      return '<div class="product-pricing-option-row">'
+        +'<div class="field"><label>Nom option</label><input class="product-pricing-option-name" placeholder="Nom libre" value="'+esc(option&&option.nom||'')+'"></div>'
+        +'<div class="field"><label>Valeur option</label><input class="product-pricing-option-value" placeholder="Valeur libre" value="'+esc(option&&option.valeur||'')+'"></div>'
+        +'<button class="btn-icon product-pricing-option-remove" type="button" title="Supprimer l option">×</button>'
+      +'</div>';
+    }).join('');
+    return '<div class="product-path-tariff-row">'
+      +'<div class="field"><label>Type tarif</label><select class="product-path-tariff-type"><option value="lot" '+(row&&row.type==='lot'?'selected':'')+'>Quantite lot</option><option value="unitaire" '+(row&&row.type==='unitaire'?'selected':'')+'>Quantite unitaire</option><option value="dimensions" '+(row&&row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></div>'
+      +'<div class="field product-path-tariff-qty-field"><label>Quantité</label><input class="product-path-tariff-qty" inputmode="numeric" placeholder="100" value="'+esc(row&&row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></div>'
+      +'<div class="field product-path-tariff-width-field"><label>Largeur</label><input class="product-path-tariff-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row&&row.width||'')+'"'+(isDimensions?'':' disabled')+'></div>'
+      +'<div class="field product-path-tariff-height-field"><label>Hauteur</label><input class="product-path-tariff-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row&&row.height||'')+'"'+(isDimensions?'':' disabled')+'></div>'
+      +'<div class="field"><label>Prix achat TTC</label><input class="product-path-tariff-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row&&row.purchasePrice||'')+'"></div>'
+      +'<div class="field"><label>Prix vente TTC</label><input class="product-path-tariff-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row&&row.salePrice||'')+'"></div>'
+      +'<div class="field product-path-margin-field"><label>Marge</label><span class="pricing-margin product-path-margin">0,00 %</span></div>'
+      +'<input class="product-path-tariff-page-min" type="hidden" value="'+esc(row&&row.pageMin||'')+'">'
+      +'<input class="product-path-tariff-page-step" type="hidden" value="'+esc(row&&row.pageStep||'')+'">'
+      +'<button class="btn-icon product-path-tariff-remove" type="button" title="Supprimer le tarif">×</button>'
+      +'<div class="product-path-options-box">'
+        +'<div class="product-pricing-options-head"><strong>Options libres de ce tarif</strong><button class="btn btn-light btn-small product-path-option-add" type="button">+ Ajouter une option</button></div>'
+        +'<div class="product-pricing-options-list">'+optionsHtml+'</div>'
+      +'</div>'
+    +'</div>';
+  }
+
+  function refreshProductPathEditor(){
+    document.querySelectorAll('.product-path-tariff-row').forEach(function(row){
+      var type = ((row.querySelector('.product-path-tariff-type')||{}).value || 'lot');
+      var qty = row.querySelector('.product-path-tariff-qty');
+      var width = row.querySelector('.product-path-tariff-width');
+      var height = row.querySelector('.product-path-tariff-height');
+      var purchase = parseAmount((row.querySelector('.product-path-tariff-purchase')||{}).value);
+      var sale = parseAmount((row.querySelector('.product-path-tariff-sale')||{}).value);
+      var margin = row.querySelector('.product-path-margin');
+      if(margin){
+        margin.textContent = purchase > 0 && sale > 0 ? formatPlainNumber(((sale / purchase) - 1) * 100) + ' %' : '0,00 %';
+      }
+      if(type === 'dimensions'){
+        if(qty){ qty.value=''; qty.disabled=true; qty.placeholder='Auto'; }
+        if(width) width.disabled=false;
+        if(height) height.disabled=false;
+      } else {
+        if(qty){ qty.disabled=false; qty.placeholder=type === 'unitaire' ? '1' : '100'; if(type === 'unitaire' && !(qty.value||'').trim()) qty.value='1'; }
+        if(width){ width.value=''; width.disabled=true; }
+        if(height){ height.value=''; height.disabled=true; }
+      }
+    });
+    refreshProductPricingTable();
+  }
+
+  function readProductPathEditor(){
+    var configMap = {};
+    var subProductTypes = [];
+    var pricingRows = [];
+    document.querySelectorAll('.product-path-card').forEach(function(card){
+      var steps = Array.prototype.slice.call(card.querySelectorAll('.product-path-step-row')).map(function(row){
+        return {
+          title:((row.querySelector('.product-path-step-title')||{}).value || '').trim(),
+          label:((row.querySelector('.product-path-step-label')||{}).value || '').trim(),
+          image:((row.querySelector('.product-path-step-image')||{}).value || '').trim()
+        };
+      }).filter(function(step){ return step.title && step.label; });
+      if(steps[0] && steps[0].label && subProductTypes.indexOf(steps[0].label) === -1){
+        subProductTypes.push(steps[0].label);
+      }
+      steps.forEach(function(step){
+        if(!configMap[step.title]){
+          configMap[step.title] = { title:step.title, key:step.title, values:[] };
+        }
+        var exists = configMap[step.title].values.some(function(value){ return value.label === step.label; });
+        if(!exists){
+          configMap[step.title].values.push({ label:step.label, image:step.image });
+        }
+      });
+      var config = {};
+      steps.forEach(function(step){
+        config[step.title] = step.label;
+      });
+      card.querySelectorAll('.product-path-tariff-row').forEach(function(row){
+        var optionsLibres = Array.prototype.slice.call(row.querySelectorAll('.product-pricing-option-row')).map(function(optionRow){
+          return {
+            nom:((optionRow.querySelector('.product-pricing-option-name')||{}).value || '').trim(),
+            valeur:((optionRow.querySelector('.product-pricing-option-value')||{}).value || '').trim()
+          };
+        }).filter(function(option){ return option.nom || option.valeur; });
+        pricingRows.push({
+          type:((row.querySelector('.product-path-tariff-type')||{}).value || 'lot').trim(),
+          subProductType:steps[0] ? steps[0].label : '',
+          config:config,
+          quantity:((row.querySelector('.product-path-tariff-qty')||{}).value || '').trim(),
+          format:'',
+          paper:'',
+          width:((row.querySelector('.product-path-tariff-width')||{}).value || '').trim(),
+          height:((row.querySelector('.product-path-tariff-height')||{}).value || '').trim(),
+          finish:'',
+          finishing:'',
+          purchasePrice:((row.querySelector('.product-path-tariff-purchase')||{}).value || '').trim(),
+          salePrice:((row.querySelector('.product-path-tariff-sale')||{}).value || '').trim(),
+          pageMin:((row.querySelector('.product-path-tariff-page-min')||{}).value || '').trim(),
+          pageStep:((row.querySelector('.product-path-tariff-page-step')||{}).value || '').trim(),
+          optionsLibres:optionsLibres
+        });
+      });
+    });
+    return {
+      configSteps:Object.keys(configMap).map(function(key){ return configMap[key]; }),
+      subProductTypes:subProductTypes,
+      pricingRows:pricingRows
+    };
+  }
+
   function saveProductEditor(){
     var entry=state.selectedProduct; if(!entry) return;
-    var pricingRows = getProductPricingRows();
+    var pathData = document.querySelector('#product-path-editor') ? readProductPathEditor() : null;
+    var pricingRows = pathData ? pathData.pricingRows : getProductPricingRows();
     var pricing=pricingRows.filter(function(row){
       if(!row.salePrice) return false;
       if(row.type === 'dimensions') return row.width && row.height;
@@ -1332,8 +1548,8 @@
         formatOptions:pricingRows.map(function(row){ return row.format; }).filter(Boolean).join(','),
         paperOptions:(($('product-edit-paper')||{}).value||'').trim(),
         finishOptions:(($('product-edit-finish')||{}).value||'').trim(),
-        subProductTypes:($('product-edit-subtypes').value||'').split(/\n|,/).map(function(value){ return value.trim(); }).filter(Boolean),
-        configSteps:readProductConfigStepsEditor(),
+        subProductTypes:pathData ? pathData.subProductTypes : (($('product-edit-subtypes')||{}).value||'').split(/\n|,/).map(function(value){ return value.trim(); }).filter(Boolean),
+        configSteps:pathData ? pathData.configSteps : readProductConfigStepsEditor(),
         deliveryDelayDays:($('product-edit-delivery-delay').value||'').trim(),
         quantityPricing:pricing,
         uploadEnabled:!!(($('product-edit-upload')||{}).checked),
@@ -2112,6 +2328,66 @@
         var pricingOption=e.target.closest('.product-pricing-option-row');
         if(pricingOption) pricingOption.remove();
       }
+      if(e.target && e.target.id==='product-path-add'){
+        var pathList=document.querySelector('#product-path-editor .product-path-list');
+        if(pathList){
+          pathList.insertAdjacentHTML('beforeend', renderProductPathCard({
+            steps:[{ title:'Sous produit', label:'', image:'' }],
+            tariffs:[{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }]
+          }));
+          refreshProductPathEditor();
+        }
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-remove')){
+        var pathCard=e.target.closest('.product-path-card');
+        if(pathCard) pathCard.remove();
+        if(!document.querySelector('.product-path-card') && $('product-path-add')) $('product-path-add').click();
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-step-add')){
+        var pathSteps=e.target.closest('.product-path-card');
+        pathSteps=pathSteps ? pathSteps.querySelector('.product-path-steps') : null;
+        if(pathSteps) pathSteps.insertAdjacentHTML('beforeend', renderProductPathStepRow({ title:'', label:'', image:'' }));
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-step-remove')){
+        var pathStep=e.target.closest('.product-path-step-row');
+        var pathCardForStep=e.target.closest('.product-path-card');
+        if(pathStep) pathStep.remove();
+        if(pathCardForStep && !pathCardForStep.querySelector('.product-path-step-row')){
+          var targetSteps=pathCardForStep.querySelector('.product-path-steps');
+          if(targetSteps) targetSteps.insertAdjacentHTML('beforeend', renderProductPathStepRow({ title:'Sous produit', label:'', image:'' }));
+        }
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-tariff-add')){
+        var tariffList=e.target.closest('.product-path-tariffs');
+        tariffList=tariffList ? tariffList.querySelector('.product-path-tariff-list') : null;
+        if(tariffList){
+          tariffList.insertAdjacentHTML('beforeend', renderProductPathTariffRow({ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }));
+          refreshProductPathEditor();
+        }
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-tariff-remove')){
+        var tariffRow=e.target.closest('.product-path-tariff-row');
+        var tariffCard=e.target.closest('.product-path-card');
+        if(tariffRow) tariffRow.remove();
+        if(tariffCard && !tariffCard.querySelector('.product-path-tariff-row')){
+          var targetTariffs=tariffCard.querySelector('.product-path-tariff-list');
+          if(targetTariffs) targetTariffs.insertAdjacentHTML('beforeend', renderProductPathTariffRow({ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }));
+        }
+        refreshProductPathEditor();
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-option-add')){
+        var pathOptionWrap=e.target.closest('.product-path-options-box');
+        pathOptionWrap=pathOptionWrap ? pathOptionWrap.querySelector('.product-pricing-options-list') : null;
+        if(pathOptionWrap){
+          pathOptionWrap.insertAdjacentHTML('beforeend',
+            '<div class="product-pricing-option-row">'
+            +'<div class="field"><label>Nom option</label><input class="product-pricing-option-name" placeholder="Nom libre" value=""></div>'
+            +'<div class="field"><label>Valeur option</label><input class="product-pricing-option-value" placeholder="Valeur libre" value=""></div>'
+            +'<button class="btn-icon product-pricing-option-remove" type="button" title="Supprimer l option">×</button>'
+            +'</div>'
+          );
+        }
+      }
       if(e.target && e.target.id==='product-step-add'){
         var stepsList=document.querySelector('#product-steps-editor .product-steps-list');
         if(stepsList) stepsList.insertAdjacentHTML('beforeend', renderProductConfigStepRow({title:'',values:[{label:'',image:''}]}));
@@ -2228,6 +2504,13 @@
     document.addEventListener('input',function(e){
       if(e.target && e.target.classList && e.target.classList.contains('manual-amount')) refreshManualTotal();
       if(e.target && e.target.classList && (
+        e.target.classList.contains('product-path-tariff-purchase') ||
+        e.target.classList.contains('product-path-tariff-sale') ||
+        e.target.classList.contains('product-path-tariff-qty') ||
+        e.target.classList.contains('product-path-tariff-width') ||
+        e.target.classList.contains('product-path-tariff-height')
+      )) refreshProductPathEditor();
+      if(e.target && e.target.classList && (
         e.target.classList.contains('product-pricing-qty') ||
         e.target.classList.contains('product-pricing-subtype') ||
         e.target.classList.contains('product-pricing-config') ||
@@ -2251,6 +2534,9 @@
     document.addEventListener('change',function(e){
       if(e.target && e.target.classList && e.target.classList.contains('product-pricing-type')){
         refreshProductPricingTable();
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-tariff-type')){
+        refreshProductPathEditor();
       }
     });
     var heroFile = $('site-hero-image-file');

@@ -954,6 +954,12 @@
 
     if (configWrap) {
       configWrap.className = "product-stepper";
+      configWrap.addEventListener("click", function (event) {
+        var button = event.target && event.target.closest ? event.target.closest(".product-step-choice") : null;
+        if (!button || !configWrap.contains(button)) return;
+        event.preventDefault();
+        chooseConfigStep(button);
+      });
     }
 
     function renderConfigStep() {
@@ -961,6 +967,7 @@
       if (!configSteps.length) {
         configWrap.innerHTML = "";
         if (finalFields) finalFields.hidden = false;
+        if (finalLayout) finalLayout.hidden = false;
         return;
       }
       var isFinal = currentStepIndex >= configSteps.length;
@@ -989,15 +996,25 @@
             + '<strong>' + esc(label) + '</strong>'
           + '</button>';
         }).join("") + '</div>';
-      configWrap.querySelectorAll("[data-step-choice]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          selections[button.getAttribute("data-step-key")] = button.getAttribute("data-step-value") || "";
-          currentQuantityOptions = getLotQuantityOptions(product, selections);
-          currentStepIndex = Math.min(currentStepIndex + 1, configSteps.length);
-          renderConfigStep();
-          if (currentStepIndex >= configSteps.length) requestPricing(readSelectedQuantity());
-        });
+    }
+
+    function chooseConfigStep(button) {
+      if (!button) return;
+      var stepKey = button.getAttribute("data-step-key");
+      if (!stepKey) return;
+      selections[stepKey] = button.getAttribute("data-step-value") || "";
+      configSteps.slice(currentStepIndex + 1).forEach(function (nextStep) {
+        delete selections[nextStep.key];
       });
+      currentQuantityOptions = getLotQuantityOptions(product, selections);
+      currentStepIndex = Math.min(currentStepIndex + 1, configSteps.length);
+      renderConfigStep();
+      if (currentStepIndex >= configSteps.length) {
+        requestPricing(readSelectedQuantity());
+        if (finalLayout && finalLayout.scrollIntoView) {
+          finalLayout.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
     }
 
     function renderQuantityField(selectedValue) {
