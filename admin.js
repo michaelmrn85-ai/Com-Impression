@@ -1645,7 +1645,7 @@
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type tarif</th><th>Sous-produit</th><th>Chemin ciblé</th><th>Quantité</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Prix achat TTC</th><th>Prix vente TTC</th><th>Pages min</th><th>Pas pages</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type tarif</th><th>Sous-produit</th><th>Chemin ciblé</th><th>Quantité</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Prix achat TTC</th><th>Prix vente TTC</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
         var isDimensions = row.type === 'dimensions';
         var optionsHtml = (Array.isArray(row.optionsLibres) ? row.optionsLibres : []).map(function(option){
@@ -1664,13 +1664,13 @@
           +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"'+(isDimensions?'':' disabled')+'></td>'
           +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
           +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
-          +'<td><input class="product-pricing-page-min" inputmode="numeric" placeholder="8" value="'+esc(row.pageMin||'')+'"></td>'
-          +'<td><input class="product-pricing-page-step" inputmode="numeric" placeholder="4" value="'+esc(row.pageStep||'')+'"></td>'
           +'<td><span class="pricing-margin">0,00</span></td>'
           +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
         +'</tr>'
-        +'<tr class="product-pricing-options"><td colspan="12"><div class="product-pricing-options-box">'
+        +'<tr class="product-pricing-options"><td colspan="10"><div class="product-pricing-options-box">'
           +'<div class="product-pricing-options-head"><strong>Options libres de cette ligne</strong><button class="btn btn-light btn-small product-pricing-option-add" type="button">+ Ajouter une option</button></div>'
+          +'<input class="product-pricing-page-min" type="hidden" value="'+esc(row.pageMin||'')+'">'
+          +'<input class="product-pricing-page-step" type="hidden" value="'+esc(row.pageStep||'')+'">'
           +'<div class="product-pricing-options-list">'+optionsHtml+'</div>'
         +'</div></td></tr>';
       }).join('')
@@ -2189,13 +2189,13 @@
             +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="" disabled></td>'
             +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value=""></td>'
             +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value=""></td>'
-            +'<td><input class="product-pricing-page-min" inputmode="numeric" placeholder="8" value=""></td>'
-            +'<td><input class="product-pricing-page-step" inputmode="numeric" placeholder="4" value=""></td>'
             +'<td><span class="pricing-margin">0,00</span></td>'
             +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
             +'</tr>'
-            +'<tr class="product-pricing-options"><td colspan="12"><div class="product-pricing-options-box">'
+            +'<tr class="product-pricing-options"><td colspan="10"><div class="product-pricing-options-box">'
             +'<div class="product-pricing-options-head"><strong>Options libres de cette ligne</strong><button class="btn btn-light btn-small product-pricing-option-add" type="button">+ Ajouter une option</button></div>'
+            +'<input class="product-pricing-page-min" type="hidden" value="">'
+            +'<input class="product-pricing-page-step" type="hidden" value="">'
             +'<div class="product-pricing-options-list"></div>'
             +'</div></td></tr>'
           );

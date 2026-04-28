@@ -762,13 +762,17 @@ body[data-page="client"] #client-dashboard-view .section-head {
   border-right: 1px solid #ded5ce;
   background: #e5e1dd;
   color: var(--ink);
-  cursor: pointer;
   font: inherit;
   font-weight: 850;
   display: grid;
   place-items: center;
   gap: 4px;
   padding: 12px;
+}
+
+#product-final-layout[hidden],
+#product-final-fields[hidden] {
+  display: none !important;
 }
 
 .product-step-tab:last-child {

@@ -970,8 +970,8 @@
         var done = selections[step.key] ? " done" : "";
         var active = index === currentStepIndex && !isFinal ? " active" : "";
         var selected = selections[step.key] ? '<span>' + esc(selections[step.key]) + '</span>' : '';
-        return '<button type="button" class="product-step-tab' + done + active + '" data-step-index="' + String(index) + '"><strong>' + esc(step.title || step.key) + '</strong>' + selected + '</button>';
-      }).join("") + '<button type="button" class="product-step-tab' + (isFinal ? ' active' : '') + '" data-step-index="' + String(configSteps.length) + '"><strong>Quantite & fichiers</strong></button>';
+        return '<div class="product-step-tab' + done + active + '"><strong>' + esc(step.title || step.key) + '</strong>' + selected + '</div>';
+      }).join("") + '<div class="product-step-tab' + (isFinal ? ' active' : '') + '"><strong>Quantite & fichiers</strong></div>';
       if (isFinal) {
         configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>';
         return;
@@ -989,20 +989,13 @@
             + '<strong>' + esc(label) + '</strong>'
           + '</button>';
         }).join("") + '</div>';
-      configWrap.querySelectorAll("[data-step-index]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          currentStepIndex = Number(button.getAttribute("data-step-index") || 0);
-          renderConfigStep();
-          if (currentStepIndex >= configSteps.length) requestPricing(readSelectedQuantity());
-        });
-      });
       configWrap.querySelectorAll("[data-step-choice]").forEach(function (button) {
         button.addEventListener("click", function () {
           selections[button.getAttribute("data-step-key")] = button.getAttribute("data-step-value") || "";
           currentQuantityOptions = getLotQuantityOptions(product, selections);
           currentStepIndex = Math.min(currentStepIndex + 1, configSteps.length);
           renderConfigStep();
-          requestPricing(readSelectedQuantity());
+          if (currentStepIndex >= configSteps.length) requestPricing(readSelectedQuantity());
         });
       });
     }
