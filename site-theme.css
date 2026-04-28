@@ -740,6 +740,91 @@ body[data-page="client"] #client-dashboard-view .section-head {
   gap: 12px;
 }
 
+.product-stepper {
+  display: grid;
+  gap: 18px;
+}
+
+.product-step-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  border: 1px solid #e7ded6;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #f4f0ec;
+}
+
+.product-step-tab {
+  min-height: 76px;
+  border: 0;
+  border-right: 1px solid #ded5ce;
+  background: #e5e1dd;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 12px;
+}
+
+.product-step-tab:last-child {
+  border-right: 0;
+}
+
+.product-step-tab span {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.product-step-tab.done,
+.product-step-tab.active {
+  background: var(--white);
+}
+
+.product-step-tab.active {
+  box-shadow: inset 0 -4px 0 var(--orange);
+}
+
+.product-step-title {
+  color: var(--orange-deep);
+  font-size: 1.35rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.product-step-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  border: 1px solid #eee4dc;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--white);
+}
+
+.product-step-choice {
+  min-height: 180px;
+  border: 0;
+  border-right: 1px solid #eee4dc;
+  border-bottom: 1px solid #eee4dc;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.12rem;
+  padding: 24px 16px;
+  transition: background .2s ease, box-shadow .2s ease, color .2s ease;
+}
+
+.product-step-choice:hover,
+.product-step-choice.selected {
+  background: #fff5eb;
+  box-shadow: inset 0 0 0 2px var(--orange);
+  color: var(--orange-deep);
+}
+
 .product-fixed-info {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

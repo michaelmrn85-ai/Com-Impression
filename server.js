@@ -256,6 +256,16 @@ function buildCatalogApiPayload() {
             if (pricingFormatOptions.length) {
                 options.Format = pricingFormatOptions;
             }
+            const pricingPaperOptions = getPricingFieldOptions(quantityPricing, 'paper');
+            if (pricingPaperOptions.length) {
+                const paperKey = Object.keys(options).find(key => /papier|grammage/i.test(key)) || 'Papier';
+                options[paperKey] = pricingPaperOptions;
+            }
+            const pricingFinishingOptions = getPricingFieldOptions(quantityPricing, 'finishing');
+            if (pricingFinishingOptions.length) {
+                const finishKey = Object.keys(options).find(key => /finit|pellic|vernis|soft/i.test(key)) || 'Finition';
+                options[finishKey] = pricingFinishingOptions;
+            }
             const sideOptions = getPricingSideOptions(quantityPricing);
             if (sideOptions.length) {
                 if (prod.id === 'impression-doc') {
@@ -267,6 +277,7 @@ function buildCatalogApiPayload() {
                     options['Recto / verso'] = sideOptions;
                 }
             }
+            const configSteps = normaliseConfigSteps(override.configSteps).length ? normaliseConfigSteps(override.configSteps) : buildConfigStepsFromOptions(options);
             const optionKeyList = Object.keys(options || {});
             const product = {
                 ref: buildProductRef(refIndex++),
@@ -281,6 +292,8 @@ function buildCatalogApiPayload() {
                 tags: [group.title, override.summary || prod.desc || '', optionKeyList.join(' ')].filter(Boolean),
                 options: options,
                 optionKeys: optionKeyList,
+                subProductTypes: normaliseCsvList(override.subProductTypes),
+                configSteps,
                 defaultSelections,
                 quantityOptions: uniquePositiveNumbers(override.quantityOptions && override.quantityOptions.length ? override.quantityOptions : (Array.isArray(prod.Q) ? prod.Q : [])),
                 quantityPricing,
@@ -323,10 +336,15 @@ function buildCatalogApiPayload() {
                 if (sideOptions.length) options['Recto / verso'] = sideOptions;
                 const pricingFormatOptions = getPricingFormatOptions(quantityPricing);
                 if (pricingFormatOptions.length) options.Format = pricingFormatOptions;
+                const pricingPaperOptions = getPricingFieldOptions(quantityPricing, 'paper');
+                if (pricingPaperOptions.length) options.Papier = pricingPaperOptions;
+                const pricingFinishingOptions = getPricingFieldOptions(quantityPricing, 'finishing');
+                if (pricingFinishingOptions.length) options.Finition = pricingFinishingOptions;
                 normaliseFreeOptions(item.freeOptions).forEach(option => {
                     if (!options[option.nom]) options[option.nom] = [];
                     if (!options[option.nom].includes(option.valeur)) options[option.nom].push(option.valeur);
                 });
+                const configSteps = normaliseConfigSteps(item.configSteps).length ? normaliseConfigSteps(item.configSteps) : buildConfigStepsFromOptions(options);
                 const optionKeys = Object.keys(options);
                 const defaultSelections = {};
                 optionKeys.forEach(key => {
@@ -345,6 +363,8 @@ function buildCatalogApiPayload() {
                     tags: [group.title, item.summary || '', item.title || ''].filter(Boolean),
                     options,
                     optionKeys,
+                    subProductTypes: normaliseCsvList(item.subProductTypes),
+                    configSteps,
                     defaultSelections,
                     quantityOptions: uniquePositiveNumbers(normaliseCsvList(item.quantityOptions)),
                     quantityPricing,
@@ -1128,20 +1148,32 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             const selectedFormatValues = formatKeys
                 .map(key => normaliseOptionKey(sels[key]))
                 .filter(Boolean);
+            const selectedPaperValues = Object.keys(sels)
+                .filter(key => /papier|grammage/i.test(key))
+                .map(key => normaliseOptionKey(sels[key]))
+                .filter(Boolean);
+            const selectedFinishingValues = Object.keys(sels)
+                .filter(key => /finit|pellic|vernis|soft/i.test(key))
+                .map(key => normaliseOptionKey(sels[key]))
+                .filter(Boolean);
+            const matchesPricingSelections = item => {
+                const selectedSubProduct = normaliseOptionKey(sels.__subProductType || sels['Type de produit'] || '');
+                const subProductOk = !selectedSubProduct || !item.subProductType || normaliseOptionKey(item.subProductType) === selectedSubProduct;
+                const configOk = !item.config || !Object.keys(item.config).length || Object.keys(item.config).every(key => {
+                    const selected = sels[key];
+                    return !selected || normaliseOptionKey(selected) === normaliseOptionKey(item.config[key]);
+                });
+                const sideOk = !selectedSideValues.length || (item.finish && selectedSideValues.includes(normaliseOptionKey(item.finish)));
+                const formatOk = !selectedFormatValues.length || (item.format && selectedFormatValues.includes(normaliseOptionKey(item.format)));
+                const paperOk = !selectedPaperValues.length || (item.paper && selectedPaperValues.includes(normaliseOptionKey(item.paper)));
+                const finishingOk = !selectedFinishingValues.length || (item.finishing && selectedFinishingValues.includes(normaliseOptionKey(item.finishing)));
+                return subProductOk && configOk && sideOk && formatOk && paperOk && finishingOk;
+            };
             let parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
             const tiers = normaliseQuantityPricing(productData.quantityPricing);
-            const lotTiersForOption = tiers.filter(item => {
-                if (item.type !== 'lot') return false;
-                if (!selectedSideValues.length) return true;
-                if (!item.finish) return false;
-                return selectedSideValues.includes(normaliseOptionKey(item.finish));
-            }).filter(item => {
-                if (!selectedFormatValues.length) return true;
-                if (!item.format) return false;
-                return selectedFormatValues.includes(normaliseOptionKey(item.format));
-            });
+            const lotTiersForOption = tiers.filter(item => item.type === 'lot' && matchesPricingSelections(item));
             if (lotTiersForOption.length) {
                 responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
                 if (quantityMode === 'lot' && !responseQuantityOptions.includes(parseInt(quantityValue, 10))) {
@@ -1168,11 +1200,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (quantityMode === 'lot' || quantityMode === 'unitaire') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
-                const optionTiers = quantityTiers.filter(item => {
-                    const sideOk = !selectedSideValues.length || (item.finish && selectedSideValues.includes(normaliseOptionKey(item.finish)));
-                    const formatOk = !selectedFormatValues.length || (item.format && selectedFormatValues.includes(normaliseOptionKey(item.format)));
-                    return sideOk && formatOk;
-                });
+                const optionTiers = quantityTiers.filter(matchesPricingSelections);
                 if (optionTiers.length) quantityTiers = optionTiers;
                 const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
                 const effectiveQty = quantityMode === 'lot' && lotTiersForOption.length && !lotTiersForOption.some(item => item.quantity === parsedQty)
@@ -1188,6 +1216,12 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             if (chosen) {
                 const safeQty = isNaN(parsedQty) || parsedQty < 1 ? 1 : parsedQty;
+                if (chosen.pageMin && chosen.pageStep && (safeQty < chosen.pageMin || ((safeQty - chosen.pageMin) % chosen.pageStep) !== 0)) {
+                    return res.status(400).json({
+                        success: false,
+                        error: `Nombre de pages invalide : minimum ${chosen.pageMin}, puis par multiple de ${chosen.pageStep}.`
+                    });
+                }
                 const parsedCopies = parseInt(copies, 10);
                 const safeCopies = productId === 'impression-doc' && !isNaN(parsedCopies) && parsedCopies > 0 ? parsedCopies : 1;
                 const unitMultiplier = productId === 'impression-doc' ? safeQty * safeCopies : safeQty;
@@ -1454,7 +1488,15 @@ function normaliseQuantityPricing(list) {
         const total = parseNumberValue(item.total != null ? item.total : (item.salePrice != null ? item.salePrice : (item.priceValue != null ? item.priceValue : item.price)));
         const finish = String(item.finish || '').trim();
         const format = String(item.format || '').trim();
+        const paper = String(item.paper || item.papier || '').trim();
+        const finishing = String(item.finishing || item.finition || '').trim();
+        const subProductType = String(item.subProductType || item.sousProduit || '').trim();
+        const config = item.config && typeof item.config === 'object'
+            ? Object.fromEntries(Object.entries(item.config).map(([key, value]) => [String(key || '').trim(), String(value || '').trim()]).filter(([key, value]) => key && value))
+            : {};
         const purchasePrice = parseNumberValue(item.purchasePrice != null ? item.purchasePrice : item.prixAchat);
+        const pageMin = parseInt(item.pageMin || item.pagesMin || item.minPages, 10);
+        const pageStep = parseInt(item.pageStep || item.pagesStep || item.multiplePages, 10);
         const optionsLibres = normaliseFreeOptions(item.optionsLibres);
         return {
             type,
@@ -1463,8 +1505,14 @@ function normaliseQuantityPricing(list) {
             height,
             finish,
             format,
+            paper,
+            finishing,
+            subProductType,
+            config,
             purchasePrice,
             total,
+            pageMin: !isNaN(pageMin) && pageMin > 0 ? pageMin : null,
+            pageStep: !isNaN(pageStep) && pageStep > 0 ? pageStep : null,
             optionsLibres
         };
     }).filter(item => {
@@ -1474,6 +1522,16 @@ function normaliseQuantityPricing(list) {
         }
         return !isNaN(item.quantity) && item.quantity > 0;
     });
+}
+
+function normaliseConfigSteps(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(step => {
+        const title = String(step && (step.title || step.key) || '').trim();
+        const values = normaliseCsvList(step && step.values);
+        if (!title || !values.length) return null;
+        return { key: title, title, values };
+    }).filter(Boolean);
 }
 
 function hasUnitPricing(pricing) {
@@ -1500,6 +1558,25 @@ function getPricingFormatOptions(pricing) {
         }
     });
     return values;
+}
+
+function getPricingFieldOptions(pricing, field) {
+    const values = [];
+    (Array.isArray(pricing) ? pricing : []).forEach(item => {
+        const value = String((item && item[field]) || '').trim();
+        if (value && !values.some(existing => existing.toLowerCase() === value.toLowerCase())) {
+            values.push(value);
+        }
+    });
+    return values;
+}
+
+function buildConfigStepsFromOptions(options) {
+    const source = options || {};
+    return Object.keys(source).map(key => {
+        const values = normaliseCsvList(source[key]);
+        return values.length ? { key, title: key, values } : null;
+    }).filter(Boolean);
 }
 
 function getProductImageUrl(filename) {
@@ -2057,6 +2134,8 @@ app.post('/api/admin/products/:legacyCat/:productId', express.json(), (req, res)
             formatOptions: normaliseCsvList(body.formatOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
+            subProductTypes: normaliseCsvList(body.subProductTypes),
+            configSteps: normaliseConfigSteps(body.configSteps),
             freeOptions: normaliseFreeOptions(body.freeOptions),
             uploadEnabled: body.uploadEnabled !== false,
             requiresQuantityInput: !!body.requiresQuantityInput || hasUnitPricing(quantityPricing),
@@ -2125,6 +2204,8 @@ app.post('/api/admin/products', express.json(), (req, res) => {
             formatOptions: normaliseCsvList(body.formatOptions),
             paperOptions: normaliseCsvList(body.paperOptions),
             finishOptions: normaliseCsvList(body.finishOptions),
+            subProductTypes: normaliseCsvList(body.subProductTypes),
+            configSteps: normaliseConfigSteps(body.configSteps),
             freeOptions: normaliseFreeOptions(body.freeOptions),
             quantityPricing,
             uploadEnabled: body.uploadEnabled !== false,

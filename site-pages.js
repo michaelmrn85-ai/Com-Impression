@@ -214,11 +214,51 @@
     });
   }
 
+  function matchesSelectedPricingField(row, selections, field, pattern) {
+    var value = normaliseOptionKey((row && row[field]) || "");
+    if (!value) return true;
+    return Object.keys(selections || {}).some(function (key) {
+      return pattern.test(key) && normaliseOptionKey(selections[key]) === value;
+    });
+  }
+
+  function matchesCustomConfig(row, selections) {
+    var selectedType = normaliseOptionKey((selections || {}).__subProductType || "");
+    if (selectedType && row.subProductType && normaliseOptionKey(row.subProductType) !== selectedType) return false;
+    var config = row.config || {};
+    return Object.keys(config).every(function (key) {
+      return !selections[key] || normaliseOptionKey(selections[key]) === normaliseOptionKey(config[key]);
+    });
+  }
+
   function getLotQuantityOptions(product, selections) {
     return uniqueValues(getProductPricingRows(product).filter(function (row) {
-      return row.type === "lot" && matchesSelectedSide(row, selections) && matchesSelectedFormat(row, selections);
+      return row.type === "lot"
+        && matchesCustomConfig(row, selections)
+        && matchesSelectedSide(row, selections)
+        && matchesSelectedFormat(row, selections)
+        && matchesSelectedPricingField(row, selections, "paper", /papier|grammage/i)
+        && matchesSelectedPricingField(row, selections, "finishing", /finit|pellic|vernis|soft/i);
     }).map(function (row) {
       return row.quantity;
+    }));
+  }
+
+  function getProductConfigSteps(product) {
+    var steps = [];
+    if (Array.isArray(product && product.subProductTypes) && product.subProductTypes.length) {
+      steps.push({ key: "__subProductType", title: "Type de produit", values: product.subProductTypes });
+    }
+    if (Array.isArray(product && product.configSteps) && product.configSteps.length) {
+      return steps.concat(product.configSteps);
+    }
+    var options = (product && product.options) || {};
+    return steps.concat((product.optionKeys || Object.keys(options)).filter(function (key) {
+      return isClientConfigKeyForProduct(product, key);
+    }).map(function (key) {
+      return { key: key, title: key, values: options[key] || [] };
+    }).filter(function (step) {
+      return step.values && step.values.length;
     }));
   }
 
@@ -804,10 +844,12 @@
           + '<div class="product-detail-config">'
             + renderFixedProductInfo(product)
             + '<div id="product-config-fields"></div>'
+            + '<div id="product-final-fields" hidden>'
             + '<div class="field" id="product-quantity-field"></div>'
             + (product.hasDimensions ? '<div class="field product-dimensions-box" id="product-dimensions"><label>Dimensions</label><div class="inline-fields"><input id="product-width" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.width) || 0) + '" placeholder="Largeur cm"><input id="product-height" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.height) || 0) + '" placeholder="Hauteur cm"></div><p>Indiquez votre format en centimetres.</p></div>' : '')
             + (product.uploadEnabled !== false ? '<div class="field product-upload-box"><label for="product-files">Fichiers</label><input id="product-files" type="file" multiple></div>' : '')
             + '<div class="field"><label for="product-notes">Precisions</label><textarea id="product-notes" placeholder="Infos utiles, demande particuliere, delai..."></textarea></div>'
+            + '</div>'
             + '<div class="status" id="product-price-status"></div>'
           + '</div>'
           + '<aside class="summary-box product-side-summary">'
@@ -827,6 +869,7 @@
       + '</div>';
 
     var configWrap = $("product-config-fields");
+    var finalFields = $("product-final-fields");
     var quantityField = $("product-quantity-field");
     var priceDisplay = $("product-price-display");
     var priceStatus = $("product-price-status");
@@ -840,18 +883,56 @@
     var selectedQuantityMode = isImpressionDocumentProduct(product) ? "unitaire" : (quantityModes[0] || "lot");
     var documentPageCount = 1;
     var documentCopies = 1;
+    var configSteps = getProductConfigSteps(product);
+    var currentStepIndex = 0;
 
     if (configWrap) {
-      configWrap.className = "product-config-grid";
-      configWrap.innerHTML = (product.optionKeys || []).filter(function (key) {
-        return isClientConfigKeyForProduct(product, key);
-      }).map(function (key) {
-        var selectId = "product-opt-" + key.replace(/[^a-z0-9]/gi, "_");
-        return '<div class="field"><label for="' + esc(selectId) + '">' + esc(key) + '</label><select data-product-option="' + esc(key) + '" id="' + esc(selectId) + '">' + (product.options[key] || []).map(function (option) {
-          var selected = selections[key] === option ? ' selected' : '';
-          return '<option value="' + esc(option) + '"' + selected + '>' + esc(option) + '</option>';
-        }).join("") + '</select></div>';
-      }).join("");
+      configWrap.className = "product-stepper";
+    }
+
+    function renderConfigStep() {
+      if (!configWrap) return;
+      if (!configSteps.length) {
+        configWrap.innerHTML = "";
+        if (finalFields) finalFields.hidden = false;
+        return;
+      }
+      var isFinal = currentStepIndex >= configSteps.length;
+      if (finalFields) finalFields.hidden = !isFinal;
+      var tabs = configSteps.map(function (step, index) {
+        var done = selections[step.key] ? " done" : "";
+        var active = index === currentStepIndex && !isFinal ? " active" : "";
+        var selected = selections[step.key] ? '<span>' + esc(selections[step.key]) + '</span>' : '';
+        return '<button type="button" class="product-step-tab' + done + active + '" data-step-index="' + String(index) + '"><strong>' + esc(step.title || step.key) + '</strong>' + selected + '</button>';
+      }).join("") + '<button type="button" class="product-step-tab' + (isFinal ? ' active' : '') + '" data-step-index="' + String(configSteps.length) + '"><strong>Quantite & fichiers</strong></button>';
+      if (isFinal) {
+        configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>';
+        return;
+      }
+      var step = configSteps[currentStepIndex];
+      var values = Array.isArray(step.values) ? step.values : [];
+      configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>'
+        + '<div class="product-step-title">' + String(currentStepIndex + 1) + '. Choisissez votre ' + esc((step.title || step.key).toLowerCase()) + '</div>'
+        + '<div class="product-step-options">' + values.map(function (value) {
+          var selected = selections[step.key] === value ? ' selected' : '';
+          return '<button type="button" class="product-step-choice' + selected + '" data-step-key="' + esc(step.key) + '" data-step-value="' + esc(value) + '"><strong>' + esc(value) + '</strong></button>';
+        }).join("") + '</div>';
+      configWrap.querySelectorAll("[data-step-index]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          currentStepIndex = Number(button.getAttribute("data-step-index") || 0);
+          renderConfigStep();
+          if (currentStepIndex >= configSteps.length) requestPricing(readSelectedQuantity());
+        });
+      });
+      configWrap.querySelectorAll("[data-step-choice]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          selections[button.getAttribute("data-step-key")] = button.getAttribute("data-step-value") || "";
+          currentQuantityOptions = getLotQuantityOptions(product, selections);
+          currentStepIndex = Math.min(currentStepIndex + 1, configSteps.length);
+          renderConfigStep();
+          requestPricing(readSelectedQuantity());
+        });
+      });
     }
 
     function renderQuantityField(selectedValue) {
@@ -998,6 +1079,7 @@
         });
     }
 
+    renderConfigStep();
     renderQuantityField(selectedQuantityMode === "unitaire" ? "1" : (product.quantityOptions && product.quantityOptions.length ? String(product.quantityOptions[0]) : "1"));
     document.querySelectorAll("[data-product-option]").forEach(function (select) {
       select.addEventListener("change", function () {
