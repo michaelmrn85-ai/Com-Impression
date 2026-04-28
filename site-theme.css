@@ -743,6 +743,8 @@ body[data-page="client"] #client-dashboard-view .section-head {
 .product-stepper {
   display: grid;
   gap: 18px;
+  min-height: 68vh;
+  align-content: start;
 }
 
 .product-step-tabs {
@@ -798,6 +800,7 @@ body[data-page="client"] #client-dashboard-view .section-head {
 .product-step-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  min-height: 48vh;
   border: 1px solid #eee4dc;
   border-radius: 20px;
   overflow: hidden;

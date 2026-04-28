@@ -1125,6 +1125,7 @@
       +'<div class="field"><label>Reference</label><input value="'+esc(entryRef.product.ref||'')+'" disabled></div>'
       +'<div class="field"><label>Libelle</label><input id="product-edit-name" value="'+esc(entryRef.product.title||'')+'"></div>'
       +'</div>'
+      +'<div class="field"><label>Étapes du parcours client</label>'+renderProductConfigStepsEditor(entryRef.product.configSteps || [])+'</div>'
       +'<div class="site-grid" style="margin-top:8px;padding:16px;border:1px solid #eee3d9;border-radius:20px;background:#fffaf5;">'
       +'<div class="field"><label>Photo principale du produit</label><input id="product-edit-image-file" type="file" accept=".jpg,.jpeg,.png,.webp"><input id="product-edit-image" type="hidden" value="'+esc(entryRef.product.image||'')+'"><div class="muted" id="product-edit-image-name">'+esc(entryRef.product.image||'Aucune image')+'</div></div>'
       +'<div class="field"><label>Apercu photo</label><div id="product-edit-image-preview" style="min-height:180px;border:1px solid #eee3d9;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+(entryRef.product.imageUrl?'<img src="'+esc(entryRef.product.imageUrl)+'" alt="Apercu produit" style="width:100%;height:180px;object-fit:cover;display:block;">':'<span class="muted">Aucune image</span>')+'</div></div>'
@@ -1133,7 +1134,6 @@
       +'<div class="field"><label>Types de sous-produit</label><textarea id="product-edit-subtypes" placeholder="Flyer standard&#10;Flyer plié&#10;Brochure">'+esc(subProductTypesText)+'</textarea></div>'
       +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
       +'<div class="field"><label>Tarification / dimensions</label>'+renderProductPricingEditor(pricingRows)+'</div>'
-      +'<div class="field"><label>Étapes du parcours client</label>'+renderProductConfigStepsEditor(entryRef.product.configSteps || [])+'</div>'
       +'<div class="site-grid">'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-upload" type="checkbox" style="width:auto;" '+(entryRef.product.uploadEnabled!==false?'checked':'')+'> Upload actif sur la fiche produit</label>'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-dimensions" type="checkbox" style="width:auto;" '+(entryRef.product.hasDimensions?'checked':'')+'> Produit avec dimensions libres</label>'
@@ -1645,7 +1645,7 @@
 
   function renderProductPricingEditor(rows){
     return '<div class="pricing-editor">'
-      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type tarif</th><th>Sous-produit</th><th>Configuration étapes</th><th>Quantite</th><th>Format</th><th>Papier</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Recto / verso</th><th>Finition</th><th>Prix d achat TTC</th><th>Prix de vente TTC</th><th>Pages min</th><th>Pas pages</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
+      +'<div class="pricing-table-wrap"><table class="pricing-table"><thead><tr><th>Type tarif</th><th>Sous-produit</th><th>Chemin ciblé</th><th>Quantité</th><th class="pricing-dim-col">Largeur</th><th class="pricing-dim-col">Hauteur</th><th>Prix achat TTC</th><th>Prix vente TTC</th><th>Pages min</th><th>Pas pages</th><th>Marge</th><th></th></tr></thead><tbody id="product-pricing-rows">'
       +rows.map(function(row){
         var isDimensions = row.type === 'dimensions';
         var optionsHtml = (Array.isArray(row.optionsLibres) ? row.optionsLibres : []).map(function(option){
@@ -1660,12 +1660,8 @@
           +'<td><input class="product-pricing-subtype" placeholder="Flyer, brochure..." value="'+esc(row.subProductType||'')+'"></td>'
           +'<td><input class="product-pricing-config" placeholder="Etape=choix; Etape 2=choix" value="'+esc(formatPricingConfig(row.config||{}))+'"></td>'
           +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value="'+esc(row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></td>'
-          +'<td><input class="product-pricing-format" placeholder="A4, A5, 10x15..." value="'+esc(row.format||'')+'"></td>'
-          +'<td><input class="product-pricing-paper" placeholder="135g couche, 350g..." value="'+esc(row.paper||'')+'"></td>'
           +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row.width||'')+'"'+(isDimensions?'':' disabled')+'></td>'
           +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row.height||'')+'"'+(isDimensions?'':' disabled')+'></td>'
-          +'<td><input class="product-pricing-finish" placeholder="Recto, recto-verso..." value="'+esc(row.finish||'')+'"></td>'
-          +'<td><input class="product-pricing-finishing" placeholder="Sans, pelliculage..." value="'+esc(row.finishing||'')+'"></td>'
           +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row.purchasePrice||'')+'"></td>'
           +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row.salePrice||'')+'"></td>'
           +'<td><input class="product-pricing-page-min" inputmode="numeric" placeholder="8" value="'+esc(row.pageMin||'')+'"></td>'
@@ -1673,7 +1669,7 @@
           +'<td><span class="pricing-margin">0,00</span></td>'
           +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
         +'</tr>'
-        +'<tr class="product-pricing-options"><td colspan="16"><div class="product-pricing-options-box">'
+        +'<tr class="product-pricing-options"><td colspan="12"><div class="product-pricing-options-box">'
           +'<div class="product-pricing-options-head"><strong>Options libres de cette ligne</strong><button class="btn btn-light btn-small product-pricing-option-add" type="button">+ Ajouter une option</button></div>'
           +'<div class="product-pricing-options-list">'+optionsHtml+'</div>'
         +'</div></td></tr>';
@@ -2189,12 +2185,8 @@
             +'<td><input class="product-pricing-subtype" placeholder="Flyer, brochure..." value=""></td>'
             +'<td><input class="product-pricing-config" placeholder="Etape=choix; Etape 2=choix" value=""></td>'
             +'<td><input class="product-pricing-qty" inputmode="numeric" placeholder="100" value=""></td>'
-            +'<td><input class="product-pricing-format" placeholder="A4, A5, 10x15..." value=""></td>'
-            +'<td><input class="product-pricing-paper" placeholder="135g couche, 350g..." value=""></td>'
             +'<td class="product-pricing-width-cell"><input class="product-pricing-width" inputmode="decimal" placeholder="Largeur" value="" disabled></td>'
             +'<td class="product-pricing-height-cell"><input class="product-pricing-height" inputmode="decimal" placeholder="Hauteur" value="" disabled></td>'
-            +'<td><input class="product-pricing-finish" placeholder="Recto, recto-verso..." value=""></td>'
-            +'<td><input class="product-pricing-finishing" placeholder="Sans, pelliculage..." value=""></td>'
             +'<td><input class="product-pricing-purchase" inputmode="decimal" placeholder="8,50" value=""></td>'
             +'<td><input class="product-pricing-sale" inputmode="decimal" placeholder="15,90" value=""></td>'
             +'<td><input class="product-pricing-page-min" inputmode="numeric" placeholder="8" value=""></td>'
@@ -2202,7 +2194,7 @@
             +'<td><span class="pricing-margin">0,00</span></td>'
             +'<td><button class="btn-icon product-pricing-remove" type="button" title="Supprimer la ligne">×</button></td>'
             +'</tr>'
-            +'<tr class="product-pricing-options"><td colspan="16"><div class="product-pricing-options-box">'
+            +'<tr class="product-pricing-options"><td colspan="12"><div class="product-pricing-options-box">'
             +'<div class="product-pricing-options-head"><strong>Options libres de cette ligne</strong><button class="btn btn-light btn-small product-pricing-option-add" type="button">+ Ajouter une option</button></div>'
             +'<div class="product-pricing-options-list"></div>'
             +'</div></td></tr>'

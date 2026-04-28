@@ -245,13 +245,24 @@
   }
 
   function getProductConfigSteps(product) {
-    var steps = [];
-    if (Array.isArray(product && product.subProductTypes) && product.subProductTypes.length) {
-      steps.push({ key: "__subProductType", title: "Type de produit", values: product.subProductTypes });
-    }
     if (Array.isArray(product && product.configSteps) && product.configSteps.length) {
-      return steps.concat(product.configSteps);
+      return product.configSteps;
     }
+    var steps = [];
+    var pricingSubTypes = uniqueValues(getProductPricingRows(product).map(function (row) { return row.subProductType; }));
+    var subTypes = Array.isArray(product && product.subProductTypes) && product.subProductTypes.length ? product.subProductTypes : pricingSubTypes;
+    if (subTypes.length) {
+      steps.push({ key: "__subProductType", title: "Type de produit", values: subTypes });
+    }
+    var configKeys = [];
+    getProductPricingRows(product).forEach(function (row) {
+      Object.keys(row.config || {}).forEach(function (key) {
+        if (configKeys.indexOf(key) === -1) configKeys.push(key);
+      });
+    });
+    configKeys.forEach(function (key) {
+      steps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).map(function (row) { return row.config && row.config[key]; })) });
+    });
     var options = (product && product.options) || {};
     return steps.concat((product.optionKeys || Object.keys(options)).filter(function (key) {
       return isClientConfigKeyForProduct(product, key);
@@ -277,6 +288,44 @@
     if (!value) return "";
     if (/^https?:\/\//i.test(value) || value.indexOf("/media/") === 0) return value;
     return "/media/products/" + encodeURIComponent(value);
+  }
+
+  function getConfiguredChoice(step, label) {
+    var wanted = normaliseOptionKey(label);
+    return (Array.isArray(step && step.values) ? step.values : []).map(function (value) {
+      return {
+        label: getStepChoiceLabel(value),
+        image: getStepChoiceImage(value)
+      };
+    }).find(function (value) {
+      return normaliseOptionKey(value.label) === wanted;
+    }) || { label: label, image: "" };
+  }
+
+  function rowMatchesStepSelections(row, steps, currentIndex, selections) {
+    for (var i = 0; i < currentIndex; i += 1) {
+      var step = steps[i];
+      var selected = selections[step.key];
+      if (!selected) continue;
+      if (step.key === "__subProductType") {
+        if (!row.subProductType || normaliseOptionKey(row.subProductType) !== normaliseOptionKey(selected)) return false;
+      } else if (!row.config || !row.config[step.key] || normaliseOptionKey(row.config[step.key]) !== normaliseOptionKey(selected)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function getAvailableStepValues(product, steps, stepIndex, selections) {
+    var step = steps[stepIndex];
+    var rows = getProductPricingRows(product).filter(function (row) {
+      return rowMatchesStepSelections(row, steps, stepIndex, selections);
+    });
+    var labels = uniqueValues(rows.map(function (row) {
+      return step.key === "__subProductType" ? row.subProductType : (row.config && row.config[step.key]);
+    }));
+    if (!labels.length) labels = uniqueValues((step.values || []).map(getStepChoiceLabel));
+    return labels.map(function (label) { return getConfiguredChoice(step, label); });
   }
 
   function uploadProductFiles(fileList) {
@@ -856,9 +905,8 @@
           + '</div>'
           + '<div class="product-detail-pricebox"><div class="muted">Prix de depart</div><div class="total" id="product-price-display">' + esc(normalizePriceLabel(product.priceLabel)) + '</div></div>'
         + '</div>'
-        + renderProductHeroMedia(entry)
         + '<div id="product-config-fields"></div>'
-        + '<div class="product-detail-layout">'
+        + '<div class="product-detail-layout" id="product-final-layout" hidden>'
           + '<div class="product-detail-config">'
             + '<div id="product-final-fields" hidden>'
             + '<div class="field" id="product-quantity-field"></div>'
@@ -886,6 +934,7 @@
       + '</div>';
 
     var configWrap = $("product-config-fields");
+    var finalLayout = $("product-final-layout");
     var finalFields = $("product-final-fields");
     var quantityField = $("product-quantity-field");
     var priceDisplay = $("product-price-display");
@@ -916,6 +965,7 @@
       }
       var isFinal = currentStepIndex >= configSteps.length;
       if (finalFields) finalFields.hidden = !isFinal;
+      if (finalLayout) finalLayout.hidden = !isFinal;
       var tabs = configSteps.map(function (step, index) {
         var done = selections[step.key] ? " done" : "";
         var active = index === currentStepIndex && !isFinal ? " active" : "";
@@ -927,7 +977,7 @@
         return;
       }
       var step = configSteps[currentStepIndex];
-      var values = Array.isArray(step.values) ? step.values : [];
+      var values = getAvailableStepValues(product, configSteps, currentStepIndex, selections);
       configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>'
         + '<div class="product-step-title">' + String(currentStepIndex + 1) + '. Choisissez votre ' + esc((step.title || step.key).toLowerCase()) + '</div>'
         + '<div class="product-step-options">' + values.map(function (value) {
