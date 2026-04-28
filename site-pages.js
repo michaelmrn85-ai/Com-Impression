@@ -21,6 +21,7 @@
       "/client": "./client.html",
       "/ouverture-compte": "./ouverture-compte.html",
       "/rendez-vous": "./rendez-vous.html",
+      "/avis": "./avis.html",
       "/mentions-legales": "./mentions-legales.html",
       "/cgv": "./cgv.html",
       "/faq": "./faq.html",
@@ -42,6 +43,11 @@
       var href = link.getAttribute("href");
       link.setAttribute("href", resolveAppUrl(href));
     });
+  }
+
+  function setMeta(selector, attr, value) {
+    var node = document.querySelector(selector);
+    if (node && value) node.setAttribute(attr, value);
   }
 
   function esc(value) {
@@ -1161,6 +1167,21 @@
 
       if (backLink) {
         backLink.setAttribute("href", resolveAppUrl("/produits" + (entry ? "?gamme=" + encodeURIComponent(entry.gammeSlug) : "")));
+      }
+
+      if (entry && entry.product) {
+        var title = entry.product.title || "Produit COM' Impression";
+        var desc = entry.product.summary || "Fiche produit COM' Impression avec options, quantite et livraison estimee.";
+        var canonical = window.location.origin + "/produit?gamme=" + encodeURIComponent(entry.gammeSlug || "") + "&produit=" + encodeURIComponent(entry.product.id || "");
+        document.title = title + " | COM' Impression";
+        setMeta('meta[name="description"]', "content", desc);
+        setMeta('link[rel="canonical"]', "href", canonical);
+        setMeta('meta[property="og:title"]', "content", title + " | COM' Impression");
+        setMeta('meta[property="og:description"]', "content", desc);
+        setMeta('meta[property="og:url"]', "content", canonical);
+        if (entry.product.imageUrl) {
+          setMeta('meta[property="og:image"]', "content", new URL(entry.product.imageUrl, window.location.origin).href);
+        }
       }
 
       mountProductDetail(root, entry);
@@ -2716,6 +2737,56 @@
     });
   }
 
+  function initAvisPage() {
+    var form = $("review-form");
+    var status = $("review-status");
+    if (!form || !status) return;
+    var params = new URLSearchParams(window.location.search);
+    if ($("review-prenom")) $("review-prenom").value = params.get("prenom") || "";
+    if ($("review-produit")) $("review-produit").value = params.get("produit") || "";
+    if ($("review-commande")) $("review-commande").value = params.get("commande") || "";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      clearStatus(status);
+      var fd = new FormData();
+      fd.append("prenom", (($("review-prenom") || {}).value || "").trim());
+      fd.append("ville", (($("review-ville") || {}).value || "").trim());
+      fd.append("produit", (($("review-produit") || {}).value || "").trim());
+      fd.append("commande", (($("review-commande") || {}).value || "").trim());
+      fd.append("note", (($("review-note") || {}).value || "5").trim());
+      fd.append("texte", (($("review-text") || {}).value || "").trim());
+      if (!fd.get("prenom") || !fd.get("texte")) {
+        setStatus(status, "err", "Prenom et avis sont obligatoires.");
+        return;
+      }
+      var submit = $("review-submit");
+      if (submit) {
+        submit.disabled = true;
+        submit.textContent = "Envoi en cours...";
+      }
+      fetch(API_BASE + "/api/avis", { method: "POST", body: fd })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            if (!response.ok || !json.success) throw new Error(json.error || "Avis impossible");
+            return json;
+          });
+        })
+        .then(function () {
+          form.reset();
+          setStatus(status, "ok", "Merci pour votre avis. Il sera publié après validation.");
+        })
+        .catch(function (error) {
+          setStatus(status, "err", error.message || "Impossible d'envoyer l'avis.");
+        })
+        .finally(function () {
+          if (submit) {
+            submit.disabled = false;
+            submit.textContent = "Envoyer mon avis";
+          }
+        });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     bindShell();
     var page = document.body.getAttribute("data-page");
@@ -2726,5 +2797,6 @@
     if (page === "client") initClientPage();
     if (page === "ouverture-compte") initOuvertureComptePage();
     if (page === "rendez-vous") initRendezVousPage();
+    if (page === "avis") initAvisPage();
   });
 })();

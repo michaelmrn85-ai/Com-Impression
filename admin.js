@@ -1835,11 +1835,12 @@
   }
 
   function resetManualForm(){
-    ['manual-prenom','manual-nom','manual-email','manual-tel','manual-type-client','manual-siret','manual-total','manual-livraison','manual-doc-type'].forEach(function(id){
+    ['manual-prenom','manual-nom','manual-email','manual-tel','manual-type-client','manual-siret','manual-total','manual-livraison','manual-doc-type','manual-payment-mode'].forEach(function(id){
       var el=$(id); if(el) el.value='';
     });
     var type=$('manual-type-client'); if(type) type.value='Particulier';
     var docType=$('manual-doc-type'); if(docType) docType.value='commande';
+    var paymentMode=$('manual-payment-mode'); if(paymentMode) paymentMode.value='CB';
     var lines=$('manual-lines'); if(lines) lines.innerHTML='';
     addManualLine();
     clearStatus('manual-status');
@@ -1859,6 +1860,7 @@
     fd.append('type_client',($('manual-type-client').value||'Particulier').trim());
     fd.append('siret',($('manual-siret').value||'').trim());
     fd.append('doc_type',($('manual-doc-type').value||'commande').trim());
+    fd.append('mode_reglement',($('manual-payment-mode').value||'CB').trim());
     fd.append('panier',buildManualPanier(rows));
     fd.append('prix_total',($('manual-total').value||'').trim()||formatAmount(rows.reduce(function(sum,row){return sum+parseAmount(row.montant);},0)));
     fd.append('date_livraison',($('manual-livraison').value||'').trim());

@@ -1271,10 +1271,31 @@ app.get('/panier', (req, res) => { try { trackVisit(req); } catch(e) {} res.send
 app.get('/client', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'client.html')); });
 app.get('/ouverture-compte', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'ouverture-compte.html')); });
 app.get('/rendez-vous', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'rendez-vous.html')); });
+app.get('/avis', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'avis.html')); });
 app.get('/mentions-legales', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'mentions-legales.html')); });
 app.get('/cgv', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'cgv.html')); });
 app.get('/faq', (req, res) => { try { trackVisit(req); } catch(e) {} res.sendFile(path.join(__dirname, 'faq.html')); });
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/robots.txt', (req, res) => {
+    const baseUrl = getPublicBaseUrl(req).replace(/\/$/, '');
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nSitemap: ${baseUrl}/sitemap.xml\n`);
+});
+app.get('/sitemap.xml', (req, res) => {
+    const baseUrl = getPublicBaseUrl(req).replace(/\/$/, '');
+    const today = new Date().toISOString().slice(0, 10);
+    const urls = ['/', '/produits', '/rendez-vous', '/ouverture-compte', '/avis', '/faq', '/cgv', '/mentions-legales'];
+    const productUrls = [];
+    const escapeXml = value => String(value || '').replace(/[<>&'"]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char]));
+    try {
+        (buildCatalogApiPayload().gammes || []).forEach(gamme => {
+            (gamme.products || []).forEach(product => {
+                productUrls.push(`/produit?gamme=${encodeURIComponent(gamme.slug)}&produit=${encodeURIComponent(product.id)}`);
+            });
+        });
+    } catch(e) {}
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.concat(productUrls).map(url => `  <url><loc>${escapeXml(baseUrl + url)}</loc><lastmod>${today}</lastmod><changefreq>${url === '/' ? 'weekly' : 'monthly'}</changefreq><priority>${url === '/' ? '1.0' : '0.7'}</priority></url>`).join('\n')}\n</urlset>`;
+    res.type('application/xml').send(xml);
+});
 app.get('/media/products/:filename', (req, res) => {
     const filename = path.basename(String(req.params.filename || ''));
     if (!filename) return res.status(404).end();
@@ -1532,6 +1553,7 @@ function trackVisit(req) {
         '/client.html': '/client',
         '/ouverture-compte.html': '/ouverture-compte',
         '/rendez-vous.html': '/rendez-vous',
+        '/avis.html': '/avis',
         '/mentions-legales.html': '/mentions-legales',
         '/cgv.html': '/cgv',
         '/faq.html': '/faq'
@@ -1539,7 +1561,7 @@ function trackVisit(req) {
     pathname = htmlAliases[pathname] || pathname;
     if (req.method !== 'GET') return;
     if (pathname.startsWith('/api') || pathname.startsWith('/admin') || pathname.includes('.')) return;
-    const tracked = ['/', '/produits', '/produit', '/panier', '/client', '/ouverture-compte', '/rendez-vous', '/mentions-legales', '/cgv', '/faq'];
+    const tracked = ['/', '/produits', '/produit', '/panier', '/client', '/ouverture-compte', '/rendez-vous', '/avis', '/mentions-legales', '/cgv', '/faq'];
     if (tracked.indexOf(pathname) === -1) return;
     const visits = lireVisits();
     const dayKey = getVisitDayKey();
@@ -2177,7 +2199,7 @@ app.post('/api/avis', upload.none(), async(req,res)=>{
         const prenom = (d.prenom || d.nom || '').trim();
         if(!prenom||!d.texte||!d.note) return res.status(400).json({success:false,error:'Champs manquants'});
         const avis=lireAvis();
-        avis.push({id:Date.now(),prenom:prenom,ville:d.ville||'',produit:d.produit||'',texte:d.texte||'',note:parseInt(d.note)||5,date:new Date().toLocaleDateString('fr-FR'),valide:false});
+        avis.push({id:Date.now(),prenom:prenom,ville:d.ville||'',produit:d.produit||'',commande:d.commande||'',texte:d.texte||'',note:parseInt(d.note)||5,date:new Date().toLocaleDateString('fr-FR'),valide:false});
         sauvegarderAvis(avis);
         try{const transporter=createTransporter();await transporter.sendMail({from:`"COM' Impression" <${process.env.SMTP_USER}>`,to:process.env.ADMIN_EMAIL||'michael@com-impression.fr',subject:`⭐ Nouvel avis — ${prenom} (${d.note}/5)`,html:`<p><strong>${prenom}${d.ville?' — '+d.ville:''}</strong><br>${d.texte}</p>`});}catch(e){}
         res.json({success:true});
@@ -3686,6 +3708,7 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
                 d.email || '--',
                 d.tel || '--',
                 d.type_client ? `Profil : ${d.type_client}` : '',
+                d.mode_reglement ? `Paiement : ${d.mode_reglement}` : '',
                 d.siret ? `SIRET / structure : ${d.siret}` : ''
             ].filter(Boolean),
             productRows: lignes,
@@ -3729,6 +3752,8 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
             panier_json: d.panier_json || '',
             lignes:      lignes,
             prix_total:  d.prix_total || '--',
+            mode_reglement: d.mode_reglement || 'CB',
+            payment_status: d.mode_reglement === 'CB' ? '' : 'attente_reglement',
             date_livraison: d.date_livraison || '',
             remise:      d.remise || '',
             code_acces:  genererCode(),
@@ -4011,6 +4036,13 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
             const transporter = createTransporter();
             const factureAttach = [];
             const accentColor = statut === 'Annulee' ? '#d9553f' : (statut === 'BAT fichier a revoir' ? '#d97706' : '#F47B20');
+            const reviewUrl = `${publicBaseUrl}/avis?commande=${encodeURIComponent(cmd.numero || cmd.id || '')}&prenom=${encodeURIComponent(cmd.prenom || '')}&produit=${encodeURIComponent((cmd.lignes && cmd.lignes[0] && cmd.lignes[0].produit) || '')}`;
+            const reviewBlock = statut === 'Expediee' ? `
+                <div style="text-align:center;margin:22px 0 26px;padding:18px;border-radius:18px;background:#fff7ef;border:1px solid #efd8c0;">
+                    <p style="margin:0 0 14px;color:#5C5C5C;font-size:15px;line-height:1.6;">Votre retour aide COM' Impression à progresser et rassure les prochains clients.</p>
+                    <a href="${reviewUrl}" style="display:inline-block;background:#171310;color:#fff;text-decoration:none;padding:13px 26px;border-radius:999px;font-size:15px;font-weight:800;">Laisser un avis</a>
+                </div>
+            ` : '';
             const contenu = `
                 <div style="display:inline-block;padding:7px 14px;border-radius:999px;background:#fff3e6;color:${accentColor};font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:14px;">Mise à jour commande</div>
                 <h2 style="color:#171310;font-size:28px;line-height:1.15;margin:0 0 14px;">${STATUTS_LABELS[statut] || statut}</h2>
@@ -4026,6 +4058,7 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
                 <div style="text-align:center;margin:24px 0 26px;">
                     <a href="${publicBaseUrl}/client" style="display:inline-block;background:${accentColor};color:#fff;text-decoration:none;padding:14px 30px;border-radius:999px;font-size:15px;font-weight:800;">Accéder à mon espace client</a>
                 </div>
+                ${reviewBlock}
                 <p style="font-size:14px;color:#5C5C5C;line-height:1.7;margin-top:20px;">
                     Pour toute question : <a href="mailto:michael@com-impression.fr" style="color:#F47B20;">michael@com-impression.fr</a><br>
                     ou au <strong>07 43 69 56 41</strong>
