@@ -118,8 +118,12 @@
     .product-path-step-preview img{width:100%;height:100%;object-fit:contain;display:block}
     .product-path-tariffs{border-top:1px solid #f0e4dc;padding-top:12px;display:grid;gap:10px}
     .product-path-tariff-list{display:grid;gap:10px}
-    .product-path-tariff-row{display:grid;grid-template-columns:1fr .85fr .85fr .85fr 1fr 1fr .75fr auto;gap:8px;align-items:end;border:1px dashed #efd8c0;border-radius:18px;padding:12px;background:#fffdfa}
+    .product-path-tariff-row{display:grid;grid-template-columns:minmax(140px,.95fr) minmax(96px,.62fr) minmax(120px,.76fr) minmax(120px,.76fr) minmax(118px,.7fr) auto;gap:8px;align-items:end;border:1px dashed #efd8c0;border-radius:18px;padding:12px;background:#fffdfa}
     .product-path-tariff-row .field{margin:0}
+    .product-path-tariff-row input,.product-path-tariff-row select{padding:10px 12px;border-radius:12px}
+    .product-path-tariff-row:not(.is-dimensions) .product-path-tariff-width-field,
+    .product-path-tariff-row:not(.is-dimensions) .product-path-tariff-height-field{display:none}
+    .product-path-tariff-row.is-dimensions{grid-template-columns:minmax(130px,.9fr) minmax(90px,.55fr) minmax(95px,.58fr) minmax(95px,.58fr) minmax(110px,.66fr) minmax(110px,.66fr) minmax(105px,.6fr) auto}
     .product-path-options-box{grid-column:1/-1;border-top:1px solid #f4e7dc;margin-top:4px;padding-top:10px;display:grid;gap:8px}
     .btn-icon{width:40px;height:40px;border-radius:50%;border:2px solid #f0e4dc;background:#fff;color:#dc2626;font-weight:900;cursor:pointer}
     .upload-box{border:2px dashed #f0d6bf;border-radius:18px;padding:14px;background:#fffdfa}

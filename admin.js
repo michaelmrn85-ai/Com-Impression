@@ -1416,6 +1416,7 @@
   function refreshProductPathEditor(){
     document.querySelectorAll('.product-path-tariff-row').forEach(function(row){
       var type = ((row.querySelector('.product-path-tariff-type')||{}).value || 'lot');
+      row.classList.toggle('is-dimensions', type === 'dimensions');
       var qty = row.querySelector('.product-path-tariff-qty');
       var width = row.querySelector('.product-path-tariff-width');
       var height = row.querySelector('.product-path-tariff-height');
