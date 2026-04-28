@@ -1079,7 +1079,18 @@
         return;
       }
       if (selectedQuantityMode === "dimensions") {
-        quantityField.innerHTML = '<label>Quantite</label>' + modeHtml + '<p>Le prix depend des dimensions indiquees.</p>';
+        currentQuantityOptions = uniqueValues(getProductPricingRows(product).filter(function (row) {
+          return row.type === "dimensions" && matchesCustomConfig(row, selections);
+        }).map(function (row) { return row.quantity; }));
+        if (currentQuantityOptions.length) {
+          var selectedDimQty = selectedValue || String(currentQuantityOptions[0]);
+          quantityField.innerHTML = '<label>Quantite</label>' + modeHtml + '<div class="quantity-grid">' + currentQuantityOptions.map(function (qty) {
+            var value = String(qty);
+            return '<button type="button" class="quantity-chip' + (value === selectedDimQty ? ' active' : '') + '" data-qty-choice="' + esc(value) + '">' + esc(value) + ' ex.</button>';
+          }).join("") + '</div><input id="product-qty-select" type="hidden" value="' + esc(selectedDimQty) + '"><p>Le prix est calcule au metre carre selon les dimensions indiquees.</p>';
+          return;
+        }
+        quantityField.innerHTML = '<label for="product-qty-input">Quantite</label>' + modeHtml + '<div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"><p>Le prix est calcule au metre carre selon les dimensions indiquees.</p></div>';
         return;
       }
       currentQuantityOptions = getLotQuantityOptions(product, selections);

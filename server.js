@@ -1184,20 +1184,16 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             let chosen = null;
             if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
-                const dimensionalTiers = tiers.filter(item => item.type === 'dimensions');
+                const dimensionalTiers = tiers.filter(item => item.type === 'dimensions' && matchesPricingSelections(item));
                 if (dimensionalTiers.length) {
-                    chosen = dimensionalTiers.find(item => item.width === parsedWidth && item.height === parsedHeight && matchesPricingSelections(item));
-                    if (!chosen) {
-                        chosen = dimensionalTiers.filter(matchesPricingSelections).slice().sort((a, b) => {
-                            const deltaA = Math.abs((a.width * a.height) - (parsedWidth * parsedHeight));
-                            const deltaB = Math.abs((b.width * b.height) - (parsedWidth * parsedHeight));
-                            return deltaA - deltaB;
-                        })[0] || dimensionalTiers.slice().sort((a, b) => {
-                            const deltaA = Math.abs((a.width * a.height) - (parsedWidth * parsedHeight));
-                            const deltaB = Math.abs((b.width * b.height) - (parsedWidth * parsedHeight));
-                            return deltaA - deltaB;
-                        })[0];
+                    responseQuantityOptions = uniquePositiveNumbers(dimensionalTiers.map(item => item.quantity));
+                    if (quantityMode === 'dimensions' && responseQuantityOptions.length && !responseQuantityOptions.includes(parseInt(quantityValue, 10))) {
+                        quantityValue = String(responseQuantityOptions[0]);
+                        parsedQty = parseInt(quantityValue, 10);
                     }
+                    chosen = dimensionalTiers.find(item => item.quantity === parsedQty)
+                        || dimensionalTiers.find(item => item.quantity >= parsedQty)
+                        || dimensionalTiers[dimensionalTiers.length - 1];
                 }
             }
             if (!chosen) {
@@ -1230,10 +1226,17 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 const parsedCopies = parseInt(copies, 10);
                 const safeCopies = productId === 'impression-doc' && !isNaN(parsedCopies) && parsedCopies > 0 ? parsedCopies : 1;
                 const unitMultiplier = productId === 'impression-doc' ? safeQty * safeCopies : safeQty;
-                numeric = chosen.type === 'unitaire' ? chosen.total * unitMultiplier : chosen.total;
-                purchaseValue = chosen.purchasePrice == null ? null : (chosen.type === 'unitaire' ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
-                priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
-                if (chosen.type === 'unitaire') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
+                if (chosen.type === 'dimensions') {
+                    const surfaceM2 = parsedWidth > 0 && parsedHeight > 0 ? (parsedWidth * parsedHeight) / 10000 : 0;
+                    numeric = chosen.total * surfaceM2 * safeQty;
+                    purchaseValue = chosen.purchasePrice == null ? null : chosen.purchasePrice * surfaceM2 * safeQty;
+                    priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
+                } else {
+                    numeric = chosen.type === 'unitaire' ? chosen.total * unitMultiplier : chosen.total;
+                    purchaseValue = chosen.purchasePrice == null ? null : (chosen.type === 'unitaire' ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
+                    priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
+                    if (chosen.type === 'unitaire') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
+                }
             }
         } else if (productData.priceLabel && numeric == null) {
             priceLabel = String(productData.priceLabel).replace(/€/g, 'EUR');
@@ -1523,7 +1526,7 @@ function normaliseQuantityPricing(list) {
     }).filter(item => {
         if (item.total == null || item.total < 0) return false;
         if (item.type === 'dimensions') {
-            return item.width != null && item.width > 0 && item.height != null && item.height > 0;
+            return !isNaN(item.quantity) && item.quantity > 0;
         }
         return !isNaN(item.quantity) && item.quantity > 0;
     });

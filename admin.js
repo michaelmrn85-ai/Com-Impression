@@ -997,7 +997,10 @@
         +'<div><div class="num">'+esc(entry.product.ref||'--')+'</div><div class="muted">'+esc(entry.gammeTitle||'')+'</div></div>'
         +'<div><strong>'+esc(entry.product.title||'Produit')+'</strong><div class="muted">'+esc(entry.product.summary||'')+'</div>'+(imageUrl?'<div class="muted"><a href="'+esc(imageUrl)+'" target="_blank">Voir l image</a></div>':'')+'</div>'
         +'<div><span class="badge b-rec">'+esc(entry.product.priceLabel||'Sur devis')+'</span><div class="muted">'+esc((entry.product.quantityOptions||[]).join(', ')||'Quantites libres')+'</div></div>'
-        +'<button class="btn btn-orange btn-small" data-edit-product="'+esc(entry.legacyCat)+'::'+esc(entry.product.id)+'" type="button">Modifier</button>'
+        +'<div class="template-actions">'
+          +'<button class="btn btn-orange btn-small" data-edit-product="'+esc(entry.legacyCat)+'::'+esc(entry.product.id)+'" type="button">Modifier</button>'
+          +'<button class="btn-icon product-delete" data-delete-product="'+esc(entry.legacyCat)+'::'+esc(entry.product.id)+'" type="button" title="Supprimer définitivement">×</button>'
+        +'</div>'
         +'</div>';
     }).join('');
   }
@@ -1326,7 +1329,7 @@
         });
       });
       if(!steps.length){
-        steps = [{ title:'Sous produit', label:'', image:'' }];
+        steps = [{ title:'', label:'', image:'' }];
       }
       var key = productPathKey(steps);
       if(!map[key]){
@@ -1337,7 +1340,7 @@
     });
     if(!groups.length){
       groups.push({
-        steps:[{ title:'Sous produit', label:'', image:'' }],
+        steps:[{ title:'', label:'', image:'' }],
         tariffs:[{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }]
       });
     }
@@ -1355,7 +1358,7 @@
   }
 
   function renderProductPathCard(group){
-    var steps = group && Array.isArray(group.steps) && group.steps.length ? group.steps : [{ title:'Sous produit', label:'', image:'' }];
+    var steps = group && Array.isArray(group.steps) && group.steps.length ? group.steps : [{ title:'', label:'', image:'' }];
     var tariffs = group && Array.isArray(group.tariffs) && group.tariffs.length ? group.tariffs : [{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }];
     return '<div class="product-path-card">'
       +'<div class="product-path-head">'
@@ -1397,11 +1400,11 @@
     }).join('');
     return '<div class="product-path-tariff-row">'
       +'<div class="field"><label>Type tarif</label><select class="product-path-tariff-type"><option value="lot" '+(row&&row.type==='lot'?'selected':'')+'>Quantite lot</option><option value="unitaire" '+(row&&row.type==='unitaire'?'selected':'')+'>Quantite unitaire</option><option value="dimensions" '+(row&&row.type==='dimensions'?'selected':'')+'>Dimensions</option></select></div>'
-      +'<div class="field product-path-tariff-qty-field"><label>Quantité</label><input class="product-path-tariff-qty" inputmode="numeric" placeholder="100" value="'+esc(row&&row.quantity||'')+'"'+(isDimensions?' disabled':'')+'></div>'
+      +'<div class="field product-path-tariff-qty-field"><label>Quantité</label><input class="product-path-tariff-qty" inputmode="numeric" placeholder="100" value="'+esc(row&&row.quantity||'')+'"></div>'
       +'<div class="field product-path-tariff-width-field"><label>Largeur</label><input class="product-path-tariff-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row&&row.width||'')+'"'+(isDimensions?'':' disabled')+'></div>'
       +'<div class="field product-path-tariff-height-field"><label>Hauteur</label><input class="product-path-tariff-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row&&row.height||'')+'"'+(isDimensions?'':' disabled')+'></div>'
       +'<div class="field"><label>Prix achat TTC</label><input class="product-path-tariff-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row&&row.purchasePrice||'')+'"></div>'
-      +'<div class="field"><label>Prix vente TTC</label><input class="product-path-tariff-sale" inputmode="decimal" placeholder="15,90" value="'+esc(row&&row.salePrice||'')+'"></div>'
+      +'<div class="field"><label>Prix vente TTC</label><input class="product-path-tariff-sale" inputmode="decimal" placeholder="'+(isDimensions?'Prix / m2':'15,90')+'" value="'+esc(row&&row.salePrice||'')+'"></div>'
       +'<div class="field product-path-margin-field"><label>Marge</label><span class="pricing-margin product-path-margin">0,00 %</span></div>'
       +'<input class="product-path-tariff-page-min" type="hidden" value="'+esc(row&&row.pageMin||'')+'">'
       +'<input class="product-path-tariff-page-step" type="hidden" value="'+esc(row&&row.pageStep||'')+'">'
@@ -1427,9 +1430,9 @@
         margin.textContent = purchase > 0 && sale > 0 ? formatPlainNumber(((sale / purchase) - 1) * 100) + ' %' : '0,00 %';
       }
       if(type === 'dimensions'){
-        if(qty){ qty.value=''; qty.disabled=true; qty.placeholder='Auto'; }
-        if(width) width.disabled=false;
-        if(height) height.disabled=false;
+        if(qty){ qty.disabled=false; qty.placeholder='Qté articles'; }
+        if(width){ width.value=''; width.disabled=true; }
+        if(height){ height.value=''; height.disabled=true; }
       } else {
         if(qty){ qty.disabled=false; qty.placeholder=type === 'unitaire' ? '1' : '100'; if(type === 'unitaire' && !(qty.value||'').trim()) qty.value='1'; }
         if(width){ width.value=''; width.disabled=true; }
@@ -1506,7 +1509,7 @@
     var pricingRows = pathData ? pathData.pricingRows : getProductPricingRows();
     var pricing=pricingRows.filter(function(row){
       if(!row.salePrice) return false;
-      if(row.type === 'dimensions') return row.width && row.height;
+      if(row.type === 'dimensions') return row.quantity;
       return row.quantity;
     }).map(function(row){
       return {
