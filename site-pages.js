@@ -262,6 +262,23 @@
     }));
   }
 
+  function getStepChoiceLabel(value) {
+    if (value && typeof value === "object") return String(value.label || value.value || "").trim();
+    return String(value || "").trim();
+  }
+
+  function getStepChoiceImage(value) {
+    if (!value || typeof value !== "object") return "";
+    return String(value.image || "").trim();
+  }
+
+  function resolveProductChoiceImage(image) {
+    var value = String(image || "").trim();
+    if (!value) return "";
+    if (/^https?:\/\//i.test(value) || value.indexOf("/media/") === 0) return value;
+    return "/media/products/" + encodeURIComponent(value);
+  }
+
   function uploadProductFiles(fileList) {
     var files = Array.prototype.slice.call(fileList || []);
     if (!files.length) return Promise.resolve([]);
@@ -840,10 +857,9 @@
           + '<div class="product-detail-pricebox"><div class="muted">Prix de depart</div><div class="total" id="product-price-display">' + esc(normalizePriceLabel(product.priceLabel)) + '</div></div>'
         + '</div>'
         + renderProductHeroMedia(entry)
+        + '<div id="product-config-fields"></div>'
         + '<div class="product-detail-layout">'
           + '<div class="product-detail-config">'
-            + renderFixedProductInfo(product)
-            + '<div id="product-config-fields"></div>'
             + '<div id="product-final-fields" hidden>'
             + '<div class="field" id="product-quantity-field"></div>'
             + (product.hasDimensions ? '<div class="field product-dimensions-box" id="product-dimensions"><label>Dimensions</label><div class="inline-fields"><input id="product-width" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.width) || 0) + '" placeholder="Largeur cm"><input id="product-height" type="number" min="' + String((product.minDimensionsCm && product.minDimensionsCm.height) || 0) + '" placeholder="Hauteur cm"></div><p>Indiquez votre format en centimetres.</p></div>' : '')
@@ -855,6 +871,7 @@
           + '<aside class="summary-box product-side-summary">'
             + '<div class="pill">Votre selection</div>'
             + '<div class="product-side-current"><strong>' + esc(product.title) + '</strong><span>' + esc(entry.gammeTitle) + '</span></div>'
+            + renderFixedProductInfo(product)
             + '<div class="product-side-meta"><strong>Reference</strong><span>' + esc(getProductRef(product)) + '</span></div>'
             + (getEstimatedDeliveryDate(product) ? '<div class="product-side-meta"><strong>Livraison estimee</strong><span>' + esc(getEstimatedDeliveryDate(product)) + '</span></div>' : '')
             + '<div class="product-side-meta"><strong>Fichier</strong><span id="product-upload-summary">Aucun fichier</span></div>'
@@ -914,8 +931,13 @@
       configWrap.innerHTML = '<div class="product-step-tabs">' + tabs + '</div>'
         + '<div class="product-step-title">' + String(currentStepIndex + 1) + '. Choisissez votre ' + esc((step.title || step.key).toLowerCase()) + '</div>'
         + '<div class="product-step-options">' + values.map(function (value) {
-          var selected = selections[step.key] === value ? ' selected' : '';
-          return '<button type="button" class="product-step-choice' + selected + '" data-step-key="' + esc(step.key) + '" data-step-value="' + esc(value) + '"><strong>' + esc(value) + '</strong></button>';
+          var label = getStepChoiceLabel(value);
+          var image = resolveProductChoiceImage(getStepChoiceImage(value));
+          var selected = selections[step.key] === label ? ' selected' : '';
+          return '<button type="button" class="product-step-choice' + selected + '" data-step-key="' + esc(step.key) + '" data-step-value="' + esc(label) + '">'
+            + (image ? '<span class="product-step-choice-media"><img src="' + esc(image) + '" alt="' + esc(label) + '"></span>' : '')
+            + '<strong>' + esc(label) + '</strong>'
+          + '</button>';
         }).join("") + '</div>';
       configWrap.querySelectorAll("[data-step-index]").forEach(function (button) {
         button.addEventListener("click", function () {

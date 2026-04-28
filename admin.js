@@ -1114,14 +1114,11 @@
     };
     $('product-edit-title').textContent=(state.selectedProduct.isNew?'Creation produit':'Edition produit')+' — '+((state.selectedProduct.product && state.selectedProduct.product.title)||'Produit');
     var entryRef = state.selectedProduct;
-    var paperOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /papier|grammage/i.test(k); })]||[]);
-    var finishOptions = ((entryRef.product.options||{})[Object.keys(entryRef.product.options||{}).find(function(k){ return /finit|pellic|vernis|soft/i.test(k); })]||[]);
     var gammeOptions = getAdminGammeOptions().map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
     }).join('');
     var pricingRows = buildProductPricingRows(entryRef.product || {});
     var subProductTypesText = (entryRef.product.subProductTypes || []).join('\n');
-    var configStepsText = formatConfigStepsForEditor(entryRef.product.configSteps || []);
     $('product-edit-body').innerHTML=
       '<div class="product-meta-grid">'
       +'<div class="field"><label>Gamme</label><select id="product-edit-gamme">'+gammeOptions+'</select></div>'
@@ -1134,11 +1131,9 @@
       +'</div>'
       +'<div class="field"><label>Taille affichée (information fixe)</label><input id="product-edit-size" placeholder="A4, 10x15, 8,5x5,4..." value="'+esc(entryRef.product.sizeInfo||'')+'"></div>'
       +'<div class="field"><label>Types de sous-produit</label><textarea id="product-edit-subtypes" placeholder="Flyer standard&#10;Flyer plié&#10;Brochure">'+esc(subProductTypesText)+'</textarea></div>'
-      +'<div class="field"><label>Étapes personnalisées</label><textarea id="product-edit-steps" placeholder="Nom étape : choix 1, choix 2&#10;Autre étape : valeur A, valeur B">'+esc(configStepsText)+'</textarea></div>'
-      +'<div class="field"><label>Papiers / grammages ancienne compatibilité</label><textarea id="product-edit-paper" placeholder="350g couche demi mat, 400g premium">'+esc(paperOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
-      +'<div class="field"><label>Finitions</label><textarea id="product-edit-finish" placeholder="Pelliculage mat, Soft touch">'+esc(finishOptions.join(', '))+'</textarea></div>'
       +'<div class="field"><label>Tarification / dimensions</label>'+renderProductPricingEditor(pricingRows)+'</div>'
+      +'<div class="field"><label>Étapes du parcours client</label>'+renderProductConfigStepsEditor(entryRef.product.configSteps || [])+'</div>'
       +'<div class="site-grid">'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-upload" type="checkbox" style="width:auto;" '+(entryRef.product.uploadEnabled!==false?'checked':'')+'> Upload actif sur la fiche produit</label>'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-dimensions" type="checkbox" style="width:auto;" '+(entryRef.product.hasDimensions?'checked':'')+'> Produit avec dimensions libres</label>'
@@ -1185,17 +1180,89 @@
     });
   }
 
-  function formatConfigStepsForEditor(steps){
-    return (Array.isArray(steps) ? steps : []).map(function(step){
-      return (step.title || step.key || '') + ' : ' + ((step.values || []).join(', '));
-    }).filter(Boolean).join('\n');
+  function uploadProductStepChoiceImage(input){
+    var file=input && input.files && input.files[0];
+    if(!file) return;
+    var row=input.closest('.product-step-choice-row');
+    var fd=new FormData();
+    fd.append('mdp',state.mdp);
+    fd.append('image',file,file.name);
+    setStatus('product-edit-status','ok','Upload image du choix en cours...');
+    fetch(api('/api/admin/product-image'),{ method:'POST', body:fd })
+      .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Upload image impossible'); return d; }); })
+      .then(function(data){
+        if(row){
+          var hidden=row.querySelector('.product-step-choice-image');
+          var name=row.querySelector('.product-step-choice-image-name');
+          var preview=row.querySelector('.product-step-choice-preview');
+          if(hidden) hidden.value=data.image || '';
+          if(name) name.textContent=data.image || file.name;
+          if(preview) preview.innerHTML=data.imageUrl ? '<img src="'+esc(data.imageUrl)+'" alt="Apercu choix">' : '<span class="muted">Apercu</span>';
+        }
+        setStatus('product-edit-status','ok','Image du choix chargee.');
+      })
+      .catch(function(err){ setStatus('product-edit-status','err',err.message||'Erreur upload image.'); });
   }
 
-  function parseConfigStepsEditor(value){
-    return String(value || '').split(/\n+/).map(function(line){
-      var parts = line.split(':');
-      var title = (parts.shift() || '').trim();
-      var values = parts.join(':').split(',').map(function(item){ return item.trim(); }).filter(Boolean);
+  function normalizeStepValue(value){
+    if(value && typeof value === 'object'){
+      return {
+        label:String(value.label || value.value || '').trim(),
+        image:String(value.image || '').trim()
+      };
+    }
+    return { label:String(value || '').trim(), image:'' };
+  }
+
+  function renderProductConfigStepsEditor(steps){
+    var normalized = (Array.isArray(steps) ? steps : []).map(function(step){
+      return {
+        title:String(step.title || step.key || '').trim(),
+        values:(Array.isArray(step.values) ? step.values : []).map(normalizeStepValue).filter(function(value){ return value.label; })
+      };
+    }).filter(function(step){ return step.title; });
+    return '<div class="product-steps-editor" id="product-steps-editor">'
+      +'<div class="product-steps-list">'
+      +normalized.map(renderProductConfigStepRow).join('')
+      +'</div>'
+      +'<button class="btn btn-light btn-small" id="product-step-add" type="button">+ Ajouter une étape</button>'
+    +'</div>';
+  }
+
+  function renderProductConfigStepRow(step){
+    var choices = step.values && step.values.length ? step.values : [{ label:'', image:'' }];
+    return '<div class="product-step-editor-row">'
+      +'<div class="product-step-editor-head">'
+        +'<div class="field"><label>Nom de l étape</label><input class="product-step-title-input" placeholder="Ex: Format, Papier, Type..." value="'+esc(step.title || '')+'"></div>'
+        +'<button class="btn-icon product-step-remove" type="button" title="Supprimer l étape">×</button>'
+      +'</div>'
+      +'<div class="product-step-choice-list">'
+        +choices.map(renderProductConfigChoiceRow).join('')
+      +'</div>'
+      +'<button class="btn btn-light btn-small product-step-choice-add" type="button">+ Ajouter un choix</button>'
+    +'</div>';
+  }
+
+  function renderProductConfigChoiceRow(choice){
+    var image = String((choice && choice.image) || '').trim();
+    var imageUrl = image ? (image.indexOf('/media/') === 0 || /^https?:/i.test(image) ? image : '/media/products/'+encodeURIComponent(image)) : '';
+    return '<div class="product-step-choice-row">'
+      +'<div class="field"><label>Nom du choix</label><input class="product-step-choice-label" placeholder="Ex: A5, 135g, Recto..." value="'+esc(choice && choice.label || '')+'"></div>'
+      +'<div class="field"><label>Image du choix</label><input class="product-step-choice-image-file" type="file" accept=".jpg,.jpeg,.png,.webp"><input class="product-step-choice-image" type="hidden" value="'+esc(image)+'"><div class="muted product-step-choice-image-name">'+esc(image || 'Aucune image')+'</div></div>'
+      +'<div class="product-step-choice-preview">'+(imageUrl ? '<img src="'+esc(imageUrl)+'" alt="Apercu choix">' : '<span class="muted">Apercu</span>')+'</div>'
+      +'<button class="btn-icon product-step-choice-remove" type="button" title="Supprimer le choix">×</button>'
+    +'</div>';
+  }
+
+  function readProductConfigStepsEditor(){
+    return Array.prototype.slice.call(document.querySelectorAll('.product-step-editor-row')).map(function(stepRow){
+      var title = ((stepRow.querySelector('.product-step-title-input')||{}).value || '').trim();
+      var values = Array.prototype.slice.call(stepRow.querySelectorAll('.product-step-choice-row')).map(function(choiceRow){
+        return {
+          label:((choiceRow.querySelector('.product-step-choice-label')||{}).value || '').trim(),
+          image:((choiceRow.querySelector('.product-step-choice-image')||{}).value || '').trim()
+        };
+      }).filter(function(choice){ return choice.label; });
       return title && values.length ? { title:title, key:title, values:values } : null;
     }).filter(Boolean);
   }
@@ -1263,10 +1330,10 @@
         salePrice:(firstRow.salePrice||'').trim(),
         quantityOptions:quantityOptions,
         formatOptions:pricingRows.map(function(row){ return row.format; }).filter(Boolean).join(','),
-        paperOptions:($('product-edit-paper').value||'').trim(),
-        finishOptions:($('product-edit-finish').value||'').trim(),
+        paperOptions:(($('product-edit-paper')||{}).value||'').trim(),
+        finishOptions:(($('product-edit-finish')||{}).value||'').trim(),
         subProductTypes:($('product-edit-subtypes').value||'').split(/\n|,/).map(function(value){ return value.trim(); }).filter(Boolean),
-        configSteps:parseConfigStepsEditor(($('product-edit-steps').value||'')),
+        configSteps:readProductConfigStepsEditor(),
         deliveryDelayDays:($('product-edit-delivery-delay').value||'').trim(),
         quantityPricing:pricing,
         uploadEnabled:!!(($('product-edit-upload')||{}).checked),
@@ -2049,6 +2116,23 @@
         var pricingOption=e.target.closest('.product-pricing-option-row');
         if(pricingOption) pricingOption.remove();
       }
+      if(e.target && e.target.id==='product-step-add'){
+        var stepsList=document.querySelector('#product-steps-editor .product-steps-list');
+        if(stepsList) stepsList.insertAdjacentHTML('beforeend', renderProductConfigStepRow({title:'',values:[{label:'',image:''}]}));
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-step-remove')){
+        var stepRow=e.target.closest('.product-step-editor-row');
+        if(stepRow) stepRow.remove();
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-step-choice-add')){
+        var choiceList=e.target.closest('.product-step-editor-row');
+        choiceList=choiceList ? choiceList.querySelector('.product-step-choice-list') : null;
+        if(choiceList) choiceList.insertAdjacentHTML('beforeend', renderProductConfigChoiceRow({label:'',image:''}));
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-step-choice-remove')){
+        var choiceRow=e.target.closest('.product-step-choice-row');
+        if(choiceRow) choiceRow.remove();
+      }
       if(e.target && e.target.id==='client-edit-save') saveClientEditor();
       if(e.target && e.target.id==='client-doc-upload') uploadClientDocument();
       var accountBtn=e.target.closest ? e.target.closest('[data-account-action]') : null;
@@ -2166,6 +2250,11 @@
         e.target.classList.contains('product-pricing-page-min') ||
         e.target.classList.contains('product-pricing-page-step')
       )) refreshProductPricingTable();
+    });
+    document.addEventListener('change',function(e){
+      if(e.target && e.target.classList && e.target.classList.contains('product-step-choice-image-file')){
+        uploadProductStepChoiceImage(e.target);
+      }
     });
     document.addEventListener('change',function(e){
       if(e.target && e.target.classList && e.target.classList.contains('product-pricing-type')){

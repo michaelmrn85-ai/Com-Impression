@@ -1528,7 +1528,20 @@ function normaliseConfigSteps(list) {
     if (!Array.isArray(list)) return [];
     return list.map(step => {
         const title = String(step && (step.title || step.key) || '').trim();
-        const values = normaliseCsvList(step && step.values);
+        let values = [];
+        if (Array.isArray(step && step.values)) {
+            values = step.values.map(value => {
+                if (value && typeof value === 'object') {
+                    const label = String(value.label || value.value || '').trim();
+                    const image = String(value.image || '').trim();
+                    return label ? { label, image } : null;
+                }
+                const label = String(value || '').trim();
+                return label ? { label, image: '' } : null;
+            }).filter(Boolean);
+        } else {
+            values = normaliseCsvList(step && step.values).map(label => ({ label, image: '' }));
+        }
         if (!title || !values.length) return null;
         return { key: title, title, values };
     }).filter(Boolean);
@@ -1574,7 +1587,7 @@ function getPricingFieldOptions(pricing, field) {
 function buildConfigStepsFromOptions(options) {
     const source = options || {};
     return Object.keys(source).map(key => {
-        const values = normaliseCsvList(source[key]);
+        const values = normaliseCsvList(source[key]).map(label => ({ label, image: '' }));
         return values.length ? { key, title: key, values } : null;
     }).filter(Boolean);
 }
