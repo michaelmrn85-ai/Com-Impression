@@ -1316,11 +1316,12 @@
       }
 
       grid.innerHTML = visible.map(function (entry) {
+        var cardInfo = entry.product.sizeInfo || entry.product.summary || "";
         return '<article class="card product-card">'
           + (entry.product.imageUrl ? '<div class="product-card-media"><img src="' + esc(entry.product.imageUrl) + '" alt="' + esc(entry.product.title) + '"></div>' : '')
           + '<div class="pill">' + esc(entry.gammeTitle) + '</div>'
           + '<h3 class="card-title">' + esc(entry.product.title) + '</h3>'
-          + '<p>' + esc(entry.product.summary) + '</p>'
+          + (cardInfo ? '<p>' + esc(cardInfo) + '</p>' : '')
           + '<div class="product-price">' + esc(normalizePriceLabel(entry.product.priceLabel)) + '</div>'
           + '<footer>'
             + '<button type="button" class="btn-light" data-open-product="' + esc(entry.product.id) + '" data-open-gamme="' + esc(entry.gammeSlug) + '">Voir le detail</button>'
