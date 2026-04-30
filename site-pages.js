@@ -1323,14 +1323,14 @@
           + '<p>' + esc(entry.product.summary) + '</p>'
           + '<div class="product-price">' + esc(normalizePriceLabel(entry.product.priceLabel)) + '</div>'
           + '<footer>'
-            + '<button type="button" class="btn-light" data-open-product="' + esc(entry.product.id) + '">Voir le detail</button>'
+            + '<button type="button" class="btn-light" data-open-product="' + esc(entry.product.id) + '" data-open-gamme="' + esc(entry.gammeSlug) + '">Voir le detail</button>'
           + '</footer>'
         + '</article>';
       }).join("");
 
       grid.querySelectorAll("[data-open-product]").forEach(function (button) {
         button.addEventListener("click", function () {
-          goTo(buildProductUrl(activeGamme, button.getAttribute("data-open-product")));
+          goTo(buildProductUrl(button.getAttribute("data-open-gamme") || activeGamme, button.getAttribute("data-open-product")));
         });
       });
     }
@@ -1346,8 +1346,8 @@
     }
     loadCatalogFromApi().then(function (catalog) {
       gammes = (catalog && catalog.gammes) || [];
-      if (!activeGamme && !searchQuery) {
-        activeGamme = gammes[0] && gammes[0].slug;
+      if (activeGamme && !gammes.some(function (gamme) { return gamme.slug === activeGamme; })) {
+        activeGamme = "";
       }
       renderFilters();
       renderGrid();
@@ -2736,6 +2736,39 @@
   }
 
   function initHomePage() {
+    function renderHomeGammes(catalog) {
+      var grid = $("gammes-grid");
+      if (!grid) return;
+      var gammes = (catalog && catalog.gammes) || [];
+      if (!gammes.length) {
+        grid.innerHTML = '<div class="search-empty show"><p>Aucune gamme disponible pour le moment.</p></div>';
+        return;
+      }
+      grid.innerHTML = gammes.map(function (gamme, index) {
+        var products = Array.isArray(gamme.products) ? gamme.products : [];
+        var productItems = products.slice(0, 3).map(function (product) {
+          return '<li>' + esc(product.title || "Produit") + '</li>';
+        }).join("");
+        if (!productItems) {
+          productItems = '<li>Catalogue en preparation</li>';
+        }
+        return '<article class="gamme-card" data-search="' + esc([gamme.title, gamme.description, products.map(function (product) { return product.title; }).join(" ")].join(" ")) + '">'
+          + '<div class="gamme-badge">Gamme ' + esc(String(index + 1)) + '</div>'
+          + '<h3>' + esc(gamme.title || "Gamme") + '</h3>'
+          + '<p>' + esc(gamme.description || "Decouvrez les produits de cette gamme.") + '</p>'
+          + '<ul>' + productItems + '</ul>'
+          + '<a class="mini-btn" href="' + esc(resolveAppUrl("/produits?gamme=" + encodeURIComponent(gamme.slug))) + '" data-gamme-link="' + esc(gamme.slug) + '">Choisir cette gamme</a>'
+        + '</article>';
+      }).join("");
+
+      grid.querySelectorAll("[data-gamme-link]").forEach(function (link) {
+        link.addEventListener("click", function (event) {
+          event.preventDefault();
+          goTo("/produits?gamme=" + encodeURIComponent(link.getAttribute("data-gamme-link")));
+        });
+      });
+    }
+
     fetch(API_BASE + "/api/site-config")
       .then(function (response) { return response.json().catch(function () { return {}; }); })
       .then(function (json) {
@@ -2772,6 +2805,10 @@
           $("home-hero-image").src = config.heroImage;
         }
       })
+      .catch(function () {});
+
+    loadCatalogFromApi()
+      .then(renderHomeGammes)
       .catch(function () {});
 
     var avisGrid = document.querySelector(".avis-grid");
