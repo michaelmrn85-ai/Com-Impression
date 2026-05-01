@@ -715,9 +715,14 @@ body[data-page="client"] #client-dashboard-view .section-head {
   align-items: start;
 }
 
+.product-detail-layout > * {
+  min-width: 0;
+}
+
 .product-detail-config {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .product-detail-summary {
@@ -956,6 +961,7 @@ body[data-page="client"] #client-dashboard-view .section-head {
 }
 
 .product-upload-box input[type="file"] {
+  max-width: 100%;
   padding: 14px;
   background: #fffaf5;
 }
@@ -965,30 +971,61 @@ body[data-page="client"] #client-dashboard-view .section-head {
   gap: 14px;
   position: sticky;
   top: 18px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.product-side-summary .pill {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0;
+  min-width: 0;
 }
 
 .product-side-current {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .product-side-current strong {
   font-size: 1.18rem;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .product-side-current span {
   color: var(--muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .product-side-meta {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(78px, auto) minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 14px;
   padding-top: 12px;
   border-top: 1px solid #efdfd1;
   color: var(--ink);
+  min-width: 0;
+}
+
+.product-side-meta span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  text-align: right;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+#product-upload-summary {
+  font-size: 0.86rem;
+  line-height: 1.25;
+  word-break: break-all;
 }
 
 .back-link {
@@ -997,6 +1034,15 @@ body[data-page="client"] #client-dashboard-view .section-head {
 
 .product-detail-actions {
   padding-top: 4px;
+  gap: 10px;
+}
+
+.product-detail-actions .btn,
+.product-detail-actions .btn-light {
+  flex: 1 1 135px;
+  justify-content: center;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .product-price {

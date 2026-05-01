@@ -1644,6 +1644,35 @@ function getVisitDayKey() {
     }).format(new Date());
 }
 
+function normalizeClientIp(value) {
+    return String(value || '')
+        .split(',')[0]
+        .trim()
+        .replace(/^::ffff:/, '');
+}
+
+function getRequestClientIp(req) {
+    return normalizeClientIp(
+        (req.headers && (req.headers['cf-connecting-ip'] || req.headers['x-real-ip'] || req.headers['x-forwarded-for'])) ||
+        req.ip ||
+        (req.socket && req.socket.remoteAddress) ||
+        ''
+    );
+}
+
+function getExcludedVisitIps() {
+    return String(process.env.EXCLUDED_VISIT_IPS || process.env.VISIT_EXCLUDED_IPS || '')
+        .split(',')
+        .map(normalizeClientIp)
+        .filter(Boolean);
+}
+
+function isVisitIpExcluded(req) {
+    const clientIp = getRequestClientIp(req);
+    if (!clientIp) return false;
+    return getExcludedVisitIps().includes(clientIp);
+}
+
 function trackVisit(req) {
     let pathname = req.path || '/';
     const htmlAliases = {
@@ -1661,6 +1690,7 @@ function trackVisit(req) {
     };
     pathname = htmlAliases[pathname] || pathname;
     if (req.method !== 'GET') return;
+    if (isVisitIpExcluded(req)) return;
     if (pathname.startsWith('/api') || pathname.startsWith('/admin') || pathname.includes('.')) return;
     const tracked = ['/', '/produits', '/produit', '/panier', '/client', '/ouverture-compte', '/rendez-vous', '/avis', '/mentions-legales', '/cgv', '/faq'];
     if (tracked.indexOf(pathname) === -1) return;
