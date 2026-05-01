@@ -226,9 +226,39 @@
     var selectedType = normaliseOptionKey((selections || {}).__subProductType || "");
     if (selectedType && row.subProductType && normaliseOptionKey(row.subProductType) !== selectedType) return false;
     var config = row.config || {};
-    return Object.keys(config).every(function (key) {
+    var configOk = Object.keys(config).every(function (key) {
       return !selections[key] || normaliseOptionKey(selections[key]) === normaliseOptionKey(config[key]);
     });
+    if (!configOk) return false;
+    return (row.optionsLibres || []).every(function (option) {
+      var key = String((option && option.nom) || "").trim();
+      if (!key || !selections[key]) return true;
+      return normaliseOptionKey(selections[key]) === normaliseOptionKey(option && option.valeur);
+    });
+  }
+
+  function getPricingFreeOptionKeys(product) {
+    var keys = [];
+    getProductPricingRows(product).forEach(function (row) {
+      (row.optionsLibres || []).forEach(function (option) {
+        var key = String((option && option.nom) || "").trim();
+        if (key && !keys.some(function (existing) { return normaliseOptionKey(existing) === normaliseOptionKey(key); })) {
+          keys.push(key);
+        }
+      });
+    });
+    return keys;
+  }
+
+  function getRowStepValue(row, stepKey) {
+    if (!row || !stepKey) return "";
+    if (stepKey === "__subProductType") return row.subProductType || "";
+    if (row.config && row.config[stepKey]) return row.config[stepKey];
+    var wanted = normaliseOptionKey(stepKey);
+    var option = (row.optionsLibres || []).find(function (item) {
+      return normaliseOptionKey(item && item.nom) === wanted;
+    });
+    return option ? option.valeur : "";
   }
 
   function getLotQuantityOptions(product, selections) {
@@ -246,7 +276,14 @@
 
   function getProductConfigSteps(product) {
     if (Array.isArray(product && product.configSteps) && product.configSteps.length) {
-      return product.configSteps;
+      var configuredSteps = product.configSteps.slice();
+      var configuredKeys = configuredSteps.map(function (step) { return normaliseOptionKey(step && step.key); });
+      getPricingFreeOptionKeys(product).forEach(function (key) {
+        if (configuredKeys.indexOf(normaliseOptionKey(key)) === -1) {
+          configuredSteps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).map(function (row) { return getRowStepValue(row, key); })) });
+        }
+      });
+      return configuredSteps;
     }
     var steps = [];
     var pricingSubTypes = uniqueValues(getProductPricingRows(product).map(function (row) { return row.subProductType; }));
@@ -262,6 +299,9 @@
     });
     configKeys.forEach(function (key) {
       steps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).map(function (row) { return row.config && row.config[key]; })) });
+    });
+    getPricingFreeOptionKeys(product).forEach(function (key) {
+      steps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).map(function (row) { return getRowStepValue(row, key); })) });
     });
     var options = (product && product.options) || {};
     return steps.concat((product.optionKeys || Object.keys(options)).filter(function (key) {
@@ -309,7 +349,7 @@
       if (!selected) continue;
       if (step.key === "__subProductType") {
         if (!row.subProductType || normaliseOptionKey(row.subProductType) !== normaliseOptionKey(selected)) return false;
-      } else if (!row.config || !row.config[step.key] || normaliseOptionKey(row.config[step.key]) !== normaliseOptionKey(selected)) {
+      } else if (!getRowStepValue(row, step.key) || normaliseOptionKey(getRowStepValue(row, step.key)) !== normaliseOptionKey(selected)) {
         return false;
       }
     }
@@ -322,7 +362,7 @@
       return rowMatchesStepSelections(row, steps, stepIndex, selections);
     });
     var labels = uniqueValues(rows.map(function (row) {
-      return step.key === "__subProductType" ? row.subProductType : (row.config && row.config[step.key]);
+      return getRowStepValue(row, step.key);
     }));
     if (!labels.length) labels = uniqueValues((step.values || []).map(getStepChoiceLabel));
     return labels.map(function (label) { return getConfiguredChoice(step, label); });

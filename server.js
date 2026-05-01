@@ -1164,6 +1164,13 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         let purchaseValue = null;
         let responseQuantityOptions = quantityOptions;
         if (productData.quantityPricing && productData.quantityPricing.length) {
+            const pricingFreeOptionKeys = new Set();
+            (Array.isArray(productData.quantityPricing) ? productData.quantityPricing : []).forEach(item => {
+                normaliseFreeOptions(item && item.optionsLibres).forEach(option => {
+                    const key = normaliseOptionKey(option.nom);
+                    if (key) pricingFreeOptionKeys.add(key);
+                });
+            });
             const exactSideKeys = Object.keys(sels).filter(key => {
                 const normalizedKey = normaliseOptionKey(key);
                 if (productId === 'impression-doc') return normalizedKey === 'impression';
@@ -1198,7 +1205,15 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 const formatOk = !item.format || !selectedFormatValues.length || selectedFormatValues.includes(normaliseOptionKey(item.format));
                 const paperOk = !item.paper || !selectedPaperValues.length || selectedPaperValues.includes(normaliseOptionKey(item.paper));
                 const finishingOk = !item.finishing || !selectedFinishingValues.length || selectedFinishingValues.includes(normaliseOptionKey(item.finishing));
-                return subProductOk && configOk && sideOk && formatOk && paperOk && finishingOk;
+                const freeOptions = normaliseFreeOptions(item.optionsLibres);
+                const freeOptionsOk = Object.keys(sels).every(key => {
+                    const normalizedKey = normaliseOptionKey(key);
+                    if (!pricingFreeOptionKeys.has(normalizedKey)) return true;
+                    const option = freeOptions.find(entry => normaliseOptionKey(entry.nom) === normalizedKey);
+                    if (!option) return false;
+                    return !sels[key] || normaliseOptionKey(sels[key]) === normaliseOptionKey(option.valeur);
+                });
+                return subProductOk && configOk && sideOk && formatOk && paperOk && finishingOk && freeOptionsOk;
             };
             let parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
@@ -4140,6 +4155,13 @@ app.post('/api/commandes/:id/modifier-admin', express.json(), rateLimit({ window
     ['prenom', 'nom', 'email', 'tel', 'siret', 'prix_total', 'date_livraison'].forEach(key => {
         if (body[key] !== undefined) commandes[idx][key] = String(body[key] || '').trim();
     });
+    if (body.mode_reglement !== undefined) {
+        const mode = String(body.mode_reglement || 'CB').trim() || 'CB';
+        commandes[idx].mode_reglement = mode;
+        if (/virement/i.test(mode)) commandes[idx].payment_status = 'attente_virement';
+        else if (/chorus/i.test(mode)) commandes[idx].payment_status = 'attente_chorus';
+        else if (mode === 'CB' && commandes[idx].payment_status !== 'paye') commandes[idx].payment_status = '';
+    }
     commandes[idx].type_document = docType.key;
     commandes[idx].type_document_label = docType.label;
     commandes[idx].updated_at = new Date().toISOString();
@@ -4218,6 +4240,7 @@ app.post('/api/commandes/:id/lignes-admin', express.json({ limit: '1mb' }), rate
 app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-order-status' }), async (req, res) => {
     const { statut, mdp } = req.body;
     const refundMode = String((req.body || {}).refundMode || 'CB').trim() === 'Virement' ? 'Virement' : 'CB';
+    const clientComment = String((req.body || {}).clientComment || '').trim();
     if (!requireAdminPasswordConfigured(res)) return;
     if (!adminPasswordMatches(mdp)) return res.status(401).json({ success: false, error: 'Non autorise' });
     const publicBaseUrl = getPublicBaseUrl(req);
@@ -4238,6 +4261,8 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
         commandes[idx].points_refunded = true;
         commandes[idx].points_refunded_count = Number(commandes[idx].points_refunded_count || 0) + Number(pointsResult.removed || 0);
         commandes[idx].notes = [commandes[idx].notes || '', `Remboursement ${refundMode} demande le ${new Date().toLocaleString('fr-FR')}. Avoir genere et envoye au client. Points retires : ${pointsResult.removed || 0}.`].filter(Boolean).join('\n');
+    } else if (clientComment) {
+        commandes[idx].notes = [commandes[idx].notes || '', `Commentaire client (${new Date().toLocaleString('fr-FR')}) : ${clientComment}`].filter(Boolean).join('\n');
     }
     sauvegarderCommandes(commandes);
 
@@ -4245,23 +4270,25 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
     const cmd = commandes[idx];
     const STATUTS_LABELS = {
         'Recue':         'Commande bien re\u00e7ue',
-        'BAT envoye':    'Votre BAT est pr\u00eat \u00e0 valider',
-        'BAT fichier a revoir': 'BAT à revoir',
+        'Pris en compte':'Commande prise en compte',
+        'BAT envoye':    'Commande prise en compte',
+        'BAT fichier a revoir': 'BAT mis en pause',
         'BAT valide':    'BAT valid\u00e9 \u2014 en production',
         'En production': 'Votre commande est en cours de production',
         'En cours de livraison': 'Votre commande est en cours de livraison',
-        'Expediee':      'Votre commande est exp\u00e9di\u00e9e !',
+        'Expediee':      'Commande finalis\u00e9e',
         'Annulee':       'Commande annul\u00e9e',
         'Remboursement': 'Remboursement et avoir'
     };
     const STATUTS_MSG = {
         'Recue':         'Nous avons bien re\u00e7u votre commande et allons la traiter rapidement.',
-        'BAT envoye':    'Votre bon \u00e0 tirer (BAT) vous a \u00e9t\u00e9 envoy\u00e9 par email. Merci de le valider pour lancer la production.',
+        'Pris en compte':'Votre commande est prise en compte. Nous vérifions vos fichiers et les informations transmises.',
+        'BAT envoye':    'Votre commande est prise en compte. Nous vérifions vos fichiers et les informations transmises.',
         'BAT fichier a revoir': 'Nous avons besoin d\'une correction sur votre BAT ou vos fichiers avant de lancer la production. Merci de revenir vers nous avec les ajustements demandés.',
         'BAT valide':    'Votre BAT a \u00e9t\u00e9 valid\u00e9. Votre commande part en production dans les plus brefs d\u00e9lais.',
         'En production': 'Votre commande est actuellement en cours de fabrication. Livraison pr\u00e9vue sous J+3.',
         'En cours de livraison': 'Votre commande a quitt\u00e9 notre atelier et est actuellement en cours de livraison.',
-        'Expediee':      'Votre commande a \u00e9t\u00e9 exp\u00e9di\u00e9e ! Vous recevrez votre colis sous 24-48h.',
+        'Expediee':      'Votre commande est finalisée. Vous pouvez maintenant laisser votre avis sur votre expérience COM\' Impression.',
         'Annulee':       'Votre commande a \u00e9t\u00e9 annul\u00e9e. N\'h\u00e9sitez pas \u00e0 nous contacter pour plus d\'informations.',
         'Remboursement': `Votre remboursement par ${refundMode} est en cours. Vous trouverez votre avoir en piece jointe.`
     };
@@ -4297,6 +4324,11 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
                     <tr><td style="font-size:14px;padding:5px 0;"><span style="color:#8c827b;width:140px;display:inline-block;">Statut</span><strong style="color:${accentColor};">${STATUTS_LABELS[statut] || statut}</strong></td></tr>
                     <tr><td style="font-size:14px;padding:5px 0;"><span style="color:#8c827b;width:140px;display:inline-block;">Montant</span><strong>${escapeHtml(cmd.prix_total || '--')}</strong></td></tr>
                 </table>
+                ${clientComment ? `
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #efd8c0;border-radius:18px;padding:16px 18px;margin:0 0 22px;">
+                    <tr><td style="font-size:14px;line-height:1.7;color:#5C5C5C;"><strong style="color:#171310;">Commentaire COM' Impression</strong><br>${escapeHtml(clientComment).replace(/\n/g, '<br>')}</td></tr>
+                </table>
+                ` : ''}
                 <div style="text-align:center;margin:24px 0 26px;">
                     <a href="${publicBaseUrl}/client" style="display:inline-block;background:${accentColor};color:#fff;text-decoration:none;padding:14px 30px;border-radius:999px;font-size:15px;font-weight:800;">Accéder à mon espace client</a>
                 </div>

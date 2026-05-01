@@ -2,15 +2,16 @@
   'use strict';
 
   var API_BASE = window.CI_ADMIN_API_BASE || window.location.origin;
-  var STATUTS = ['Recue','BAT envoye','BAT fichier a revoir','BAT valide','En production','En cours de livraison','Expediee','Remboursement','Annulee'];
+  var STATUTS = ['Recue','Pris en compte','BAT fichier a revoir','BAT valide','En production','En cours de livraison','Expediee','Remboursement','Annulee'];
   var STATUT_LABELS = {
     'Recue':'Reçue',
-    'BAT envoye':'BAT envoyé',
-    'BAT fichier a revoir':'BAT à revoir',
+    'Pris en compte':'Pris en compte',
+    'BAT envoye':'Pris en compte',
+    'BAT fichier a revoir':'BAT mis en pause',
     'BAT valide':'BAT validé',
     'En production':'En production',
     'En cours de livraison':'En cours de livraison',
-    'Expediee':'Terminée',
+    'Expediee':'Commande finalisée',
     'Remboursement':'Remboursement',
     'Annulee':'Annulée'
   };
@@ -32,7 +33,9 @@
     selectedClient: null,
     dailySummaryDate: '',
     dailySummaryStart: '',
-    dailySummaryEnd: ''
+    dailySummaryEnd: '',
+    notificationSnapshot: null,
+    refreshTimer: null
   };
 
   var CLIENT_TYPE_OPTIONS = [
@@ -70,7 +73,7 @@
   }
   function badgeClass(statut){
     if(statut==='Recue') return 'b-rec';
-    if(statut==='BAT envoye'||statut==='BAT valide'||statut==='BAT fichier a revoir') return 'b-bat';
+    if(statut==='Pris en compte'||statut==='BAT envoye'||statut==='BAT valide'||statut==='BAT fichier a revoir') return 'b-bat';
     if(statut==='En production') return 'b-prod';
     if(statut==='En cours de livraison'||statut==='Expediee') return 'b-exp';
     if(statut==='Annulee'||statut==='Remboursement') return 'b-ann';
@@ -94,9 +97,11 @@
     if($('count-terminees')) $('count-terminees').textContent = state.commandes.filter(isStandardCommand).filter(isDone).length;
     if($('count-annulees')) $('count-annulees').textContent = state.commandes.filter(isStandardCommand).filter(isCancelled).length;
     if($('count-rdv')) $('count-rdv').textContent = state.commandes.filter(isRdvCommand).length;
+    if($('count-rdv-summary')) $('count-rdv-summary').textContent = state.commandes.filter(isRdvCommand).length;
     if($('count-transactions')) $('count-transactions').textContent = state.commandes.filter(isStandardCommand).length;
     if($('count-produits')) $('count-produits').textContent = state.catalog.length;
     if($('count-clients')) $('count-clients').textContent = state.clients.length;
+    if($('count-avis')) $('count-avis').textContent = state.avis.length;
     if($('count-cours-summary')) $('count-cours-summary').textContent = state.commandes.filter(isInProgress).length;
     if($('count-transactions-summary')) $('count-transactions-summary').textContent = state.commandes.filter(isStandardCommand).length;
     if($('count-produits-summary')) $('count-produits-summary').textContent = state.catalog.length;
@@ -116,12 +121,18 @@
     });
   }
   function showDashboard(){
+    document.body.classList.add('admin-logged-in');
     $('login-card').style.display='none';
     $('dashboard').style.display='block';
     hideAdminSections();
     setActiveScope('');
   }
   function showLogin(){
+    document.body.classList.remove('admin-logged-in');
+    if(state.refreshTimer){
+      window.clearInterval(state.refreshTimer);
+      state.refreshTimer = null;
+    }
     $('login-card').style.display='block';
     $('dashboard').style.display='none';
     hideAdminSections();
@@ -149,6 +160,90 @@
     if($('dashboard') && typeof $('dashboard').scrollIntoView==='function') $('dashboard').scrollIntoView({behavior:'smooth',block:'start'});
   }
 
+  function itemId(item){
+    return String((item && (item.id || item.numero || item.email)) || '').trim();
+  }
+  function buildNotificationSnapshot(){
+    var commandes=state.commandes || [];
+    var clients=state.clients || [];
+    var avis=state.avis || [];
+    return {
+      commandes: commandes.filter(isStandardCommand).map(itemId).filter(Boolean),
+      rdv: commandes.filter(isRdvCommand).map(itemId).filter(Boolean),
+      avis: avis.map(itemId).filter(Boolean),
+      clients: clients.map(itemId).filter(Boolean),
+      demandesCompte: clients.filter(function(client){
+        return client.account_request && client.account_request.status === 'demande';
+      }).map(itemId).filter(Boolean)
+    };
+  }
+  function diffNewIds(before, after, key){
+    before = before || {};
+    after = after || {};
+    var oldSet = new Set(before[key] || []);
+    return (after[key] || []).filter(function(id){ return id && !oldSet.has(id); });
+  }
+  function pushAdminToast(title, message){
+    var wrap=$('admin-notifications');
+    if(wrap){
+      var toast=document.createElement('div');
+      toast.className='admin-toast';
+      toast.innerHTML='<strong>'+esc(title)+'</strong><span>'+esc(message)+'</span>';
+      wrap.prepend(toast);
+      window.setTimeout(function(){ toast.remove(); }, 9000);
+    }
+    if('Notification' in window && Notification.permission === 'granted'){
+      try { new Notification(title, { body: message, icon: './favicon.png' }); } catch(e) {}
+    }
+  }
+  function askNotificationPermission(){
+    if(!('Notification' in window)) return;
+    if(Notification.permission === 'default'){
+      try { Notification.requestPermission(); } catch(e) {}
+    }
+  }
+  function notifySnapshotDiff(before, after){
+    if(!before || !after) return;
+    var messages=[
+      { key:'commandes', title:'Nouvelle commande', singular:'nouvelle commande', plural:'nouvelles commandes' },
+      { key:'rdv', title:'Nouveau rendez-vous', singular:'nouveau rendez-vous', plural:'nouveaux rendez-vous' },
+      { key:'avis', title:'Nouvel avis', singular:'nouvel avis à valider', plural:'nouveaux avis à valider' },
+      { key:'clients', title:'Nouveau client', singular:'nouveau client', plural:'nouveaux clients' },
+      { key:'demandesCompte', title:'Demande de compte client', singular:'nouvelle demande de compte client', plural:'nouvelles demandes de compte client' }
+    ];
+    messages.forEach(function(item){
+      var count=diffNewIds(before, after, item.key).length;
+      if(count){
+        pushAdminToast(item.title, count + ' ' + (count > 1 ? item.plural : item.singular));
+      }
+    });
+  }
+  function startAutoRefresh(){
+    if(state.refreshTimer) window.clearInterval(state.refreshTimer);
+    state.refreshTimer = window.setInterval(function(){
+      if(!state.mdp) return;
+      var before = state.notificationSnapshot || buildNotificationSnapshot();
+      Promise.all([loadCommandes(), loadClientsAdmin(false)])
+        .then(function(){
+          var after = buildNotificationSnapshot();
+          notifySnapshotDiff(before, after);
+          state.notificationSnapshot = after;
+        })
+        .catch(function(err){
+          if($('last-update')) $('last-update').textContent = 'Erreur actualisation auto : ' + (err.message || 'chargement impossible');
+        });
+    }, 60000);
+  }
+
+  function updateAdminClock(){
+    var el=$('admin-clock');
+    if(!el) return;
+    var now=new Date();
+    var pad=function(value){ return String(value).padStart(2,'0'); };
+    el.textContent=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+    el.setAttribute('datetime', now.toISOString());
+  }
+
   function login(){
     var pwd=($('admin-password').value||'').trim();
     if(!pwd){ setStatus('login-status','err','Entre le mot de passe admin.'); return; }
@@ -164,8 +259,13 @@
     .then(function(){
       state.mdp=pwd;
       sessionStorage.setItem('ci_admin_pwd',pwd);
+      askNotificationPermission();
       showDashboard();
-      return Promise.all([loadCommandes(), loadProductsAdmin(false), loadClientsAdmin(false), loadSiteConfig()]);
+      return Promise.all([loadCommandes(), loadProductsAdmin(false), loadClientsAdmin(false), loadSiteConfig()])
+        .then(function(){
+          state.notificationSnapshot = buildNotificationSnapshot();
+          startAutoRefresh();
+        });
     })
     .catch(function(err){ setStatus('login-status','err',err.message||'Connexion impossible.'); })
     .finally(function(){
@@ -181,10 +281,11 @@
         if(!data.success) throw new Error(data.error||'Chargement impossible');
         state.commandes = Array.isArray(data.commandes) ? data.commandes : [];
         updateCounts();
-        loadAvisAdmin(false);
-        if($('modal-orders').classList.contains('open')) renderOrders();
-        if($('modal-rdv') && $('modal-rdv').classList.contains('open')) renderAppointments();
-        if($('modal-transactions') && $('modal-transactions').classList.contains('open')) renderTransactions();
+        return loadAvisAdmin(false).then(function(){
+          if($('modal-orders').classList.contains('open')) renderOrders();
+          if($('modal-rdv') && $('modal-rdv').classList.contains('open')) renderAppointments();
+          if($('modal-transactions') && $('modal-transactions').classList.contains('open')) renderTransactions();
+        });
       })
       .catch(function(err){
         $('last-update').textContent = 'Erreur : ' + (err.message || 'chargement impossible');
@@ -215,9 +316,13 @@
     list.innerHTML=orders.map(function(cmd){
       var fullName=((cmd.prenom||'')+' '+(cmd.nom||'')).trim()||'Client';
       var canCancel = !isCancelled(cmd);
+      var cartRows = parseCommandCartRows(cmd);
+      var firstRow = cartRows[0] || {};
+      var choicesPreview = (firstRow.choices || []).slice(0, 3).join(' • ');
       return '<div class="order">'
         +'<div><div class="num">'+esc(cmd.numero||cmd.id)+'</div><div class="muted">'+esc(cmd.date||'')+'</div></div>'
-        +'<div><strong>'+esc(fullName)+'</strong><div class="muted">'+esc(cmd.email||'')+'</div></div>'
+        +'<div><strong>'+esc(fullName)+'</strong><div class="muted">'+esc(cmd.email||'')+'</div><div class="muted">'+esc(cmd.tel||'')+'</div></div>'
+        +'<div><strong>'+esc(firstRow.title||'Produit')+'</strong><div class="muted">'+esc(firstRow.file ? 'Fichier : '+firstRow.file : 'Aucun fichier indiqué')+'</div><div class="muted">'+esc(choicesPreview||'Choix à vérifier dans la fiche')+'</div></div>'
         +'<div><span class="badge '+badgeClass(cmd.statut)+'">'+esc(STATUT_LABELS[cmd.statut]||cmd.statut||'Statut')+'</span><div class="muted">'+esc(cmd.prix_total||'--')+'</div></div>'
         +'<div class="order-actions"><button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
         +(canCancel ? '<button class="btn-icon" data-delete-command="'+esc(cmd.id||cmd.numero)+'" type="button" title="Supprimer de l admin">×</button>' : '')
@@ -234,6 +339,23 @@
     if(status === 'attente_virement' || mode === 'Virement') return 'Virement en attente';
     if(status === 'attente_chorus' || mode === 'Administration Chorus') return 'Chorus en attente';
     return mode || 'CB';
+  }
+
+  function displayGammeName(value){
+    var raw=String(value || '').trim();
+    if(!raw) return 'Non classée';
+    var normalized=raw.toLowerCase().replace(/[\s'’_-]+/g,'');
+    var allOptions=(PRODUCT_GAMME_OPTIONS || []).concat((state.gammesAdmin || []).map(function(gamme){
+      return { value: gamme.legacy || gamme.legacyCat || gamme.slug || '', label: gamme.title || '' };
+    })).concat((state.gammes || []).map(function(gamme){
+      return { value: gamme.legacy || gamme.legacyCat || gamme.slug || '', label: gamme.title || '' };
+    }));
+    var found=allOptions.find(function(item){
+      return [item.value, item.label].some(function(label){
+        return String(label || '').toLowerCase().replace(/[\s'’_-]+/g,'') === normalized;
+      });
+    });
+    return (found && found.label) || raw;
   }
 
   function renderTransactions(){
@@ -264,6 +386,7 @@
         +'<div><strong>'+esc(cmd.prix_total||'--')+'</strong><div class="muted">'+esc(STATUT_LABELS[cmd.statut]||cmd.statut||'Statut')+'</div></div>'
         +'<div class="order-actions">'
           +'<button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+          +'<button class="btn btn-light btn-small" data-transaction-payment="'+esc(cmd.id||cmd.numero)+'" type="button">Changer paiement</button>'
           +(canRefund ? '<button class="btn btn-light btn-small" data-transaction-refund="'+esc(cmd.id||cmd.numero)+'" type="button">Rembourser</button>' : '')
         +'</div>'
         +'</div>';
@@ -287,6 +410,39 @@
       return loadCommandes().then(renderTransactions);
     })
     .catch(function(err){ alert(err.message || 'Remboursement impossible.'); });
+  }
+
+  function changeTransactionPayment(id){
+    var cmd=findCommand(id);
+    if(!cmd) return;
+    var mode=window.prompt('Mode de paiement : CB, Virement ou Administration Chorus', cmd.mode_reglement || 'CB');
+    if(mode === null) return;
+    mode=String(mode || '').trim();
+    if(/chorus/i.test(mode)) mode='Administration Chorus';
+    else if(/virement/i.test(mode)) mode='Virement';
+    else mode='CB';
+    fetch(api('/api/commandes/'+encodeURIComponent(cmd.id||cmd.numero)+'/modifier-admin'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        mdp:state.mdp,
+        prenom:cmd.prenom || '',
+        nom:cmd.nom || '',
+        email:cmd.email || '',
+        tel:cmd.tel || '',
+        siret:cmd.siret || '',
+        type_document:cmd.type_document || 'commande',
+        prix_total:cmd.prix_total || '',
+        date_livraison:cmd.date_livraison || '',
+        mode_reglement:mode
+      })
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Changement impossible'); return d; }); })
+    .then(function(data){
+      if(data.commande) Object.assign(cmd,data.commande);
+      return loadCommandes().then(renderTransactions);
+    })
+    .catch(function(err){ alert(err.message || 'Changement de paiement impossible.'); });
   }
 
   function findCommand(id){
@@ -585,21 +741,16 @@
       +renderOrderRequestPanel(cmd)
       +'<div class="admin-doc-area"><h3>Documents disponibles</h3>'+(docs||'<p class="muted">Aucun document déposé pour cette commande.</p>')+docUpload+'</div>'
       +'</section>'
-      +'<section class="panel"><h3>Modifier la commande</h3>'
-      +'<div class="site-grid">'
-      +'<div class="field"><label>Prénom</label><input id="edit-prenom" value="'+esc(cmd.prenom||'')+'"></div>'
-      +'<div class="field"><label>Nom</label><input id="edit-nom" value="'+esc(cmd.nom||'')+'"></div>'
-      +'<div class="field"><label>Email</label><input id="edit-email" value="'+esc(cmd.email||'')+'"></div>'
-      +'<div class="field"><label>Téléphone</label><input id="edit-tel" value="'+esc(cmd.tel||'')+'"></div>'
+      +'<section class="panel"><h3>Documents et paiement</h3>'
+      +'<div class="kv" style="margin-bottom:12px;">'
+      +'<div><span>Paiement choisi</span><strong>'+esc(paymentLabel(cmd))+'</strong></div>'
+      +'<div><span>Référence paiement</span><strong>'+esc(cmd.payment_id||'--')+'</strong></div>'
       +'</div>'
       +'<div class="site-grid">'
-      +'<div class="field"><label>Type</label><select id="edit-type-document">'+typeOptions+'</select></div>'
+      +'<div class="field"><label>Document</label><select id="edit-type-document">'+typeOptions+'</select></div>'
       +'<div class="field"><label>Total TTC</label><input id="edit-prix-total" value="'+esc(cmd.prix_total||'')+'"></div>'
       +'</div>'
-      +'<div class="site-grid">'
       +'<div class="field"><label>Date livraison</label><input id="edit-date-livraison" type="date" value="'+esc(cmd.date_livraison||'')+'"></div>'
-      +'<div class="field"><label>SIRET / structure</label><input id="edit-siret" value="'+esc(cmd.siret||'')+'"></div>'
-      +'</div>'
       +'<button class="btn btn-orange btn-small" id="save-command-edit" type="button">Enregistrer les modifications</button>'
       +'</section>'
       +(rdvInfo ? '<section class="panel"><h3>Modifier le rendez-vous</h3>'
@@ -613,7 +764,16 @@
       +'</section>' : '')
       +'<section class="panel"><h3>Produits modifiables</h3>'+renderEditableProductRows(cmd)+'</section>'
       +'<section class="panel"><h3>Traitement</h3>'
+      +'<div class="order-step-actions">'
+      +'<button class="btn btn-light btn-small" data-status-action="Pris en compte" type="button">Pris en compte</button>'
+      +'<button class="btn btn-light btn-small" data-status-action="BAT fichier a revoir" type="button">BAT mis en pause</button>'
+      +'<button class="btn btn-light btn-small" data-status-action="BAT valide" type="button">BAT validé</button>'
+      +'<button class="btn btn-light btn-small" data-status-action="En production" type="button">Production en cours</button>'
+      +'<button class="btn btn-light btn-small" data-status-action="En cours de livraison" type="button">Livraison en cours</button>'
+      +'<button class="btn btn-orange btn-small" data-status-action="Expediee" type="button">Commande finalisée</button>'
+      +'</div>'
       +'<div class="field"><label>Statut</label><select id="detail-statut">'+statutOptions+'</select></div>'
+      +'<div class="field"><label>Commentaire client</label><textarea id="detail-client-comment" placeholder="Message envoyé au client avec la mise à jour, utile surtout pour BAT mis en pause."></textarea></div>'
       +'<div class="field"><label>Mode de remboursement</label><select id="detail-refund-mode"><option value="CB">CB</option><option value="Virement">Virement</option></select></div>'
       +'<button class="btn btn-orange btn-small" id="save-statut" type="button">Mettre à jour le statut</button>'
       +'<div class="field"><label>Notes internes</label><textarea id="detail-notes" placeholder="Notes visibles uniquement par toi">'+esc(cmd.notes||'')+'</textarea></div>'
@@ -638,10 +798,11 @@
     var cmd=state.selected; if(!cmd) return;
     var statut=$('detail-statut').value;
     var refundMode=(($('detail-refund-mode')||{}).value||'CB');
+    var clientComment=(($('detail-client-comment')||{}).value||'').trim();
     fetch(api('/api/commandes/'+encodeURIComponent(cmd.id)+'/statut'),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({statut:statut,refundMode:refundMode,mdp:state.mdp})
+      body:JSON.stringify({statut:statut,refundMode:refundMode,clientComment:clientComment,mdp:state.mdp})
     })
     .then(function(r){ return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Mise à jour impossible'); return d; }); })
     .then(function(data){
@@ -684,11 +845,11 @@
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         mdp:state.mdp,
-        prenom:($('edit-prenom')||{}).value||'',
-        nom:($('edit-nom')||{}).value||'',
-        email:($('edit-email')||{}).value||'',
-        tel:($('edit-tel')||{}).value||'',
-        siret:($('edit-siret')||{}).value||'',
+        prenom:(($('edit-prenom')||{}).value||cmd.prenom||''),
+        nom:(($('edit-nom')||{}).value||cmd.nom||''),
+        email:(($('edit-email')||{}).value||cmd.email||''),
+        tel:(($('edit-tel')||{}).value||cmd.tel||''),
+        siret:(($('edit-siret')||{}).value||cmd.siret||''),
         type_document:($('edit-type-document')||{}).value||'commande',
         prix_total:($('edit-prix-total')||{}).value||'',
         date_livraison:($('edit-date-livraison')||{}).value||''
@@ -1863,6 +2024,20 @@
       +'<div class="field"><label>Code réduction permanent</label><input id="client-edit-promo-code" value="'+esc(current.promo_permanent_code||'')+'" placeholder="Ex : CLIENT10"></div>'
       +'<div class="field"><label>Remise permanente %</label><input id="client-edit-promo-remise" inputmode="decimal" value="'+esc(current.promo_permanent_remise||'')+'" placeholder="10"></div>'
       +'</div>'
+      +(!current.isNew ? '<div class="panel"><h3>Commandes du client</h3>'
+        +'<div class="list">'+(state.commandes.filter(function(cmd){
+          return String(cmd.email || '').toLowerCase() === String(current.email || '').toLowerCase();
+        }).length ? state.commandes.filter(function(cmd){
+          return String(cmd.email || '').toLowerCase() === String(current.email || '').toLowerCase();
+        }).map(function(cmd){
+          return '<div class="order" style="grid-template-columns:1fr .55fr .45fr auto;">'
+            +'<div><div class="num">'+esc(cmd.numero||cmd.id)+'</div><div class="muted">'+esc(cmd.date||cmd.created_at||'')+'</div></div>'
+            +'<div><span class="badge '+badgeClass(cmd.statut)+'">'+esc(STATUT_LABELS[cmd.statut]||cmd.statut||'Statut')+'</span></div>'
+            +'<div><strong>'+esc(cmd.prix_total||'--')+'</strong></div>'
+            +'<button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+          +'</div>';
+        }).join('') : '<div class="empty">Aucune commande liée à ce client.</div>')+'</div>'
+      +'</div>' : '')
       +(!current.isNew ? '<div class="panel"><h3>Documents archivés</h3>'
         +'<div class="site-grid">'
           +'<div class="field"><label>Type de document</label><select id="client-doc-type"><option>Devis</option><option>Commande</option><option>Facture</option><option>Avoir</option></select></div>'
@@ -2258,7 +2433,7 @@
     table.innerHTML='<table class="admin-table-mini">'
       +'<thead><tr><th>Gamme</th><th>Commandes</th><th>Total</th><th>Marge %</th></tr></thead>'
       +'<tbody>'+(summary.byGamme||[]).map(function(row){
-        return '<tr><td>'+esc(row.gamme||'Non classee')+'</td><td>'+esc(String(row.orders||0))+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td><td>'+esc(formatPercent(row.marginRate||0))+'</td></tr>';
+        return '<tr><td>'+esc(displayGammeName(row.gamme))+'</td><td>'+esc(String(row.orders||0))+'</td><td>'+esc(formatAmount(Number(row.total||0)))+'</td><td>'+esc(formatPercent(row.marginRate||0))+'</td></tr>';
       }).join('')+'</tbody>'
       +'<tfoot><tr><td>Total visites site</td><td colspan="3">'+esc(String(summary.visitsTotal||0))+'</td></tr></tfoot>'
       +'</table>';
@@ -2456,9 +2631,14 @@
   }
 
   document.addEventListener('DOMContentLoaded',function(){
+    updateAdminClock();
+    window.setInterval(updateAdminClock,1000);
     if(state.mdp){
       showDashboard();
-      Promise.all([loadCommandes(), loadProductsAdmin(false), loadClientsAdmin(false), loadSiteConfig()]).catch(function(){
+      Promise.all([loadCommandes(), loadProductsAdmin(false), loadClientsAdmin(false), loadSiteConfig()]).then(function(){
+        state.notificationSnapshot = buildNotificationSnapshot();
+        startAutoRefresh();
+      }).catch(function(){
         sessionStorage.removeItem('ci_admin_pwd');
         state.mdp='';
         showLogin();
@@ -2467,7 +2647,11 @@
     } else { showLogin(); }
     $('btn-login').addEventListener('click',login);
     $('admin-password').addEventListener('keydown',function(e){ if(e.key==='Enter') login(); });
-    $('btn-refresh').addEventListener('click',loadCommandes);
+    $('btn-refresh').addEventListener('click',function(){
+      Promise.all([loadCommandes(), loadProductsAdmin(false), loadClientsAdmin(false), loadSiteConfig()])
+        .then(function(){ state.notificationSnapshot = buildNotificationSnapshot(); })
+        .catch(function(err){ if($('last-update')) $('last-update').textContent = 'Erreur actualisation : ' + (err.message || 'chargement impossible'); });
+    });
     $('orders-reload').addEventListener('click',loadCommandes);
     if($('rdv-reload')) $('rdv-reload').addEventListener('click',loadCommandes);
     if($('products-reload')) $('products-reload').addEventListener('click',function(){ loadProductsAdmin(false); });
@@ -2487,6 +2671,7 @@
     $('btn-logout').addEventListener('click',function(){
       sessionStorage.removeItem('ci_admin_pwd');
       state.mdp='';
+      state.notificationSnapshot=null;
       showLogin();
     });
     document.querySelectorAll('[data-open-scope]').forEach(function(btn){
@@ -2503,6 +2688,9 @@
         if(scope==='transactions'){ renderTransactions(); openModal('modal-transactions','transactions'); return; }
         if(scope==='gammes'){ loadGammesAdmin(true); return; }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
+        if(scope==='caisse'){ resetManualForm(); openModal('modal-manual','caisse'); return; }
+        if(scope==='fidelisation'){ openModal('modal-fidelisation','fidelisation'); return; }
+        if(scope==='stock'){ openModal('modal-stock','stock'); return; }
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }
         if(scope==='produits'){ loadProductsAdmin(true); return; }
         if(scope==='clients'){ loadClientsAdmin(true); return; }
@@ -2519,6 +2707,14 @@
       if(deleteBtn){ deleteCommand(deleteBtn.getAttribute('data-delete-command')); return; }
       var transactionRefund=e.target.closest ? e.target.closest('[data-transaction-refund]') : null;
       if(transactionRefund){ refundTransaction(transactionRefund.getAttribute('data-transaction-refund')); return; }
+      var transactionPayment=e.target.closest ? e.target.closest('[data-transaction-payment]') : null;
+      if(transactionPayment){ changeTransactionPayment(transactionPayment.getAttribute('data-transaction-payment')); return; }
+      var statusAction=e.target.closest ? e.target.closest('[data-status-action]') : null;
+      if(statusAction){
+        if($('detail-statut')) $('detail-statut').value=statusAction.getAttribute('data-status-action') || '';
+        saveStatut();
+        return;
+      }
       if(e.target && e.target.id==='save-statut') saveStatut();
       if(e.target && e.target.id==='save-command-edit') saveCommandEdit();
       if(e.target && e.target.id==='save-rdv-edit') saveRdvEdit();

@@ -74,7 +74,7 @@
     .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
     .search{min-width:240px;flex:1}
     .list{display:grid;gap:10px}
-    .order{border:1px solid #eee0d6;border-radius:22px;padding:16px 18px;background:#fff;display:grid;grid-template-columns:1.1fr .9fr .8fr auto;gap:14px;align-items:center;box-shadow:0 10px 22px rgba(23,19,16,.04)}
+    .order{border:1px solid #eee0d6;border-radius:22px;padding:16px 18px;background:#fff;display:grid;grid-template-columns:.85fr 1fr 1.2fr .85fr auto;gap:14px;align-items:center;box-shadow:0 10px 22px rgba(23,19,16,.04)}
     .transaction-order{grid-template-columns:.75fr 1fr 1fr .75fr auto}
     .order:hover{border-color:#f2c9aa;background:#fffaf5;transform:translateY(-1px)}
     .order-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
@@ -210,6 +210,47 @@
       .login-card .btn-orange{margin-left:0;min-width:0;width:100%;font-size:1.5rem}
       .admin-tabs,.admin-summary{grid-template-columns:1fr 1fr}
     }
+    body.admin-logged-in{background:#050505}
+    body.admin-logged-in .page{width:100%;max-width:none;margin:0;padding:0 28px 48px 244px}
+    body.admin-logged-in .topbar{position:sticky;top:0;z-index:40;display:grid;grid-template-columns:minmax(260px,1fr) auto minmax(260px,1fr);align-items:center;min-height:118px;margin:0 0 22px;padding:18px 28px;background:linear-gradient(180deg,#050505 0%,rgba(5,5,5,.92) 78%,rgba(5,5,5,0) 100%)}
+    body.admin-logged-in .brand{grid-column:2;gap:18px}
+    body.admin-logged-in .logo{width:190px}
+    body.admin-logged-in .brand h1{font-size:3rem;line-height:.82}
+    body.admin-logged-in .admin-clock{grid-column:3;justify-self:end;margin:0;color:#ff8128;font-size:3.4rem;min-width:210px;text-align:right}
+    body.admin-logged-in .top-actions{grid-column:1;grid-row:1;justify-self:start;align-items:center}
+    body.admin-logged-in .top-actions .btn{padding:10px 15px}
+    body.admin-logged-in .dashboard{display:block;padding:0}
+    body.admin-logged-in .dash-head{margin:0 0 24px;display:flex;align-items:center;justify-content:space-between;color:#fff}
+    body.admin-logged-in .dash-head h2{display:block}
+    body.admin-logged-in .dash-head .sub{display:block;color:#b7b0aa}
+    body.admin-logged-in .admin-tabs{position:fixed;left:28px;top:136px;bottom:24px;z-index:45;width:180px;display:flex;flex-direction:column;gap:10px;padding:10px 8px;overflow:auto;background:#050505;border:2px solid #1e1e1e;border-radius:18px;box-shadow:0 0 28px rgba(244,123,32,.18)}
+    body.admin-logged-in .admin-tab{min-height:48px;border:2px solid var(--or);border-radius:10px;padding:10px 12px;font-size:.88rem;justify-content:space-between;text-align:left;box-shadow:inset 0 0 0 2px #000}
+    body.admin-logged-in .admin-tab span:first-child{display:block}
+    body.admin-logged-in .admin-tab-count{display:inline-flex;min-width:24px;height:24px;border-radius:999px;align-items:center;justify-content:center;background:var(--or);color:#000;font-size:.78rem}
+    body.admin-logged-in .admin-tab.active .admin-tab-count{background:#000;color:#fff}
+    body.admin-logged-in .admin-summary{margin:0;grid-template-columns:repeat(4,minmax(180px,1fr));gap:18px}
+    body.admin-logged-in .admin-summary-card{min-height:168px;border-radius:18px;background:linear-gradient(180deg,#0d0d0d 0%,#060606 100%);padding:24px}
+    body.admin-logged-in .admin-summary-card[role="button"]{cursor:pointer;transition:.18s}
+    body.admin-logged-in .admin-summary-card[role="button"]:hover{transform:translateY(-3px);box-shadow:0 0 28px rgba(244,123,32,.32)}
+    body.admin-logged-in .admin-summary-card strong{font-size:1.35rem}
+    body.admin-logged-in .admin-summary-card .count{font-size:2.8rem}
+    body.admin-logged-in .admin-section.open{width:auto;max-width:none;margin:24px 28px 64px 244px;color:var(--ink)}
+    body.admin-logged-in .admin-section .box{border-radius:24px;border:1px solid #f0ded0;box-shadow:0 20px 50px rgba(0,0,0,.28);overflow:hidden}
+    body.admin-logged-in .box-head{padding:22px 26px}
+    body.admin-logged-in .box-head h2{font-size:1.65rem}
+    body.admin-logged-in .box-body{padding:26px;background:#fffdfa}
+    body.admin-logged-in .order{grid-template-columns:.8fr 1.05fr 1.3fr .86fr auto}
+    body.admin-logged-in .transaction-order{grid-template-columns:.8fr 1.1fr 1.2fr .75fr auto}
+    body.admin-logged-in #site-editor-section.open{width:auto!important;margin:24px 28px 64px 244px!important;padding:0!important}
+    body.admin-logged-in #site-editor-section .box{width:100%}
+    @media(max-width:1100px){
+      body.admin-logged-in .page{padding:0 16px 40px}
+      body.admin-logged-in .topbar{position:relative;grid-template-columns:1fr;gap:14px;min-height:0}
+      body.admin-logged-in .brand,body.admin-logged-in .top-actions,body.admin-logged-in .admin-clock{grid-column:1;grid-row:auto;justify-self:center}
+      body.admin-logged-in .admin-tabs{position:relative;left:auto;top:auto;bottom:auto;width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0 0 22px}
+      body.admin-logged-in .admin-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+      body.admin-logged-in .admin-section.open,body.admin-logged-in #site-editor-section.open{margin:22px 0 48px!important}
+    }
   </style>
 </head>
 <body>
@@ -258,34 +299,54 @@
         <button class="admin-tab" data-open-scope="caisse" type="button"><span>Caisse</span></button>
         <button class="admin-tab" data-open-scope="clients" type="button"><span>Fiche client</span><span class="admin-tab-count" id="count-clients">0</span></button>
         <button class="admin-tab" data-open-scope="avis" type="button"><span>Avis</span><span class="admin-tab-count" id="count-avis">0</span></button>
+        <button class="admin-tab" data-open-scope="rdv" type="button"><span>Rendez-vous</span><span class="admin-tab-count" id="count-rdv">0</span></button>
         <button class="admin-tab" data-open-scope="produits" type="button"><span>Produits</span><span class="admin-tab-count" id="count-produits">0</span></button>
         <button class="admin-tab" data-open-scope="gammes" type="button"><span>Gammes</span></button>
         <button class="admin-tab" data-open-scope="site" type="button"><span>Gestion site</span></button>
         <button class="admin-tab" data-open-scope="fidelisation" type="button"><span>Fidélisation</span></button>
         <button class="admin-tab" data-open-scope="stock" type="button"><span>Produit stock</span></button>
-        <button class="admin-tab" data-open-scope="rdv" type="button"><span>Rendez-vous</span><span class="admin-tab-count" id="count-rdv">0</span></button>
         <button class="admin-tab" data-open-scope="diagnostic" type="button"><span>Diagnostic</span></button>
       </div>
       <div class="admin-summary">
-        <article class="admin-summary-card">
+        <article class="admin-summary-card" data-open-scope="commandes" role="button" tabindex="0">
           <strong>Commandes en cours</strong>
           <span class="count" id="count-cours-summary">0</span>
           <p>Recues, BAT, production et suivis actifs.</p>
         </article>
-        <article class="admin-summary-card">
+        <article class="admin-summary-card" data-open-scope="transactions" role="button" tabindex="0">
           <strong>Transactions</strong>
           <span class="count" id="count-transactions-summary">0</span>
           <p>CB, virements, Chorus et remboursements.</p>
         </article>
-        <article class="admin-summary-card">
+        <article class="admin-summary-card" data-open-scope="caisse" role="button" tabindex="0">
+          <strong>Caisse</strong>
+          <span class="count">PDF</span>
+          <p>Devis, commande et facture manuelle.</p>
+        </article>
+        <article class="admin-summary-card" data-open-scope="clients" role="button" tabindex="0">
           <strong>Fiches clients</strong>
           <span class="count" id="count-clients-summary">0</span>
           <p>Comptes clients, reglages pros et informations.</p>
         </article>
-        <article class="admin-summary-card">
+        <article class="admin-summary-card" data-open-scope="rdv" role="button" tabindex="0">
+          <strong>Rendez-vous</strong>
+          <span class="count" id="count-rdv-summary">0</span>
+          <p>Demandes clients et rendez-vous manuels.</p>
+        </article>
+        <article class="admin-summary-card" data-open-scope="avis" role="button" tabindex="0">
           <strong>Avis en attente</strong>
           <span class="count" id="count-avis-summary">0</span>
           <p>Validation et moderation avant publication.</p>
+        </article>
+        <article class="admin-summary-card" data-open-scope="produits" role="button" tabindex="0">
+          <strong>Produits</strong>
+          <span class="count" id="count-produits-summary">0</span>
+          <p>Fiches produits, cheminements et tarifs.</p>
+        </article>
+        <article class="admin-summary-card" data-open-scope="diagnostic" role="button" tabindex="0">
+          <strong>Diagnostic</strong>
+          <span class="count">OK</span>
+          <p>Controle SMTP, SumUp, fichiers et stockage.</p>
         </article>
       </div>
     </section>
