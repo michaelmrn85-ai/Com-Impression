@@ -1018,7 +1018,8 @@
       var tabs = configSteps.map(function (step, index) {
         var done = selections[step.key] ? " done" : "";
         var active = index === currentStepIndex && !isFinal ? " active" : "";
-        var selected = selections[step.key] ? '<span>' + esc(selections[step.key]) + '</span>' : '';
+        var showSelected = selections[step.key] && (index < currentStepIndex || isFinal);
+        var selected = showSelected ? '<span>' + esc(selections[step.key]) + '</span>' : '';
         var canGoBack = index < currentStepIndex || !!selections[step.key];
         return '<button type="button" class="product-step-tab' + done + active + (canGoBack ? ' is-nav' : '') + '" data-step-index="' + esc(String(index)) + '"' + (canGoBack ? '' : ' disabled') + '><strong>' + esc(step.title || step.key) + '</strong>' + selected + '</button>';
       }).join("") + '<button type="button" class="product-step-tab' + (isFinal ? ' active' : '') + '" disabled><strong>Quantite & fichiers</strong></button>';
