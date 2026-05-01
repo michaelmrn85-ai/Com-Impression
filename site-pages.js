@@ -184,6 +184,7 @@
     var modes = [];
     if (rows.some(function (row) { return row.type === "lot"; })) modes.push("lot");
     if (rows.some(function (row) { return row.type === "unitaire"; }) || product.requiresQuantityInput) modes.push("unitaire");
+    if (rows.some(function (row) { return row.type === "pages"; })) modes.push("pages");
     if (rows.some(function (row) { return row.type === "dimensions"; }) || product.hasDimensions) modes.push("dimensions");
     if (!modes.length) modes.push(product.requiresQuantityInput ? "unitaire" : "lot");
     return modes;
@@ -1158,12 +1159,25 @@
       }
       var modeHtml = quantityModes.length > 1
         ? '<div class="quantity-mode-grid">' + quantityModes.map(function (mode) {
-            var label = mode === "unitaire" ? "Unitaire" : (mode === "dimensions" ? "Dimensions" : "Quantite lot");
+            var label = mode === "unitaire" ? "Unitaire" : (mode === "dimensions" ? "Dimensions" : (mode === "pages" ? "Pages brochure" : "Quantite lot"));
             return '<button type="button" class="quantity-chip' + (mode === selectedQuantityMode ? ' active' : '') + '" data-qty-mode="' + esc(mode) + '">' + esc(label) + '</button>';
           }).join("") + '</div>'
         : '';
       if (selectedQuantityMode === "unitaire") {
         quantityField.innerHTML = '<label for="product-qty-input">Quantite</label>' + modeHtml + '<div class="quantity-stack"><input id="product-qty-input" type="number" min="1" value="' + esc(selectedValue || "1") + '"><p>Entre directement la quantite souhaitee.</p></div>';
+        return;
+      }
+      if (selectedQuantityMode === "pages") {
+        var pageRows = getProductPricingRows(product).filter(function (row) {
+          return row.type === "pages" && matchesCustomConfig(row, selections);
+        });
+        var firstPageRow = pageRows[0] || {};
+        var minPages = parseInt(firstPageRow.pageMin || firstPageRow.quantity || 8, 10);
+        var stepPages = parseInt(firstPageRow.pageStep || 4, 10);
+        if (isNaN(minPages) || minPages < 1) minPages = 8;
+        if (isNaN(stepPages) || stepPages < 1) stepPages = 4;
+        quantityField.innerHTML = '<label for="product-qty-input">Nombre de pages</label>' + modeHtml
+          + '<div class="quantity-stack"><input id="product-qty-input" type="number" min="' + esc(String(minPages)) + '" step="' + esc(String(stepPages)) + '" value="' + esc(selectedValue || String(minPages)) + '"><p>Minimum ' + esc(String(minPages)) + ' pages, puis par multiple de ' + esc(String(stepPages)) + '.</p></div>';
         return;
       }
       if (selectedQuantityMode === "dimensions") {

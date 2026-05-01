@@ -1243,7 +1243,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             if (!chosen) {
                 let quantityTiers = tiers.filter(item => item.type !== 'dimensions');
-                if (quantityMode === 'lot' || quantityMode === 'unitaire') {
+                if (quantityMode === 'lot' || quantityMode === 'unitaire' || quantityMode === 'pages') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
                 const optionTiers = quantityTiers.filter(matchesPricingSelections);
@@ -1277,10 +1277,10 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                     purchaseValue = chosen.purchasePrice == null ? null : chosen.purchasePrice * surfaceM2 * safeQty;
                     priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
                 } else {
-                    numeric = chosen.type === 'unitaire' ? chosen.total * unitMultiplier : chosen.total;
-                    purchaseValue = chosen.purchasePrice == null ? null : (chosen.type === 'unitaire' ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
+                    numeric = (chosen.type === 'unitaire' || chosen.type === 'pages') ? chosen.total * unitMultiplier : chosen.total;
+                    purchaseValue = chosen.purchasePrice == null ? null : ((chosen.type === 'unitaire' || chosen.type === 'pages') ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
                     priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
-                    if (chosen.type === 'unitaire') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
+                    if (chosen.type === 'unitaire' || chosen.type === 'pages') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
                 }
             }
         } else if (productData.priceLabel && numeric == null) {
@@ -2066,7 +2066,6 @@ function buildDailySummaryPdfBuffer(summary) {
     const orange = [0.96, 0.48, 0.13];
     const pale = [1, 0.97, 0.93];
     const lineColor = [0.93, 0.86, 0.80];
-    const paymentInfo = paymentInfoForPdf(definition || {});
     function color(values, op) { return `${values.map(v => Number(v).toFixed(3)).join(' ')} ${op}`; }
     function rect(x, y, w, h, fill, stroke) {
         if (fill) commands.push(`${color(fill, 'rg')} ${x} ${y} ${w} ${h} re f`);
