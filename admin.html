@@ -118,6 +118,34 @@
     .manual-line-options-head strong{font-family:'Baloo 2',cursive;font-size:.95rem}
     .manual-options-list{display:grid;gap:8px}
     .manual-option-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+    .cash-register{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,.72fr);gap:20px;background:#050505;color:#fff;border-radius:24px;padding:20px;min-height:620px}
+    .cash-left,.cash-ticket{border:2px solid #f47b20;border-radius:18px;background:#090909;box-shadow:0 0 24px rgba(244,123,32,.16)}
+    .cash-left{padding:18px;display:grid;gap:16px;align-content:start}
+    .cash-search-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .cash-register label{color:#fff}
+    .cash-register input,.cash-register select,.cash-register textarea{background:#111;color:#fff;border-color:#42332a}
+    .cash-register input::placeholder,.cash-register textarea::placeholder{color:#8f8781}
+    .cash-register input:focus,.cash-register select:focus,.cash-register textarea:focus{border-color:#f47b20;box-shadow:0 0 0 2px rgba(244,123,32,.16)}
+    .cash-client-card,.cash-tools,.cash-payment-box{border:1px solid #2e241d;border-radius:16px;background:#0f0f0f;padding:14px}
+    .cash-ticket{position:sticky;top:138px;padding:18px;align-self:start}
+    .cash-ticket-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid #39271b;padding-bottom:14px;margin-bottom:14px}
+    .cash-ticket-head strong{font-family:'Baloo 2',cursive;font-size:1.35rem;color:#fff}
+    .cash-ticket-client{color:#f47b20;font-weight:900;text-align:right}
+    .cash-ticket-lines{display:grid;gap:10px;min-height:180px}
+    .cash-ticket-line{border:1px solid #2e241d;border-radius:14px;padding:12px;background:#070707;display:grid;grid-template-columns:1fr auto;gap:8px}
+    .cash-ticket-line strong{color:#fff}
+    .cash-ticket-line small{display:block;color:#aaa;margin-top:3px;overflow-wrap:anywhere}
+    .cash-ticket-line span{color:#f47b20;font-weight:900}
+    .cash-ticket-total{border-top:2px solid #f47b20;margin-top:16px;padding-top:16px;display:flex;justify-content:space-between;align-items:center;font-family:'Baloo 2',cursive;font-size:1.45rem}
+    .cash-ticket-total span:last-child{color:#f47b20}
+    .cash-ticket-actions{display:grid;gap:10px;margin-top:16px}
+    .cash-ticket .btn{justify-content:center}
+    .manual-lines{gap:12px}
+    .cash-register .manual-line{grid-template-columns:minmax(160px,1.2fr) 92px 110px 1fr auto;background:#0f0f0f;border-color:#2f241c;border-radius:16px;box-shadow:none}
+    .cash-register .manual-line label{color:#bfb7b1}
+    .cash-register .manual-line-options{border-color:#2f241c}
+    .cash-register .manual-line-options-head strong{color:#fff}
+    .cash-register .btn-light{background:#171717;color:#fff;border-color:#3a2e26}
     .product-pricing-options td{background:#fffdfa;border-top:0;padding-top:0}
     .product-pricing-options-box{border:1px dashed #efd8c0;border-radius:16px;padding:12px;display:grid;gap:8px}
     .product-pricing-options-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
@@ -189,7 +217,7 @@
     .day-kpi span{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:1.8rem;color:var(--or)}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:1px dashed var(--line);border-radius:20px}
     @media(max-width:1100px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
-    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.detail-split,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
+    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid,.cash-register,.cash-search-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.detail-split,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}.cash-ticket{position:static}}
     @media(max-width:560px){.admin-summary,.day-kpis,.admin-tabs{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
     @media(max-width:1100px){
       .page{padding-top:24px}
@@ -409,9 +437,10 @@
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
+        <div class="day-kpis" id="loyalty-kpis"></div>
         <div class="panel">
-          <h3>Programme fidélité</h3>
-          <p class="muted">Suivi des points, codes fidélité et avantages clients. La structure est prête pour raccorder les réglages détaillés.</p>
+          <h3>Clients fidélité</h3>
+          <div class="list" id="loyalty-list"></div>
         </div>
       </div>
     </div>
@@ -629,57 +658,88 @@
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
-        <div class="site-grid">
-          <div class="field"><label>Prénom</label><input id="manual-prenom" placeholder="Jean"></div>
-          <div class="field"><label>Nom</label><input id="manual-nom" placeholder="Dupont"></div>
-          <div class="field"><label>Email</label><input id="manual-email" type="email" placeholder="client@email.fr"></div>
-          <div class="field"><label>Téléphone</label><input id="manual-tel" placeholder="06 00 00 00 00"></div>
-        </div>
-        <div class="site-grid">
-          <div class="field">
-            <label>Profil client</label>
-            <select id="manual-type-client">
-              <option>Particulier</option>
-              <option>Professionnel</option>
-              <option>Professionnel sans SIRET</option>
-              <option>Administration publique (Chorus Pro)</option>
-              <option>Association</option>
-            </select>
+        <datalist id="manual-client-options"></datalist>
+        <datalist id="manual-product-options"></datalist>
+        <div class="cash-register">
+          <div class="cash-left">
+            <div class="cash-search-grid">
+              <div class="field">
+                <label>Recherche client</label>
+                <input id="manual-client-search" list="manual-client-options" placeholder="Nom, email, société...">
+              </div>
+              <div class="field">
+                <label>Recherche produit</label>
+                <input id="manual-product-search" list="manual-product-options" placeholder="Carte de visite, flyer...">
+              </div>
+            </div>
+            <div class="cash-client-card">
+              <div class="site-grid">
+                <div class="field"><label>Prénom</label><input id="manual-prenom" placeholder="Jean"></div>
+                <div class="field"><label>Nom</label><input id="manual-nom" placeholder="Dupont"></div>
+                <div class="field"><label>Email</label><input id="manual-email" type="email" placeholder="client@email.fr"></div>
+                <div class="field"><label>Téléphone</label><input id="manual-tel" placeholder="06 00 00 00 00"></div>
+              </div>
+              <div class="site-grid">
+                <div class="field">
+                  <label>Profil client</label>
+                  <select id="manual-type-client">
+                    <option>Particulier</option>
+                    <option>Professionnel</option>
+                    <option>Professionnel sans SIRET</option>
+                    <option>Administration publique (Chorus Pro)</option>
+                    <option>Association</option>
+                  </select>
+                </div>
+                <div class="field"><label>SIRET / infos structure</label><input id="manual-siret" placeholder="Optionnel"></div>
+              </div>
+            </div>
+            <div class="cash-tools">
+              <div class="manual-lines" id="manual-lines"></div>
+              <button class="btn btn-light btn-small" id="manual-add-line" type="button">+ Ajouter une ligne libre</button>
+            </div>
           </div>
-          <div class="field"><label>SIRET / infos structure</label><input id="manual-siret" placeholder="Optionnel"></div>
+          <aside class="cash-ticket">
+            <div class="cash-ticket-head">
+              <div>
+                <strong>Ticket</strong>
+                <div class="muted" id="manual-ticket-doc">Commande</div>
+              </div>
+              <div class="cash-ticket-client" id="manual-ticket-client">Client non sélectionné</div>
+            </div>
+            <div class="cash-payment-box">
+              <div class="site-grid">
+                <div class="field">
+                  <label>Type</label>
+                  <select id="manual-doc-type">
+                    <option value="devis">Devis</option>
+                    <option value="commande" selected>Commande</option>
+                    <option value="facture">Facture</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Paiement</label>
+                  <select id="manual-payment-mode">
+                    <option value="CB">CB</option>
+                    <option value="Virement">Virement</option>
+                    <option value="Administration Chorus">Administration Chorus</option>
+                    <option value="Espèces">Espèces</option>
+                    <option value="Chèque">Chèque</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field"><label>Date livraison souhaitée</label><input id="manual-livraison" type="date"></div>
+              <div class="muted" id="manual-loyalty-info">Fidélité : client non identifié.</div>
+            </div>
+            <div class="cash-ticket-lines" id="manual-ticket-lines"></div>
+            <div class="cash-ticket-total"><span>Total TTC</span><span id="manual-ticket-total">0,00 €</span></div>
+            <input id="manual-total" type="hidden" value="">
+            <div class="cash-ticket-actions">
+              <button class="btn btn-orange" id="manual-create" type="button">Valider et générer le PDF</button>
+              <div class="muted">Le PDF est rangé automatiquement selon le type choisi.</div>
+            </div>
+            <div class="status" id="manual-status"></div>
+          </aside>
         </div>
-        <div class="site-grid">
-          <div class="field">
-            <label>Type de commande</label>
-            <select id="manual-doc-type">
-              <option value="devis">Devis</option>
-              <option value="commande" selected>Commande</option>
-              <option value="facture">Facture</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Mode de paiement</label>
-            <select id="manual-payment-mode">
-              <option value="CB">CB</option>
-              <option value="Virement">Virement</option>
-              <option value="Administration Chorus">Administration Chorus</option>
-              <option value="Espèces">Espèces</option>
-              <option value="Chèque">Chèque</option>
-            </select>
-          </div>
-          <div class="field"><label>Date livraison souhaitée</label><input id="manual-livraison" type="date"></div>
-        </div>
-        <div class="field">
-          <label>Produits</label>
-          <div class="manual-lines" id="manual-lines"></div>
-          <button class="btn btn-light btn-small" id="manual-add-line" type="button">+ Ajouter une ligne produit</button>
-        </div>
-        <div class="site-grid">
-          <div class="field"><label>Montant total TTC</label><input id="manual-total" placeholder="35,90 €"></div>
-          <div class="field"><label>PDF généré automatiquement</label><input value="Rangement automatique selon le type choisi" disabled></div>
-        </div>
-        <button class="btn btn-orange" id="manual-create" type="button">Valider et générer le PDF</button>
-        <div class="status" id="manual-status"></div>
       </div>
     </div>
   </section>

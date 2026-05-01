@@ -1280,6 +1280,7 @@
         state.catalog = flattenCatalog(state.gammes);
         updateCounts();
         renderProductsList();
+        renderManualSearchOptions();
         if(openAfterLoad) openModal('modal-products','produits');
       });
   }
@@ -1948,8 +1949,42 @@
         state.clients = Array.isArray(data.clients) ? data.clients : [];
         updateCounts();
         renderClientsList();
+        renderManualSearchOptions();
+        renderFidelisation();
         if(openAfterLoad) openModal('modal-clients','clients');
       });
+  }
+
+  function renderFidelisation(){
+    var kpis=$('loyalty-kpis');
+    var list=$('loyalty-list');
+    if(!kpis && !list) return;
+    var clients=state.clients || [];
+    var withPoints=clients.filter(function(client){ return Number(client.points||0)>0; });
+    var totalPoints=clients.reduce(function(sum,client){ return sum + Number(client.points||0); },0);
+    var permanentCodes=clients.filter(function(client){ return client.promo_permanent_code; }).length;
+    if(kpis){
+      kpis.innerHTML=[
+        ['Clients', clients.length],
+        ['Clients avec points', withPoints.length],
+        ['Points en cours', totalPoints],
+        ['Codes permanents', permanentCodes]
+      ].map(function(item){
+        return '<div class="day-kpi"><strong>'+esc(item[0])+'</strong><span>'+esc(item[1])+'</span></div>';
+      }).join('');
+    }
+    if(list){
+      var items=clients.slice().sort(function(a,b){ return Number(b.points||0)-Number(a.points||0); }).slice(0,40);
+      list.innerHTML=items.length ? items.map(function(client){
+        var name=[client.prenom, client.nom].filter(Boolean).join(' ') || client.email || 'Client';
+        return '<div class="order">'
+          +'<div><div class="num">'+esc(name)+'</div><div class="muted">'+esc(client.email||'')+'</div></div>'
+          +'<div><strong>'+esc(Number(client.points||0))+' point(s)</strong><div class="muted">'+esc(client.promo_permanent_code ? 'Code : '+client.promo_permanent_code : 'Aucun code permanent')+'</div></div>'
+          +'<div><span class="badge b-bat">'+esc(client.mode_reglement||'CB')+'</span><div class="muted">'+esc(client.type_client||'Particulier')+'</div></div>'
+          +'<button class="btn btn-orange btn-small" data-edit-client="'+esc(client.id)+'" type="button">Ouvrir</button>'
+        +'</div>';
+      }).join('') : '<div class="empty">Aucun client enregistré.</div>';
+    }
   }
 
   function renderClientsList(){
@@ -2493,16 +2528,103 @@
     }).join('');
   }
 
+  function renderManualSearchOptions(){
+    var clientOptions=$('manual-client-options');
+    if(clientOptions){
+      clientOptions.innerHTML=(state.clients||[]).map(function(client){
+        var label=[client.prenom, client.nom].filter(Boolean).join(' ') || client.email || 'Client';
+        var detail=[client.email, client.societe, client.siret].filter(Boolean).join(' - ');
+        return '<option value="'+esc(label+(detail ? ' — '+detail : ''))+'"></option>';
+      }).join('');
+    }
+    var productOptions=$('manual-product-options');
+    if(productOptions){
+      productOptions.innerHTML=(state.catalog||[]).map(function(entry){
+        var product=entry.product||{};
+        return '<option value="'+esc([product.title, product.ref].filter(Boolean).join(' — '))+'"></option>';
+      }).join('');
+    }
+  }
+
+  function findManualClientFromSearch(value){
+    var q=String(value||'').toLowerCase();
+    return (state.clients||[]).find(function(client){
+      return q.indexOf(String(client.email||'').toLowerCase())!==-1;
+    }) || (state.clients||[]).find(function(client){
+      return [client.prenom, client.nom, client.societe, client.siret].some(function(part){
+        return part && q.indexOf(String(part).toLowerCase())!==-1;
+      });
+    });
+  }
+
+  function findManualProductFromSearch(value){
+    var q=String(value||'').toLowerCase();
+    return (state.catalog||[]).find(function(entry){
+      var product=entry.product||{};
+      return q.indexOf(String(product.ref||'').toLowerCase())!==-1 || q.indexOf(String(product.title||'').toLowerCase())!==-1;
+    });
+  }
+
+  function applyManualClient(client){
+    if(!client) return;
+    if($('manual-prenom')) $('manual-prenom').value=client.prenom||'';
+    if($('manual-nom')) $('manual-nom').value=client.nom||'';
+    if($('manual-email')) $('manual-email').value=client.email||'';
+    if($('manual-tel')) $('manual-tel').value=client.telephone||client.tel||'';
+    if($('manual-type-client')) $('manual-type-client').value=client.type_client||'Particulier';
+    if($('manual-siret')) $('manual-siret').value=client.siret||client.societe||'';
+    if($('manual-payment-mode') && client.mode_reglement) $('manual-payment-mode').value=client.mode_reglement;
+    refreshManualTicket();
+  }
+
+  function addManualProductFromSearch(){
+    var input=$('manual-product-search');
+    var entry=findManualProductFromSearch(input && input.value);
+    if(!entry) return;
+    var product=entry.product||{};
+    addManualLine({
+      produit: product.title || '',
+      qte: (product.quantityOptions && product.quantityOptions[0]) ? String(product.quantityOptions[0]) : '1',
+      montant: product.priceLabel || ''
+    });
+    if(input) input.value='';
+    refreshManualTicket();
+  }
+
+  function refreshManualTicket(){
+    var rows=getManualRows();
+    var total=rows.reduce(function(sum,row){ return sum+parseAmount(row.montant); },0);
+    var fullName=[($('manual-prenom')||{}).value, ($('manual-nom')||{}).value].filter(Boolean).join(' ').trim();
+    var email=(($('manual-email')||{}).value||'').trim();
+    var client=(state.clients||[]).find(function(item){ return String(item.email||'').toLowerCase()===email.toLowerCase(); });
+    if($('manual-ticket-client')) $('manual-ticket-client').textContent=fullName || email || 'Client non sélectionné';
+    if($('manual-ticket-doc')) $('manual-ticket-doc').textContent=(($('manual-doc-type')||{}).value||'commande').replace(/^./,function(c){return c.toUpperCase();});
+    if($('manual-loyalty-info')){
+      var points=client && client.points != null ? client.points : 0;
+      $('manual-loyalty-info').textContent=email ? ('Fidélité : '+points+' point(s). Cette vente est liée à la fiche client.') : 'Fidélité : client non identifié.';
+    }
+    if($('manual-ticket-lines')){
+      $('manual-ticket-lines').innerHTML=rows.length ? rows.map(function(row){
+        return '<div class="cash-ticket-line">'
+          +'<div><strong>'+esc(row.produit||'Produit')+'</strong><small>Qté : '+esc(row.qte||'--')+(row.fileName ? ' - Fichier : '+esc(row.fileName) : '')+'</small></div>'
+          +'<span>'+esc(row.montant||'--')+'</span>'
+        +'</div>';
+      }).join('') : '<div class="empty" style="background:#080808;color:#aaa;border-color:#2f241c;">Ticket vide.</div>';
+    }
+    if($('manual-ticket-total')) $('manual-ticket-total').textContent=formatAmount(total);
+    if($('manual-total')) $('manual-total').value=total>0 ? formatAmount(total) : '';
+  }
+
   function addManualLine(data){
     var wrap=$('manual-lines'); if(!wrap) return;
     var row=document.createElement('div');
     row.className='manual-line';
     var options = Array.isArray(data && data.optionsLibres) ? data.optionsLibres : [];
     row.innerHTML=
-      '<div class="field"><label>Produit</label><input class="manual-product" placeholder="Cartes de visite" value="'+esc(data&&data.produit||'')+'"></div>'
-      +'<div class="field"><label>Upload fichier</label><input class="manual-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.ai,.eps,.svg,.zip"></div>'
-      +'<div class="field"><label>Qté</label><input class="manual-qty" placeholder="250 ex." value="'+esc(data&&data.qte||'')+'"></div>'
+      '<div class="field"><label>Produit</label><input class="manual-product" list="manual-product-options" placeholder="Cartes de visite" value="'+esc(data&&data.produit||'')+'"></div>'
+      +'<div class="field"><label>Qté</label><div style="display:grid;grid-template-columns:36px 1fr 36px;gap:6px;"><button class="btn btn-light btn-small manual-qty-minus" type="button">-</button><input class="manual-qty" placeholder="1" value="'+esc(data&&data.qte||'1')+'"><button class="btn btn-light btn-small manual-qty-plus" type="button">+</button></div></div>'
       +'<div class="field"><label>Montant TTC</label><input class="manual-amount" placeholder="35,90 €" value="'+esc(data&&data.montant||'')+'"></div>'
+      +'<div class="field"><label>Fichier</label><input class="manual-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.ai,.eps,.svg,.zip"><div class="muted manual-file-name">Aucun fichier</div></div>'
       +'<button class="btn-icon manual-remove-line" type="button" title="Supprimer la ligne">×</button>'
       +'<div class="manual-line-options">'
         +'<div class="manual-line-options-head"><strong>Options libres</strong><button class="btn btn-light btn-small manual-add-option" type="button">+ Ajouter une option</button></div>'
@@ -2510,6 +2632,7 @@
       +'</div>';
     wrap.appendChild(row);
     options.forEach(function(option){ addManualOption(row, option); });
+    refreshManualTicket();
   }
 
   function addManualOption(line, data){
@@ -2525,11 +2648,7 @@
   }
 
   function refreshManualTotal(){
-    var sum=0;
-    document.querySelectorAll('#manual-lines .manual-amount').forEach(function(input){
-      sum+=parseAmount(input.value);
-    });
-    if(sum>0) $('manual-total').value=formatAmount(sum);
+    refreshManualTicket();
   }
 
   function getManualRows(){
@@ -2579,9 +2698,13 @@
     var type=$('manual-type-client'); if(type) type.value='Particulier';
     var docType=$('manual-doc-type'); if(docType) docType.value='commande';
     var paymentMode=$('manual-payment-mode'); if(paymentMode) paymentMode.value='CB';
+    if($('manual-client-search')) $('manual-client-search').value='';
+    if($('manual-product-search')) $('manual-product-search').value='';
     var lines=$('manual-lines'); if(lines) lines.innerHTML='';
     addManualLine();
     clearStatus('manual-status');
+    renderManualSearchOptions();
+    refreshManualTicket();
   }
 
   function createManualOrder(){
@@ -2688,8 +2811,14 @@
         if(scope==='transactions'){ renderTransactions(); openModal('modal-transactions','transactions'); return; }
         if(scope==='gammes'){ loadGammesAdmin(true); return; }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
-        if(scope==='caisse'){ resetManualForm(); openModal('modal-manual','caisse'); return; }
-        if(scope==='fidelisation'){ openModal('modal-fidelisation','fidelisation'); return; }
+        if(scope==='caisse'){
+          Promise.all([loadProductsAdmin(false), loadClientsAdmin(false)]).then(function(){
+            resetManualForm();
+            openModal('modal-manual','caisse');
+          });
+          return;
+        }
+        if(scope==='fidelisation'){ loadClientsAdmin(false).then(function(){ renderFidelisation(); openModal('modal-fidelisation','fidelisation'); }); return; }
         if(scope==='stock'){ openModal('modal-stock','stock'); return; }
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }
         if(scope==='produits'){ loadProductsAdmin(true); return; }
@@ -2731,6 +2860,22 @@
       if(e.target && e.target.id==='save-notes') saveNotes();
       if(e.target && e.target.id==='upload-doc') uploadDocument();
       if(e.target && e.target.id==='manual-add-line') addManualLine();
+      if(e.target && e.target.classList && e.target.classList.contains('manual-qty-minus')){
+        var minusLine=e.target.closest('.manual-line');
+        var minusInput=minusLine && minusLine.querySelector('.manual-qty');
+        var minusValue=parseInt((minusInput&&minusInput.value)||'1',10);
+        if(minusInput) minusInput.value=String(Math.max(1,(isNaN(minusValue)?1:minusValue)-1));
+        refreshManualTicket();
+        return;
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('manual-qty-plus')){
+        var plusLine=e.target.closest('.manual-line');
+        var plusInput=plusLine && plusLine.querySelector('.manual-qty');
+        var plusValue=parseInt((plusInput&&plusInput.value)||'1',10);
+        if(plusInput) plusInput.value=String((isNaN(plusValue)?1:plusValue)+1);
+        refreshManualTicket();
+        return;
+      }
       if(e.target && e.target.classList && e.target.classList.contains('manual-add-option')){
         var optionLine=e.target.closest('.manual-line');
         if(optionLine) addManualOption(optionLine);
@@ -2943,7 +3088,17 @@
       }
     });
     document.addEventListener('input',function(e){
-      if(e.target && e.target.classList && e.target.classList.contains('manual-amount')) refreshManualTotal();
+      if(e.target && e.target.id==='manual-client-search'){
+        applyManualClient(findManualClientFromSearch(e.target.value));
+      }
+      if(e.target && ['manual-prenom','manual-nom','manual-email','manual-tel','manual-doc-type','manual-payment-mode'].indexOf(e.target.id)!==-1){
+        refreshManualTicket();
+      }
+      if(e.target && e.target.classList && (
+        e.target.classList.contains('manual-amount') ||
+        e.target.classList.contains('manual-product') ||
+        e.target.classList.contains('manual-qty')
+      )) refreshManualTotal();
       if(e.target && e.target.classList && (
         e.target.classList.contains('product-path-tariff-purchase') ||
         e.target.classList.contains('product-path-tariff-sale') ||
@@ -2970,6 +3125,22 @@
     document.addEventListener('change',function(e){
       if(e.target && e.target.classList && e.target.classList.contains('product-step-choice-image-file')){
         uploadProductStepChoiceImage(e.target);
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('manual-file')){
+        var fileLine=e.target.closest('.manual-line');
+        var fileName=fileLine && fileLine.querySelector('.manual-file-name');
+        var file=e.target.files && e.target.files[0];
+        if(fileName) fileName.textContent=file ? file.name : 'Aucun fichier';
+        refreshManualTicket();
+      }
+      if(e.target && e.target.id==='manual-product-search') addManualProductFromSearch();
+      if(e.target && ['manual-doc-type','manual-payment-mode','manual-type-client'].indexOf(e.target.id)!==-1) refreshManualTicket();
+    });
+    var manualProductSearch=$('manual-product-search');
+    if(manualProductSearch) manualProductSearch.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        addManualProductFromSearch();
       }
     });
     document.addEventListener('change',function(e){
