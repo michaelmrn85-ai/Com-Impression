@@ -1126,8 +1126,8 @@
       currentQuantityOptions = getLotQuantityOptions(product, selections);
       currentStepIndex = Math.min(currentStepIndex + 1, configSteps.length);
       renderConfigStep();
+      requestPricing(readSelectedQuantity());
       if (currentStepIndex >= configSteps.length) {
-        requestPricing(readSelectedQuantity());
         if (finalLayout && finalLayout.scrollIntoView) {
           finalLayout.scrollIntoView({ behavior: "smooth", block: "start" });
         }

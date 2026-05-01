@@ -1215,11 +1215,45 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 });
                 return subProductOk && configOk && sideOk && formatOk && paperOk && finishingOk && freeOptionsOk;
             };
+            const pricingMatchScore = item => {
+                let score = 0;
+                if (sels.__subProductType && item.subProductType && normaliseOptionKey(item.subProductType) === normaliseOptionKey(sels.__subProductType)) score += 8;
+                if (item.config && typeof item.config === 'object') {
+                    Object.keys(item.config).forEach(key => {
+                        if (sels[key] && normaliseOptionKey(sels[key]) === normaliseOptionKey(item.config[key])) score += 10;
+                    });
+                }
+                const freeOptions = normaliseFreeOptions(item.optionsLibres);
+                const grouped = {};
+                freeOptions.forEach(option => {
+                    const key = normaliseOptionKey(option.nom);
+                    const value = normaliseOptionKey(option.valeur);
+                    if (!key || !value) return;
+                    if (!grouped[key]) grouped[key] = [];
+                    if (!grouped[key].includes(value)) grouped[key].push(value);
+                });
+                Object.keys(sels).forEach(key => {
+                    const normalizedKey = normaliseOptionKey(key);
+                    const selected = normaliseOptionKey(sels[key]);
+                    if (!selected || !grouped[normalizedKey] || !grouped[normalizedKey].includes(selected)) return;
+                    score += grouped[normalizedKey].length === 1 ? 7 : 3;
+                });
+                if (item.finish && selectedSideValues.includes(normaliseOptionKey(item.finish))) score += 4;
+                if (item.format && selectedFormatValues.includes(normaliseOptionKey(item.format))) score += 4;
+                if (item.paper && selectedPaperValues.includes(normaliseOptionKey(item.paper))) score += 4;
+                if (item.finishing && selectedFinishingValues.includes(normaliseOptionKey(item.finishing))) score += 4;
+                return score;
+            };
+            const sortPricingMatches = list => list.slice().sort((a, b) => {
+                const scoreDiff = pricingMatchScore(b) - pricingMatchScore(a);
+                if (scoreDiff) return scoreDiff;
+                return Number(b.total || 0) - Number(a.total || 0);
+            });
             let parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
             const tiers = normaliseQuantityPricing(productData.quantityPricing);
-            const lotTiersForOption = tiers.filter(item => item.type === 'lot' && matchesPricingSelections(item));
+            const lotTiersForOption = sortPricingMatches(tiers.filter(item => item.type === 'lot' && matchesPricingSelections(item)));
             if (lotTiersForOption.length) {
                 responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
                 if (quantityMode === 'lot' && !responseQuantityOptions.includes(parseInt(quantityValue, 10))) {
@@ -1229,7 +1263,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             let chosen = null;
             if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
-                const dimensionalTiers = tiers.filter(item => item.type === 'dimensions' && matchesPricingSelections(item));
+                const dimensionalTiers = sortPricingMatches(tiers.filter(item => item.type === 'dimensions' && matchesPricingSelections(item)));
                 if (dimensionalTiers.length) {
                     responseQuantityOptions = uniquePositiveNumbers(dimensionalTiers.map(item => item.quantity));
                     if (quantityMode === 'dimensions' && responseQuantityOptions.length && !responseQuantityOptions.includes(parseInt(quantityValue, 10))) {
@@ -1246,7 +1280,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (quantityMode === 'lot' || quantityMode === 'unitaire' || quantityMode === 'pages') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
-                const optionTiers = quantityTiers.filter(matchesPricingSelections);
+                const optionTiers = sortPricingMatches(quantityTiers.filter(matchesPricingSelections));
                 if (optionTiers.length) quantityTiers = optionTiers;
                 const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
                 const effectiveQty = quantityMode === 'lot' && lotTiersForOption.length && !lotTiersForOption.some(item => item.quantity === parsedQty)
