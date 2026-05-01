@@ -1985,15 +1985,26 @@ function buildDailySummaryPdfBuffer(summary) {
     function money(value) {
         return (Number(value || 0)).toFixed(2).replace('.', ',') + ' EUR';
     }
+    const logo = readPngImageForPdf(BRAND_LOGO_PATH);
+    function drawLogo(x, y, w) {
+        if (!logo) {
+            text("COM' Impression", x, y + 24, { font: 'F2', size: 17, color: [1, 1, 1] });
+            return;
+        }
+        const h = w * (logo.height / logo.width);
+        commands.push(`q ${w} 0 0 ${h} ${x} ${y} cm /ImLogo Do Q`);
+    }
 
-    rect(0, 760, pageW, 82, orange);
-    text("COM' Impression", 40, 805, { font: 'F2', size: 22, color: [1, 1, 1] });
-    text('Recapitulatif de periode', 40, 785, { size: 11, color: [1, 1, 1] });
-    rect(374, 782, 165, 36, [1, 1, 1], null);
+    rect(0, 744, pageW, 98, orange);
+    rect(40, 770, 92, 46, [1, 1, 1], null);
+    drawLogo(52, 778, 68);
+    text("COM' Impression", 152, 802, { font: 'F2', size: 22, color: [1, 1, 1] });
+    text('Recapitulatif de periode', 152, 781, { size: 11, color: [1, 1, 1] });
+    rect(374, 782, 165, 40, [1, 1, 1], null);
     const periodText = summary.start === summary.end
         ? formatDate(new Date(summary.start || new Date()))
         : `${formatDate(new Date(summary.start))} - ${formatDate(new Date(summary.end))}`;
-    text(periodText, 392, 796, { font: 'F2', size: 11, color: orange });
+    text(periodText, 392, 798, { font: 'F2', size: 11, color: orange });
 
     const kpis = [
         ['Commandes', String(summary.orders || 0)],
@@ -2003,16 +2014,16 @@ function buildDailySummaryPdfBuffer(summary) {
         ['Marge estimee', `${Number(summary.marginRate || 0).toFixed(2).replace('.', ',')} %`],
         ['Visites', String(summary.visitsToday || 0)]
     ];
-    let y = 708;
+    let y = 668;
     kpis.forEach((item, index) => {
-        const x = 40 + ((index % 3) * 172);
-        const boxY = y - (Math.floor(index / 3) * 74);
-        rect(x, boxY, 150, 52, pale, lineColor);
-        text(item[0], x + 12, boxY + 31, { font: 'F2', size: 9 });
-        text(item[1], x + 12, boxY + 12, { font: 'F2', size: 13, color: orange });
+        const x = 40 + ((index % 3) * 174);
+        const boxY = y - (Math.floor(index / 3) * 90);
+        rect(x, boxY, 156, 62, pale, lineColor);
+        text(item[0], x + 14, boxY + 39, { font: 'F2', size: 9.5 });
+        text(item[1], x + 14, boxY + 15, { font: 'F2', size: 13, color: orange });
     });
 
-    y = 550;
+    y = 482;
     text('Totaux par gamme', 40, y, { font: 'F2', size: 14, color: orange });
     y -= 24;
     rect(40, y - 4, 515, 24, pale, lineColor);
@@ -2055,11 +2066,17 @@ function buildDailySummaryPdfBuffer(summary) {
     const objects = [
         '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
         '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-        '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >> endobj',
+        '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >>' + (logo ? ' /XObject << /ImLogo 7 0 R >>' : '') + ' >> /Contents 4 0 R >> endobj',
         `4 0 obj << /Length ${Buffer.byteLength(stream, 'utf8')} >> stream\n${stream}\nendstream\nendobj`,
         '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
         '6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj'
     ];
+    if (logo) {
+        objects.push(`7 0 obj << /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8${logo.alpha ? ' /SMask 8 0 R' : ''} /Filter [/ASCIIHexDecode /FlateDecode] /Length ${logo.data.toString('hex').length + 1} >> stream\n${logo.data.toString('hex')}>\nendstream\nendobj`);
+        if (logo.alpha) {
+            objects.push(`8 0 obj << /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter [/ASCIIHexDecode /FlateDecode] /Length ${logo.alpha.toString('hex').length + 1} >> stream\n${logo.alpha.toString('hex')}>\nendstream\nendobj`);
+        }
+    }
     let pdf = '%PDF-1.4\n';
     const offsets = [0];
     objects.forEach(obj => { offsets.push(Buffer.byteLength(pdf, 'utf8')); pdf += `${obj}\n`; });
