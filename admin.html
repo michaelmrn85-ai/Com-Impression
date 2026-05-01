@@ -12,24 +12,31 @@
   <style>
     :root{--or:#F47B20;--or2:#d95e0d;--ink:#151515;--paper:#fff9f2;--line:#f0ded0;--muted:#777;--green:#16a34a;--blue:#2563eb;--red:#dc2626;--shadow:0 18px 42px rgba(23,19,16,.08);--rad:28px;}
     *{box-sizing:border-box}
-    body{margin:0;background:radial-gradient(circle at top left,rgba(244,123,32,.10),transparent 28%),radial-gradient(circle at top right,rgba(244,123,32,.08),transparent 24%),linear-gradient(180deg,#fff9f3 0%,#fff 42%,#fff6ed 100%);color:var(--ink);font-family:'Nunito',sans-serif;min-height:100vh}
+    body{margin:0;background:#000;color:#fff;font-family:'Nunito',sans-serif;min-height:100vh}
     button,input,select,textarea{font:inherit}
-    .page{width:min(1240px,calc(100% - 32px));margin:0 auto;padding:24px 0 64px}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:58px;padding:24px 28px;border:1px solid rgba(240,222,208,.95);border-radius:30px;background:rgba(255,255,255,.88);backdrop-filter:blur(12px);box-shadow:var(--shadow);position:sticky;top:14px;z-index:20}
-    .brand{display:flex;align-items:center;gap:14px}
-    .logo{width:90px;height:auto;display:block;filter:drop-shadow(0 10px 18px rgba(23,19,16,.12))}
+    .page{width:min(1460px,calc(100% - 32px));margin:0 auto;padding:54px 0 64px}
+    .topbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:22px;margin-bottom:72px;padding:18px 24px;background:transparent;position:relative;z-index:20}
+    .brand{grid-column:2;display:flex;align-items:center;justify-content:center;gap:24px}
+    .logo{width:270px;height:auto;display:block;filter:drop-shadow(0 0 18px rgba(244,123,32,.32))}
+    .brand h1{font-family:'Baloo 2',cursive;font-size:clamp(2.4rem,4vw,4.1rem);line-height:.82;margin:0;color:#fff;letter-spacing:.01em;text-shadow:0 0 10px rgba(255,255,255,.08)}
+    .brand h1 span{display:block}
     h1{font-family:'Baloo 2',cursive;font-size:clamp(1.9rem,4vw,3.2rem);line-height:.95;margin:0}
-    .sub{margin:6px 0 0;color:var(--muted);font-size:.98rem;line-height:1.55;max-width:60ch}
-    .top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .sub{margin:6px 0 0;color:#b7b0aa;font-size:.98rem;line-height:1.55;max-width:60ch}
+    .top-actions{grid-column:1;justify-self:start;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start}
+    .admin-clock{grid-column:3;justify-self:end;color:var(--or);font-family:'Baloo 2',cursive;font-size:clamp(2.3rem,4.5vw,4rem);line-height:1;font-weight:800;letter-spacing:.03em;margin-top:12px}
     .btn{border:none;border-radius:999px;padding:12px 18px;font-family:'Baloo 2',cursive;font-weight:800;cursor:pointer;transition:.18s;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
     .btn:hover{transform:translateY(-2px)}
     .btn-dark{background:var(--ink);color:#fff;box-shadow:0 10px 20px rgba(23,19,16,.12)}
     .btn-orange{background:linear-gradient(180deg,#ff922f 0%,var(--or) 100%);color:#fff;box-shadow:0 10px 24px rgba(244,123,32,.28)}
     .btn-light{background:#fff;border:1px solid var(--line);color:var(--ink);box-shadow:0 8px 18px rgba(23,19,16,.05)}
     .btn-small{padding:8px 12px;font-size:.88rem}
-    .login-card,.dashboard,.admin-section{background:rgba(255,255,255,.86);border:1px solid rgba(240,222,208,.95);box-shadow:var(--shadow);border-radius:var(--rad);overflow:hidden}
-    .login-card{width:min(480px,100%);margin:70px auto 0;padding:30px}
-    .login-card h2{font-family:'Baloo 2',cursive;margin:0 0 8px;font-size:1.55rem}
+    .login-card,.dashboard,.admin-section{background:transparent;border:none;box-shadow:none;border-radius:0;overflow:visible}
+    .login-card{width:min(720px,100%);margin:90px auto 0;padding:0;color:#fff}
+    .login-card h2,.login-card .sub{display:none}
+    .login-row{display:grid;grid-template-columns:230px minmax(220px,320px);align-items:center;gap:28px;margin:18px 0}
+    .login-row label{font-family:'Nunito',sans-serif;color:var(--or);font-size:2rem;font-weight:400;text-align:right}
+    .login-row input{height:72px;border-radius:999px;border:2px solid rgba(255,255,255,.9);background:linear-gradient(180deg,#fff 0%,#e9e9e9 100%);box-shadow:inset 0 3px 8px rgba(0,0,0,.20),0 0 16px rgba(255,255,255,.32);color:#171310;font-size:1.2rem;padding:0 28px}
+    .login-card .btn-orange{margin-left:258px;margin-top:28px;min-width:300px;justify-content:center;border-radius:999px;background:linear-gradient(180deg,#fff 0%,#e9e9e9 100%);border:2px solid rgba(255,255,255,.86);color:var(--or);font-size:2rem;font-weight:400;box-shadow:inset 0 3px 8px rgba(0,0,0,.18),0 0 18px rgba(255,255,255,.28)}
     .field{display:flex;flex-direction:column;gap:6px;margin:14px 0}
     label{font-weight:800;font-size:.9rem}
     input,select,textarea{border:1px solid #eaded4;border-radius:16px;padding:13px 14px;background:#fff;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.95)}
@@ -38,20 +45,25 @@
     .status{display:none;border-radius:14px;padding:10px 14px;margin:12px 0;font-weight:700}
     .status.ok{display:block;background:#dcfce7;color:#166534}
     .status.err{display:block;background:#fee2e2;color:#991b1b}
-    .dashboard,.admin-section{display:none;padding:34px}
-    .dash-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:34px}
-    .admin-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:26px;padding:16px;border:1px solid rgba(240,222,208,.95);border-radius:26px;background:rgba(255,255,255,.82);position:sticky;top:118px;z-index:15;box-shadow:0 10px 26px rgba(23,19,16,.05)}
-    .admin-tab{border:1px solid var(--line);border-radius:18px;background:#fff;color:var(--ink);padding:14px 14px;font-family:'Baloo 2',cursive;font-weight:800;cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;transition:.18s;white-space:normal;text-align:left;box-shadow:0 8px 18px rgba(23,19,16,.04);min-height:72px}
+    .admin-notifications{position:fixed;right:24px;bottom:24px;z-index:80;display:grid;gap:10px;width:min(360px,calc(100% - 48px));pointer-events:none}
+    .admin-toast{background:#fff;border:2px solid var(--or);border-radius:18px;padding:14px 16px;color:#171310;box-shadow:0 14px 34px rgba(244,123,32,.28);animation:toastIn .22s ease-out both;pointer-events:auto}
+    .admin-toast strong{display:block;font-family:'Baloo 2',cursive;color:var(--or);font-size:1rem;line-height:1.1}
+    .admin-toast span{display:block;margin-top:4px;color:#4f4741;font-size:.9rem;line-height:1.35}
+    @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .dashboard,.admin-section{display:none;padding:0}
+    .dash-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin:0 0 26px 210px;color:#fff}
+    .dash-head h2{display:none}
+    .admin-tabs{position:fixed;left:70px;top:200px;z-index:30;display:flex;flex-direction:column;align-items:stretch;gap:9px;width:126px;margin:0;padding:0;background:transparent;border:none;border-radius:0;box-shadow:22px 8px 32px rgba(244,123,32,.26)}
+    .admin-tab{border:7px solid var(--or);border-radius:0;background:#050505;color:#fff;padding:8px 8px;font-family:'Nunito',sans-serif;font-size:.76rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:.18s;white-space:normal;text-align:center;box-shadow:none;min-height:46px;line-height:1.15}
     .admin-tab:hover{transform:translateY(-2px)}
-    .admin-tab.active{background:linear-gradient(180deg,#1f1a16 0%,#151515 100%);color:#fff;border-color:#151515;box-shadow:0 12px 24px rgba(23,19,16,.12)}
-    .admin-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:999px;background:#fff2e7;color:var(--or2);padding:0 8px;font-size:.86rem;font-weight:900}
-    .admin-tab.active .admin-tab-count{background:var(--or);color:#fff}
-    .admin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:18px}
-    .admin-summary-card{background:linear-gradient(180deg,#fffaf5 0%,#fff 100%);border:1px solid #eee0d6;border-radius:24px;padding:24px;box-shadow:0 12px 26px rgba(23,19,16,.05)}
+    .admin-tab.active{background:var(--or);color:#000;border-color:var(--or);box-shadow:0 0 20px rgba(244,123,32,.42)}
+    .admin-tab-count{display:none}
+    .admin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:18px 0 0 210px}
+    .admin-summary-card{background:#090909;border:2px solid var(--or);border-radius:0;padding:24px;box-shadow:0 0 24px rgba(244,123,32,.18)}
     .admin-summary-card strong{display:block;font-family:'Baloo 2',cursive;font-size:1.16rem;line-height:1}
     .admin-summary-card .count{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:2.15rem;color:var(--or)}
     .admin-summary-card p{margin:8px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55}
-    .admin-section.open{display:block}
+    .admin-section.open{display:block;width:min(1180px,calc(100% - 260px));margin:0 40px 64px 220px;color:var(--ink)}
     .box{background:rgba(255,255,255,.96);border:1px solid rgba(240,222,208,.95);box-shadow:var(--shadow);border-radius:30px;width:min(1100px,100%);max-height:88vh;overflow:hidden;display:flex;flex-direction:column}
     .box.small{width:min(620px,100%)}
     .admin-section .box{width:100%;max-height:none;box-shadow:none;border:none;border-radius:0}
@@ -85,6 +97,8 @@
     .admin-doc-area{margin-top:18px;padding-top:18px;border-top:1px solid #f2e7df}
     .admin-doc-link{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0 8px 8px 0;white-space:normal;text-align:left}
     .admin-doc-link small{max-width:240px;color:#6b625d;font-weight:700;overflow-wrap:anywhere}
+    .order-step-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0 14px}
+    .order-step-actions .btn{justify-content:center;text-align:center}
     .kv{display:grid;gap:7px;font-size:.92rem}
     .kv div{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #f5ebe4;padding-bottom:6px}
     .kv span:first-child{color:var(--muted)}
@@ -177,6 +191,25 @@
     @media(max-width:1100px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
     @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.detail-split,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
     @media(max-width:560px){.admin-summary,.day-kpis,.admin-tabs{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
+    @media(max-width:1100px){
+      .page{padding-top:24px}
+      .topbar{grid-template-columns:1fr;justify-items:center;margin-bottom:28px}
+      .brand,.top-actions,.admin-clock{grid-column:auto;justify-self:center}
+      .logo{width:180px}
+      .top-actions{order:3}
+      .admin-clock{font-size:2.2rem;margin-top:0}
+      .admin-tabs{position:static;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:auto;margin:0 0 24px;padding:0;box-shadow:none}
+      .admin-summary,.dash-head{margin-left:0}
+      .admin-section.open{width:min(100% - 24px,1180px);margin:0 auto 48px}
+    }
+    @media(max-width:700px){
+      .brand{flex-direction:column;gap:10px}
+      .brand h1{text-align:center}
+      .login-row{grid-template-columns:1fr;gap:8px}
+      .login-row label{text-align:left;font-size:1.5rem}
+      .login-card .btn-orange{margin-left:0;min-width:0;width:100%;font-size:1.5rem}
+      .admin-tabs,.admin-summary{grid-template-columns:1fr 1fr}
+    }
   </style>
 </head>
 <body>
@@ -185,10 +218,10 @@
       <div class="brand">
         <img class="logo" src="./com-logo.png" alt="Logo COM' Impression">
         <div>
-          <h1>BackOffice</h1>
-          <p class="sub">COM' Impression : commandes, transactions, catalogue, clients et contenu du site.</p>
+          <h1><span>Back'</span><span>Office</span></h1>
         </div>
       </div>
+      <div class="admin-clock" id="admin-clock">--:--:--</div>
       <div class="top-actions">
         <a class="btn btn-light" href="./com-impression.html">Retour au site</a>
         <button class="btn btn-dark" id="btn-refresh" type="button">Actualiser</button>
@@ -198,7 +231,11 @@
     <section class="login-card" id="login-card">
       <h2>Accès administrateur</h2>
       <p class="sub">Entre ton mot de passe admin pour ouvrir le tableau de bord.</p>
-      <div class="field">
+      <div class="login-row">
+        <label for="admin-name">Prénom</label>
+        <input id="admin-name" type="text" autocomplete="given-name">
+      </div>
+      <div class="login-row">
         <label for="admin-password">Mot de passe</label>
         <input id="admin-password" type="password" autocomplete="current-password" placeholder="Mot de passe admin">
       </div>
@@ -215,15 +252,18 @@
         <button class="btn btn-light btn-small" id="btn-logout" type="button">Déconnexion</button>
       </div>
       <div class="admin-tabs">
-        <button class="admin-tab" data-open-scope="jour" type="button"><span>Fiche du jour</span></button>
-        <button class="admin-tab" data-open-scope="commandes" type="button"><span>Commandes</span><span class="admin-tab-count" id="count-commandes">0</span></button>
-        <button class="admin-tab" data-open-scope="transactions" type="button"><span>Transactions</span><span class="admin-tab-count" id="count-transactions">0</span></button>
+        <button class="admin-tab" data-open-scope="jour" type="button"><span>CA Journalier</span></button>
+        <button class="admin-tab" data-open-scope="commandes" type="button"><span>Commande</span><span class="admin-tab-count" id="count-commandes">0</span></button>
+        <button class="admin-tab" data-open-scope="transactions" type="button"><span>Transaction</span><span class="admin-tab-count" id="count-transactions">0</span></button>
+        <button class="admin-tab" data-open-scope="caisse" type="button"><span>Caisse</span></button>
+        <button class="admin-tab" data-open-scope="clients" type="button"><span>Fiche client</span><span class="admin-tab-count" id="count-clients">0</span></button>
+        <button class="admin-tab" data-open-scope="avis" type="button"><span>Avis</span><span class="admin-tab-count" id="count-avis">0</span></button>
         <button class="admin-tab" data-open-scope="produits" type="button"><span>Produits</span><span class="admin-tab-count" id="count-produits">0</span></button>
         <button class="admin-tab" data-open-scope="gammes" type="button"><span>Gammes</span></button>
-        <button class="admin-tab" data-open-scope="clients" type="button"><span>Fiches clients</span><span class="admin-tab-count" id="count-clients">0</span></button>
-        <button class="admin-tab" data-open-scope="avis" type="button"><span>Avis</span><span class="admin-tab-count" id="count-avis">0</span></button>
-        <button class="admin-tab" data-open-scope="rdv" type="button"><span>Rendez-vous</span><span class="admin-tab-count" id="count-rdv">0</span></button>
         <button class="admin-tab" data-open-scope="site" type="button"><span>Gestion site</span></button>
+        <button class="admin-tab" data-open-scope="fidelisation" type="button"><span>Fidélisation</span></button>
+        <button class="admin-tab" data-open-scope="stock" type="button"><span>Produit stock</span></button>
+        <button class="admin-tab" data-open-scope="rdv" type="button"><span>Rendez-vous</span><span class="admin-tab-count" id="count-rdv">0</span></button>
         <button class="admin-tab" data-open-scope="diagnostic" type="button"><span>Diagnostic</span></button>
       </div>
       <div class="admin-summary">
@@ -250,6 +290,7 @@
       </div>
     </section>
   </main>
+  <div class="admin-notifications" id="admin-notifications" aria-live="polite"></div>
 
   <section class="admin-section" id="modal-orders">
     <div class="box">
@@ -300,10 +341,47 @@
     </div>
   </section>
 
+  <section class="admin-section" id="modal-fidelisation">
+    <div class="box">
+      <div class="box-head">
+        <h2>Fidélisation</h2>
+        <button class="btn btn-light btn-small" data-close type="button">Retour</button>
+      </div>
+      <div class="box-body">
+        <div class="panel">
+          <h3>Programme fidélité</h3>
+          <p class="muted">Suivi des points, codes fidélité et avantages clients. La structure est prête pour raccorder les réglages détaillés.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-section" id="modal-stock">
+    <div class="box">
+      <div class="box-head">
+        <h2>Produit stock</h2>
+        <button class="btn btn-light btn-small" data-close type="button">Retour</button>
+      </div>
+      <div class="box-body">
+        <div class="panel">
+          <h3>Articles stockés</h3>
+          <div class="site-grid">
+            <div class="field"><label>Nom du produit</label><input placeholder="Ex : Tampon, stylo, support prêt à vendre"></div>
+            <div class="field"><label>Code EAN</label><input placeholder="Code barre / EAN"></div>
+            <div class="field"><label>Stock</label><input type="number" min="0" placeholder="Quantité disponible"></div>
+            <div class="field"><label>Prix TTC</label><input placeholder="0,00 €"></div>
+          </div>
+          <div class="field"><label>Image produit</label><input type="file" accept="image/*"></div>
+          <p class="muted">Premier bloc posé pour les produits physiques avec EAN, stock et image. On branchera l’enregistrement dès qu’on valide le fonctionnement souhaité.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="admin-section" id="modal-day-sheet">
     <div class="box">
       <div class="box-head">
-        <h2>Fiche du jour</h2>
+        <h2>CA Journalier</h2>
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
@@ -486,7 +564,7 @@
   <section class="admin-section" id="modal-manual">
     <div class="box">
       <div class="box-head">
-        <h2>Commande manuelle</h2>
+        <h2>Caisse</h2>
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
