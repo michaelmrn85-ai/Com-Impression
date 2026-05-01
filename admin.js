@@ -1355,8 +1355,11 @@
     var tariffs = group && Array.isArray(group.tariffs) && group.tariffs.length ? group.tariffs : [{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }];
     return '<div class="product-path-card">'
       +'<div class="product-path-head">'
-        +'<strong>Cheminement</strong>'
-        +'<button class="btn-icon product-path-remove" type="button" title="Supprimer le cheminement">×</button>'
+        +'<div class="product-path-title-wrap"><strong>Cheminement</strong><span class="product-path-summary">Chemin en cours</span></div>'
+        +'<div class="product-path-actions">'
+          +'<button class="btn btn-light btn-small product-path-collapse" type="button">Réduire</button>'
+          +'<button class="btn-icon product-path-remove" type="button" title="Supprimer le cheminement">×</button>'
+        +'</div>'
       +'</div>'
       +'<div class="product-path-steps">'
         +steps.map(renderProductPathStepRow).join('')
@@ -1411,6 +1414,22 @@
   }
 
   function refreshProductPathEditor(){
+    document.querySelectorAll('.product-path-card').forEach(function(card, index){
+      var summary = card.querySelector('.product-path-summary');
+      var collapseBtn = card.querySelector('.product-path-collapse');
+      var stepLabels = Array.prototype.slice.call(card.querySelectorAll('.product-path-step-row')).map(function(row){
+        var title = ((row.querySelector('.product-path-step-title')||{}).value || '').trim();
+        var label = ((row.querySelector('.product-path-step-label')||{}).value || '').trim();
+        return [title, label].filter(Boolean).join(': ');
+      }).filter(Boolean);
+      var tariffCount = card.querySelectorAll('.product-path-tariff-row').length;
+      if(summary){
+        summary.textContent = (stepLabels.join(' • ') || ('Cheminement ' + String(index + 1))) + ' — ' + tariffCount + ' tarif' + (tariffCount > 1 ? 's' : '');
+      }
+      if(collapseBtn){
+        collapseBtn.textContent = card.classList.contains('is-collapsed') ? 'Déplier' : 'Réduire';
+      }
+    });
     document.querySelectorAll('.product-path-tariff-row').forEach(function(row){
       var type = ((row.querySelector('.product-path-tariff-type')||{}).value || 'lot');
       row.classList.toggle('is-dimensions', type === 'dimensions');
@@ -2355,15 +2374,25 @@
           refreshProductPathEditor();
         }
       }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-collapse')){
+        var collapseCard=e.target.closest('.product-path-card');
+        if(collapseCard){
+          collapseCard.classList.toggle('is-collapsed');
+          refreshProductPathEditor();
+        }
+        return;
+      }
       if(e.target && e.target.classList && e.target.classList.contains('product-path-remove')){
         var pathCard=e.target.closest('.product-path-card');
         if(pathCard) pathCard.remove();
         if(!document.querySelector('.product-path-card') && $('product-path-add')) $('product-path-add').click();
+        refreshProductPathEditor();
       }
       if(e.target && e.target.classList && e.target.classList.contains('product-path-step-add')){
         var pathSteps=e.target.closest('.product-path-card');
         pathSteps=pathSteps ? pathSteps.querySelector('.product-path-steps') : null;
         if(pathSteps) pathSteps.insertAdjacentHTML('beforeend', renderProductPathStepRow({ title:'', label:'', image:'' }));
+        refreshProductPathEditor();
       }
       if(e.target && e.target.classList && e.target.classList.contains('product-path-step-remove')){
         var pathStep=e.target.closest('.product-path-step-row');
@@ -2373,6 +2402,7 @@
           var targetSteps=pathCardForStep.querySelector('.product-path-steps');
           if(targetSteps) targetSteps.insertAdjacentHTML('beforeend', renderProductPathStepRow({ title:'', label:'', image:'' }));
         }
+        refreshProductPathEditor();
       }
       if(e.target && e.target.classList && e.target.classList.contains('product-path-tariff-add')){
         var tariffList=e.target.closest('.product-path-tariffs');
