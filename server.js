@@ -1137,13 +1137,6 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
         let purchaseValue = null;
         let responseQuantityOptions = quantityOptions;
         if (productData.quantityPricing && productData.quantityPricing.length) {
-            const tiers = normaliseQuantityPricing(productData.quantityPricing);
-            const configKeysInProduct = [];
-            tiers.forEach(item => {
-                Object.keys(item.config || {}).forEach(key => {
-                    if (!configKeysInProduct.includes(key)) configKeysInProduct.push(key);
-                });
-            });
             const exactSideKeys = Object.keys(sels).filter(key => {
                 const normalizedKey = normaliseOptionKey(key);
                 if (productId === 'impression-doc') return normalizedKey === 'impression';
@@ -1170,15 +1163,10 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             const matchesPricingSelections = item => {
                 const selectedSubProduct = normaliseOptionKey(sels.__subProductType || sels['Type de produit'] || '');
                 const subProductOk = !selectedSubProduct || !item.subProductType || normaliseOptionKey(item.subProductType) === selectedSubProduct;
-                const selectedConfigOk = !configKeysInProduct.length || configKeysInProduct.every(key => {
-                    const selected = sels[key];
-                    if (!selected) return true;
-                    return item.config && item.config[key] && normaliseOptionKey(selected) === normaliseOptionKey(item.config[key]);
-                });
-                const configOk = selectedConfigOk && (!item.config || !Object.keys(item.config).length || Object.keys(item.config).every(key => {
+                const configOk = !item.config || !Object.keys(item.config).length || Object.keys(item.config).every(key => {
                     const selected = sels[key];
                     return !selected || normaliseOptionKey(selected) === normaliseOptionKey(item.config[key]);
-                }));
+                });
                 const sideOk = !item.finish || !selectedSideValues.length || selectedSideValues.includes(normaliseOptionKey(item.finish));
                 const formatOk = !item.format || !selectedFormatValues.length || selectedFormatValues.includes(normaliseOptionKey(item.format));
                 const paperOk = !item.paper || !selectedPaperValues.length || selectedPaperValues.includes(normaliseOptionKey(item.paper));
@@ -1188,6 +1176,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             let parsedQty = parseInt(quantityValue, 10);
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
+            const tiers = normaliseQuantityPricing(productData.quantityPricing);
             const lotTiersForOption = tiers.filter(item => item.type === 'lot' && matchesPricingSelections(item));
             if (lotTiersForOption.length) {
                 responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));

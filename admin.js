@@ -1358,6 +1358,7 @@
         +'<div class="product-path-title-wrap"><strong>Cheminement</strong><span class="product-path-summary">Chemin en cours</span></div>'
         +'<div class="product-path-actions">'
           +'<button class="btn btn-light btn-small product-path-collapse" type="button">Réduire</button>'
+          +'<button class="btn btn-orange btn-small product-path-duplicate" type="button">+ Dupliquer ce cheminement</button>'
           +'<button class="btn-icon product-path-remove" type="button" title="Supprimer le cheminement">×</button>'
         +'</div>'
       +'</div>'
@@ -1453,6 +1454,40 @@
       }
     });
     refreshProductPricingTable();
+  }
+
+  function readProductPathCardGroup(card){
+    if(!card) return null;
+    var steps = Array.prototype.slice.call(card.querySelectorAll('.product-path-step-row')).map(function(row){
+      return {
+        title:((row.querySelector('.product-path-step-title')||{}).value || '').trim(),
+        label:((row.querySelector('.product-path-step-label')||{}).value || '').trim(),
+        image:((row.querySelector('.product-path-step-image')||{}).value || '').trim()
+      };
+    }).filter(function(step){ return step.title || step.label || step.image; });
+    var tariffs = Array.prototype.slice.call(card.querySelectorAll('.product-path-tariff-row')).map(function(row){
+      var optionsLibres = Array.prototype.slice.call(row.querySelectorAll('.product-pricing-option-row')).map(function(optionRow){
+        return {
+          nom:((optionRow.querySelector('.product-pricing-option-name')||{}).value || '').trim(),
+          valeur:((optionRow.querySelector('.product-pricing-option-value')||{}).value || '').trim()
+        };
+      }).filter(function(option){ return option.nom || option.valeur; });
+      return {
+        type:((row.querySelector('.product-path-tariff-type')||{}).value || 'lot').trim(),
+        quantity:((row.querySelector('.product-path-tariff-qty')||{}).value || '').trim(),
+        width:((row.querySelector('.product-path-tariff-width')||{}).value || '').trim(),
+        height:((row.querySelector('.product-path-tariff-height')||{}).value || '').trim(),
+        purchasePrice:((row.querySelector('.product-path-tariff-purchase')||{}).value || '').trim(),
+        salePrice:((row.querySelector('.product-path-tariff-sale')||{}).value || '').trim(),
+        pageMin:((row.querySelector('.product-path-tariff-page-min')||{}).value || '').trim(),
+        pageStep:((row.querySelector('.product-path-tariff-page-step')||{}).value || '').trim(),
+        optionsLibres:optionsLibres
+      };
+    });
+    return {
+      steps:steps.length ? steps : [{ title:'', label:'', image:'' }],
+      tariffs:tariffs.length ? tariffs : [{ type:'lot', quantity:'100', width:'', height:'', purchasePrice:'', salePrice:'', pageMin:'', pageStep:'', optionsLibres:[] }]
+    };
   }
 
   function readProductPathEditor(){
@@ -2378,6 +2413,17 @@
         var collapseCard=e.target.closest('.product-path-card');
         if(collapseCard){
           collapseCard.classList.toggle('is-collapsed');
+          refreshProductPathEditor();
+        }
+        return;
+      }
+      if(e.target && e.target.classList && e.target.classList.contains('product-path-duplicate')){
+        var duplicateCard=e.target.closest('.product-path-card');
+        if(duplicateCard){
+          var duplicateData=readProductPathCardGroup(duplicateCard);
+          duplicateCard.insertAdjacentHTML('afterend', renderProductPathCard(duplicateData));
+          var insertedCard=duplicateCard.nextElementSibling;
+          if(insertedCard) insertedCard.classList.remove('is-collapsed');
           refreshProductPathEditor();
         }
         return;
