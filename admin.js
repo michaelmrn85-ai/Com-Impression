@@ -80,20 +80,20 @@
     return '';
   }
   function isDone(cmd){ return cmd.statut === 'Expediee'; }
-  function isCancelled(cmd){ return cmd.statut === 'Annulee'; }
+  function isCancelled(cmd){ return cmd.statut === 'Annulee' || cmd.statut === 'Remboursement'; }
   function isRdvCommand(cmd){ return /^Rendez-vous/i.test(String((cmd && cmd.panier) || '')); }
   function isStandardCommand(cmd){ return !isRdvCommand(cmd); }
   function isInProgress(cmd){ return isStandardCommand(cmd) && !isDone(cmd) && !isCancelled(cmd); }
   function ordersForScope(scope){
     var commandes = state.commandes.filter(isStandardCommand);
-    if(scope==='commandes') return commandes;
+    if(scope==='commandes' || scope==='cours') return commandes.filter(isInProgress);
     if(scope==='terminees') return commandes.filter(isDone);
     if(scope==='annulees') return commandes.filter(isCancelled);
     return state.commandes.filter(isInProgress);
   }
   function updateCounts(){
     if($('count-cours')) $('count-cours').textContent = state.commandes.filter(isInProgress).length;
-    if($('count-commandes')) $('count-commandes').textContent = state.commandes.filter(isStandardCommand).length;
+    if($('count-commandes')) $('count-commandes').textContent = state.commandes.filter(isInProgress).length;
     if($('count-terminees')) $('count-terminees').textContent = state.commandes.filter(isStandardCommand).filter(isDone).length;
     if($('count-annulees')) $('count-annulees').textContent = state.commandes.filter(isStandardCommand).filter(isCancelled).length;
     if($('count-rdv')) $('count-rdv').textContent = state.commandes.filter(isRdvCommand).length;
@@ -294,7 +294,7 @@
 
   function openOrders(scope){
     state.scope=scope;
-    var titles={commandes:'Commandes',cours:'Commandes en cours',terminees:'Commandes terminées',annulees:'Commandes annulées'};
+    var titles={commandes:'Commandes en cours',cours:'Commandes en cours',terminees:'Commandes terminées',annulees:'Commandes annulées'};
     $('orders-title').textContent=titles[scope]||'Commandes';
     $('orders-search').value='';
     renderOrders();
