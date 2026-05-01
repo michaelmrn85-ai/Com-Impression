@@ -886,6 +886,24 @@
     }).join("\n");
   }
 
+  function compactConfigurationLabel(value) {
+    var seen = {};
+    var labels = String(value || "").split("•").map(function (part) {
+      var text = part.trim();
+      var pieces = text.split(":");
+      if (pieces.length > 1) text = pieces.slice(1).join(":").trim();
+      if (!text || /^standard$/i.test(text)) return "";
+      var key = normaliseOptionKey(text);
+      if (seen[key]) return "";
+      seen[key] = true;
+      return text;
+    }).filter(Boolean);
+    if (labels.length > 5) {
+      return labels.slice(0, 5).join(" • ") + " • ...";
+    }
+    return labels.join(" • ");
+  }
+
   function mountProductDetail(detail, entry) {
     if (!detail) return;
     if (!entry) {
@@ -1673,8 +1691,9 @@
             + '</div>'
             + '<div class="cart-table-body">'
               + cart.map(function (item) {
+                var compactChoices = compactConfigurationLabel(item.configuration);
                 return '<div class="cart-table-row">'
-                  + '<div class="cart-label"><span class="cart-mobile-label">Produit</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.ref || getProductRef(item)) + '</div>' + (item.configuration ? '<div class="muted">Choix: ' + esc(item.configuration) + '</div>' : '') + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.paperFinish ? '<div class="muted">' + esc(item.paperFinish) + '</div>' : '') + (item.deliveryDate ? '<div class="muted">Livraison estimee: ' + esc(item.deliveryDate) + '</div>' : '') + '</div></div>'
+                  + '<div class="cart-label"><span class="cart-mobile-label">Produit</span><div class="cart-cell-value"><strong>' + esc(item.title) + '</strong><div class="muted">' + esc(item.ref || getProductRef(item)) + '</div>' + (compactChoices ? '<div class="muted">Choix: ' + esc(compactChoices) + '</div>' : '') + (item.quantity ? '<div class="muted">Quantite: ' + esc(item.quantity) + '</div>' : '') + (item.deliveryDate ? '<div class="muted">Livraison estimee: ' + esc(item.deliveryDate) + '</div>' : '') + '</div></div>'
                   + '<div class="cart-file-cell"><span class="cart-mobile-label">Fichier</span><span class="cart-cell-value">' + esc(((item.uploadNames || []).length ? item.uploadNames.join(", ") : "Aucun fichier")) + '</span></div>'
                   + '<div class="cart-total-cell product-price"><span class="cart-mobile-label">Total TTC</span><span class="cart-cell-value">' + esc(item.priceValue != null ? euro(item.priceValue) : item.priceLabel || "-") + '</span></div>'
                   + '<div class="cart-action"><span class="cart-mobile-label">Action</span><span class="cart-cell-value"><button class="cart-remove-btn" type="button" data-remove-cart="' + esc(item.id) + '" aria-label="Supprimer">×</button></span></div>'
