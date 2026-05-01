@@ -118,30 +118,38 @@
     .manual-line-options-head strong{font-family:'Baloo 2',cursive;font-size:.95rem}
     .manual-options-list{display:grid;gap:8px}
     .manual-option-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
-    .cash-register{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,.72fr);gap:20px;background:#050505;color:#fff;border-radius:24px;padding:20px;min-height:620px}
+    .cash-register{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,360px);gap:18px;background:#050505;color:#fff;border-radius:24px;padding:18px;min-height:620px;overflow:hidden}
     .cash-left,.cash-ticket{border:2px solid #f47b20;border-radius:18px;background:#090909;box-shadow:0 0 24px rgba(244,123,32,.16)}
-    .cash-left{padding:18px;display:grid;gap:16px;align-content:start}
-    .cash-search-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .cash-left{padding:18px;display:grid;gap:16px;align-content:start;min-width:0;overflow:hidden}
+    .cash-search-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
     .cash-register label{color:#fff}
-    .cash-register input,.cash-register select,.cash-register textarea{background:#111;color:#fff;border-color:#42332a}
+    .cash-register .field{min-width:0}
+    .cash-register input,.cash-register select,.cash-register textarea{background:#111;color:#fff;border-color:#42332a;width:100%;min-width:0;box-sizing:border-box}
     .cash-register input::placeholder,.cash-register textarea::placeholder{color:#8f8781}
     .cash-register input:focus,.cash-register select:focus,.cash-register textarea:focus{border-color:#f47b20;box-shadow:0 0 0 2px rgba(244,123,32,.16)}
     .cash-client-card,.cash-tools,.cash-payment-box{border:1px solid #2e241d;border-radius:16px;background:#0f0f0f;padding:14px}
-    .cash-ticket{position:sticky;top:138px;padding:18px;align-self:start}
+    .cash-ticket{position:relative;top:auto;padding:18px;align-self:start;min-width:0;max-width:360px;width:100%;overflow:hidden}
     .cash-ticket-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid #39271b;padding-bottom:14px;margin-bottom:14px}
     .cash-ticket-head strong{font-family:'Baloo 2',cursive;font-size:1.35rem;color:#fff}
     .cash-ticket-client{color:#f47b20;font-weight:900;text-align:right}
     .cash-ticket-lines{display:grid;gap:10px;min-height:180px}
-    .cash-ticket-line{border:1px solid #2e241d;border-radius:14px;padding:12px;background:#070707;display:grid;grid-template-columns:1fr auto;gap:8px}
+    .cash-ticket-line{border:1px solid #2e241d;border-radius:14px;padding:12px;background:#070707;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;min-width:0}
     .cash-ticket-line strong{color:#fff}
     .cash-ticket-line small{display:block;color:#aaa;margin-top:3px;overflow-wrap:anywhere}
-    .cash-ticket-line span{color:#f47b20;font-weight:900}
+    .cash-ticket-line span{color:#f47b20;font-weight:900;white-space:nowrap}
     .cash-ticket-total{border-top:2px solid #f47b20;margin-top:16px;padding-top:16px;display:flex;justify-content:space-between;align-items:center;font-family:'Baloo 2',cursive;font-size:1.45rem}
     .cash-ticket-total span:last-child{color:#f47b20}
     .cash-ticket-actions{display:grid;gap:10px;margin-top:16px}
     .cash-ticket .btn{justify-content:center}
+    .cash-ticket .site-grid{grid-template-columns:1fr;gap:8px}
+    .cash-ticket .field{margin:8px 0}
+    .cash-ticket select,.cash-ticket input{width:100%;min-width:0}
     .manual-lines{gap:12px}
-    .cash-register .manual-line{grid-template-columns:minmax(160px,1.2fr) 92px 110px 1fr auto;background:#0f0f0f;border-color:#2f241c;border-radius:16px;box-shadow:none}
+    .cash-register .manual-line{grid-template-columns:minmax(150px,1fr) 118px 130px minmax(170px,.9fr) auto;background:#0f0f0f;border-color:#2f241c;border-radius:16px;box-shadow:none;min-width:0}
+    .cash-register .manual-line > *{min-width:0}
+    .cash-register .manual-line .btn{min-width:0;padding-left:0;padding-right:0}
+    .cash-register .manual-file{width:100%;max-width:100%}
+    .cash-register .manual-file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .cash-register .manual-line label{color:#bfb7b1}
     .cash-register .manual-line-options{border-color:#2f241c}
     .cash-register .manual-line-options-head strong{color:#fff}
@@ -217,6 +225,7 @@
     .day-kpi span{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:1.8rem;color:var(--or)}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:1px dashed var(--line);border-radius:20px}
     @media(max-width:1100px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:1250px){.cash-register{grid-template-columns:1fr}.cash-ticket{max-width:none}.cash-register .manual-line{grid-template-columns:minmax(160px,1fr) 120px 140px minmax(170px,1fr) auto}}
     @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid,.cash-register,.cash-search-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.detail-split,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}.cash-ticket{position:static}}
     @media(max-width:560px){.admin-summary,.day-kpis,.admin-tabs{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
     @media(max-width:1100px){
