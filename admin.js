@@ -2567,6 +2567,8 @@
 
   function applyManualClient(client){
     if(!client) return;
+    var clientCard=document.querySelector('.cash-client-card');
+    if(clientCard) clientCard.classList.add('is-open');
     if($('manual-prenom')) $('manual-prenom').value=client.prenom||'';
     if($('manual-nom')) $('manual-nom').value=client.nom||'';
     if($('manual-email')) $('manual-email').value=client.email||'';
@@ -2577,10 +2579,17 @@
     refreshManualTicket();
   }
 
-  function addManualProductFromSearch(){
+  function addManualProductFromSearch(allowFree){
     var input=$('manual-product-search');
     var entry=findManualProductFromSearch(input && input.value);
-    if(!entry) return;
+    if(!entry){
+      if(allowFree && input && input.value.trim()){
+        addManualLine({ produit:input.value.trim(), qte:'1', montant:'' });
+        input.value='';
+        refreshManualTicket();
+      }
+      return;
+    }
     var product=entry.product||{};
     addManualLine({
       produit: product.title || '',
@@ -2589,6 +2598,24 @@
     });
     if(input) input.value='';
     refreshManualTicket();
+  }
+
+  function openManualClientCard(clear){
+    var card=document.querySelector('.cash-client-card');
+    if(card) card.classList.add('is-open');
+    if(clear){
+      ['manual-prenom','manual-nom','manual-email','manual-tel','manual-siret'].forEach(function(id){
+        var el=$(id); if(el) el.value='';
+      });
+      var type=$('manual-type-client'); if(type) type.value='Particulier';
+      if($('manual-client-search')) $('manual-client-search').value='';
+      refreshManualTicket();
+    }
+  }
+
+  function closeManualClientCard(){
+    var card=document.querySelector('.cash-client-card');
+    if(card) card.classList.remove('is-open');
   }
 
   function refreshManualTicket(){
@@ -2701,7 +2728,7 @@
     if($('manual-client-search')) $('manual-client-search').value='';
     if($('manual-product-search')) $('manual-product-search').value='';
     var lines=$('manual-lines'); if(lines) lines.innerHTML='';
-    addManualLine();
+    closeManualClientCard();
     clearStatus('manual-status');
     renderManualSearchOptions();
     refreshManualTicket();
@@ -2860,6 +2887,9 @@
       if(e.target && e.target.id==='save-notes') saveNotes();
       if(e.target && e.target.id==='upload-doc') uploadDocument();
       if(e.target && e.target.id==='manual-add-line') addManualLine();
+      if(e.target && e.target.id==='manual-new-client'){ openManualClientCard(true); return; }
+      if(e.target && e.target.id==='manual-client-close'){ closeManualClientCard(); return; }
+      if(e.target && e.target.id==='manual-free-product'){ addManualProductFromSearch(true); if(!document.querySelector('#manual-lines .manual-line')) addManualLine({ qte:'1' }); return; }
       if(e.target && e.target.classList && e.target.classList.contains('manual-qty-minus')){
         var minusLine=e.target.closest('.manual-line');
         var minusInput=minusLine && minusLine.querySelector('.manual-qty');
@@ -3140,7 +3170,7 @@
     if(manualProductSearch) manualProductSearch.addEventListener('keydown',function(e){
       if(e.key==='Enter'){
         e.preventDefault();
-        addManualProductFromSearch();
+        addManualProductFromSearch(true);
       }
     });
     document.addEventListener('change',function(e){

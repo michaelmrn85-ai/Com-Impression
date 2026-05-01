@@ -122,12 +122,17 @@
     .cash-left,.cash-ticket{border:2px solid #f47b20;border-radius:18px;background:#090909;box-shadow:0 0 24px rgba(244,123,32,.16)}
     .cash-left{padding:18px;display:grid;gap:16px;align-content:start;min-width:0;overflow:hidden}
     .cash-search-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+    .cash-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
     .cash-register label{color:#fff}
     .cash-register .field{min-width:0}
     .cash-register input,.cash-register select,.cash-register textarea{background:#111;color:#fff;border-color:#42332a;width:100%;min-width:0;box-sizing:border-box}
     .cash-register input::placeholder,.cash-register textarea::placeholder{color:#8f8781}
     .cash-register input:focus,.cash-register select:focus,.cash-register textarea:focus{border-color:#f47b20;box-shadow:0 0 0 2px rgba(244,123,32,.16)}
     .cash-client-card,.cash-tools,.cash-payment-box{border:1px solid #2e241d;border-radius:16px;background:#0f0f0f;padding:14px}
+    .cash-client-card{display:none}
+    .cash-client-card.is-open{display:block}
+    .cash-client-card-head,.cash-tools-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .cash-client-card-head strong,.cash-tools-head strong{font-family:'Baloo 2',cursive;font-size:1.05rem}
     .cash-ticket{position:relative;top:auto;padding:18px;align-self:start;min-width:0;max-width:360px;width:100%;overflow:hidden}
     .cash-ticket-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid #39271b;padding-bottom:14px;margin-bottom:14px}
     .cash-ticket-head strong{font-family:'Baloo 2',cursive;font-size:1.35rem;color:#fff}
@@ -145,7 +150,7 @@
     .cash-ticket .field{margin:8px 0}
     .cash-ticket select,.cash-ticket input{width:100%;min-width:0}
     .manual-lines{gap:12px}
-    .cash-register .manual-line{grid-template-columns:minmax(150px,1fr) 118px 130px minmax(170px,.9fr) auto;background:#0f0f0f;border-color:#2f241c;border-radius:16px;box-shadow:none;min-width:0}
+    .cash-register .manual-line{grid-template-columns:minmax(150px,1fr) 112px 130px minmax(160px,.8fr) auto;background:#0f0f0f;border-color:#2f241c;border-radius:16px;box-shadow:none;min-width:0;padding:10px}
     .cash-register .manual-line > *{min-width:0}
     .cash-register .manual-line .btn{min-width:0;padding-left:0;padding-right:0}
     .cash-register .manual-file{width:100%;max-width:100%}
@@ -675,13 +680,23 @@
               <div class="field">
                 <label>Recherche client</label>
                 <input id="manual-client-search" list="manual-client-options" placeholder="Nom, email, société...">
+                <div class="cash-actions">
+                  <button class="btn btn-light btn-small" id="manual-new-client" type="button">+ Nouveau client</button>
+                </div>
               </div>
               <div class="field">
                 <label>Recherche produit</label>
                 <input id="manual-product-search" list="manual-product-options" placeholder="Carte de visite, flyer...">
+                <div class="cash-actions">
+                  <button class="btn btn-light btn-small" id="manual-free-product" type="button">+ Produit libre</button>
+                </div>
               </div>
             </div>
             <div class="cash-client-card">
+              <div class="cash-client-card-head">
+                <strong>Client</strong>
+                <button class="btn btn-light btn-small" id="manual-client-close" type="button">Réduire</button>
+              </div>
               <div class="site-grid">
                 <div class="field"><label>Prénom</label><input id="manual-prenom" placeholder="Jean"></div>
                 <div class="field"><label>Nom</label><input id="manual-nom" placeholder="Dupont"></div>
@@ -703,8 +718,11 @@
               </div>
             </div>
             <div class="cash-tools">
+              <div class="cash-tools-head">
+                <strong>Articles du ticket</strong>
+                <button class="btn btn-light btn-small" id="manual-add-line" type="button">+ Ligne libre</button>
+              </div>
               <div class="manual-lines" id="manual-lines"></div>
-              <button class="btn btn-light btn-small" id="manual-add-line" type="button">+ Ajouter une ligne libre</button>
             </div>
           </div>
           <aside class="cash-ticket">
