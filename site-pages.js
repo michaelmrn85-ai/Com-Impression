@@ -830,7 +830,8 @@
         notes: item.notes || "",
         gamme: item.gamme || "",
         deliveryDate: item.deliveryDate || "",
-        configuration: item.configuration || item.finish || ""
+        configuration: item.configuration || item.finish || "",
+        uploadNames: item.uploadNames || []
       };
     });
   }
@@ -1538,6 +1539,39 @@
       clearStatus(sumupStatus);
     }
 
+    function ensureCheckoutProcessingOverlay() {
+      var overlay = $("checkout-processing-overlay");
+      if (overlay) return overlay;
+      overlay = document.createElement("div");
+      overlay.id = "checkout-processing-overlay";
+      overlay.className = "checkout-processing-overlay";
+      overlay.innerHTML =
+        '<div class="checkout-processing-card" role="status" aria-live="polite">'
+          + '<div class="checkout-processing-spinner" aria-hidden="true"></div>'
+          + '<strong id="checkout-processing-title">Paiement en cours</strong>'
+          + '<span id="checkout-processing-message">Nous verifions le paiement et enregistrons votre commande.</span>'
+        + '</div>';
+      document.body.appendChild(overlay);
+      return overlay;
+    }
+
+    function showCheckoutProcessing(title, message) {
+      var overlay = ensureCheckoutProcessingOverlay();
+      var titleEl = $("checkout-processing-title");
+      var messageEl = $("checkout-processing-message");
+      if (titleEl) titleEl.textContent = title || "Paiement en cours";
+      if (messageEl) messageEl.textContent = message || "Nous verifions le paiement et enregistrons votre commande.";
+      overlay.classList.add("open");
+      overlay.removeAttribute("hidden");
+    }
+
+    function hideCheckoutProcessing() {
+      var overlay = $("checkout-processing-overlay");
+      if (!overlay) return;
+      overlay.classList.remove("open");
+      overlay.setAttribute("hidden", "hidden");
+    }
+
     function resetPaymentButton() {
       if (!sumupBtn) return;
       sumupBtn.disabled = false;
@@ -1968,6 +2002,7 @@
 
       appliedPromo = pending.promo || null;
       updatePayableTotal();
+      showCheckoutProcessing("Paiement en cours", "Retour SumUp recu. Nous verifions le paiement et preparons la commande.");
       setStatus(validateStatus, "ok", "Retour SumUp recu. Verification du paiement...");
 
       return fetch(API_BASE + "/api/sumup/verify-checkout/" + encodeURIComponent(checkoutId))
@@ -1984,10 +2019,12 @@
             if (window.history && window.history.replaceState) {
               window.history.replaceState(null, "", resolveAppUrl("/panier"));
             }
+            hideCheckoutProcessing();
             setStatus(validateStatus, "err", status ? ("Paiement refuse ou non valide. Statut SumUp : " + status + ".") : "Paiement refuse ou non valide.");
             return false;
           }
 
+          showCheckoutProcessing("Paiement accepte", "Votre commande est en cours d'enregistrement. Merci de patienter quelques secondes.");
           return submitOrder({
             payment_id: checkoutId,
             payment_status: "paye"
@@ -1996,11 +2033,13 @@
             if (window.history && window.history.replaceState) {
               window.history.replaceState(null, "", resolveAppUrl("/panier"));
             }
+            hideCheckoutProcessing();
             setStatus(validateStatus, "ok", "Paiement accepte et commande enregistree.");
             return true;
           });
         })
         .catch(function (error) {
+          hideCheckoutProcessing();
           setStatus(validateStatus, "err", error.message || "Impossible de verifier le paiement SumUp.");
           return false;
         });

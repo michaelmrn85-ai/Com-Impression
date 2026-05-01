@@ -40,13 +40,13 @@
     .status.err{display:block;background:#fee2e2;color:#991b1b}
     .dashboard,.admin-section{display:none;padding:34px}
     .dash-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:34px}
-    .admin-tabs{display:flex;flex-wrap:nowrap;gap:12px;margin-bottom:36px;padding:18px;border:1px solid rgba(240,222,208,.95);border-radius:26px;background:rgba(255,255,255,.82);overflow:auto;position:sticky;top:118px;z-index:15;box-shadow:0 10px 26px rgba(23,19,16,.05)}
-    .admin-tab{border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);padding:12px 18px;font-family:'Baloo 2',cursive;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:10px;transition:.18s;white-space:nowrap;box-shadow:0 8px 18px rgba(23,19,16,.04)}
+    .admin-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:26px;padding:16px;border:1px solid rgba(240,222,208,.95);border-radius:26px;background:rgba(255,255,255,.82);position:sticky;top:118px;z-index:15;box-shadow:0 10px 26px rgba(23,19,16,.05)}
+    .admin-tab{border:1px solid var(--line);border-radius:18px;background:#fff;color:var(--ink);padding:14px 14px;font-family:'Baloo 2',cursive;font-weight:800;cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;transition:.18s;white-space:normal;text-align:left;box-shadow:0 8px 18px rgba(23,19,16,.04);min-height:72px}
     .admin-tab:hover{transform:translateY(-2px)}
     .admin-tab.active{background:linear-gradient(180deg,#1f1a16 0%,#151515 100%);color:#fff;border-color:#151515;box-shadow:0 12px 24px rgba(23,19,16,.12)}
     .admin-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border-radius:999px;background:#fff2e7;color:var(--or2);padding:0 8px;font-size:.86rem;font-weight:900}
     .admin-tab.active .admin-tab-count{background:var(--or);color:#fff}
-    .admin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px;margin-top:18px}
+    .admin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:18px}
     .admin-summary-card{background:linear-gradient(180deg,#fffaf5 0%,#fff 100%);border:1px solid #eee0d6;border-radius:24px;padding:24px;box-shadow:0 12px 26px rgba(23,19,16,.05)}
     .admin-summary-card strong{display:block;font-family:'Baloo 2',cursive;font-size:1.16rem;line-height:1}
     .admin-summary-card .count{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:2.15rem;color:var(--or)}
@@ -63,6 +63,7 @@
     .search{min-width:240px;flex:1}
     .list{display:grid;gap:10px}
     .order{border:1px solid #eee0d6;border-radius:22px;padding:16px 18px;background:#fff;display:grid;grid-template-columns:1.1fr .9fr .8fr auto;gap:14px;align-items:center;box-shadow:0 10px 22px rgba(23,19,16,.04)}
+    .transaction-order{grid-template-columns:.75fr 1fr 1fr .75fr auto}
     .order:hover{border-color:#f2c9aa;background:#fffaf5;transform:translateY(-1px)}
     .order-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
     .num{font-family:'Baloo 2',cursive;color:var(--or);font-weight:800;font-size:1.02rem}
@@ -70,8 +71,20 @@
     .badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:.78rem;font-weight:800;color:#fff;background:#777}
     .b-rec{background:#f97316}.b-bat{background:#6366f1}.b-prod{background:#2563eb}.b-exp{background:#16a34a}.b-ann{background:#dc2626}
     .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .detail-split{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.72fr);gap:18px;align-items:start}
+    .detail-main-col,.detail-client-col{display:grid;gap:16px;min-width:0}
     .panel{border:1px solid #eee0d6;border-radius:22px;padding:18px;background:linear-gradient(180deg,#fffdfa 0%,#fff 100%);box-shadow:0 10px 22px rgba(23,19,16,.04)}
     .panel h3{font-family:'Baloo 2',cursive;margin:0 0 10px;font-size:1.08rem}
+    .admin-order-request-list{display:grid;gap:12px}
+    .admin-order-request-item{border:1px solid #f1e1d4;border-radius:16px;padding:14px;background:#fffaf6}
+    .admin-order-request-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
+    .admin-order-request-head span{color:#f47b20;font-weight:900;white-space:nowrap}
+    .admin-order-request-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 12px;color:#6b625d;font-size:.92rem}
+    .admin-order-choice-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .admin-order-choice-list span{border:1px solid #efdccc;border-radius:999px;padding:6px 10px;background:#fff;color:#4f4741;font-weight:700;font-size:.86rem}
+    .admin-doc-area{margin-top:18px;padding-top:18px;border-top:1px solid #f2e7df}
+    .admin-doc-link{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0 8px 8px 0;white-space:normal;text-align:left}
+    .admin-doc-link small{max-width:240px;color:#6b625d;font-weight:700;overflow-wrap:anywhere}
     .kv{display:grid;gap:7px;font-size:.92rem}
     .kv div{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #f5ebe4;padding-bottom:6px}
     .kv span:first-child{color:var(--muted)}
@@ -161,8 +174,9 @@
     .day-kpi strong{display:block;font-family:'Baloo 2',cursive;font-size:1rem;line-height:1}
     .day-kpi span{display:block;margin-top:10px;font-family:'Baloo 2',cursive;font-size:1.8rem;color:var(--or)}
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:1px dashed var(--line);border-radius:20px}
-    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
-    @media(max-width:560px){.admin-summary,.day-kpis{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
+    @media(max-width:1100px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.detail-split,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}}
+    @media(max-width:560px){.admin-summary,.day-kpis,.admin-tabs{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
   </style>
 </head>
 <body>
@@ -171,8 +185,8 @@
       <div class="brand">
         <img class="logo" src="./com-logo.png" alt="Logo COM' Impression">
         <div>
-          <h1>Tableau de bord</h1>
-          <p class="sub">Un parcours plus simple pour gerer commandes, produits, clients et contenu du site.</p>
+          <h1>BackOffice</h1>
+          <p class="sub">COM' Impression : commandes, transactions, catalogue, clients et contenu du site.</p>
         </div>
       </div>
       <div class="top-actions">
@@ -195,38 +209,36 @@
     <section class="dashboard" id="dashboard">
       <div class="dash-head">
         <div>
-          <h2 style="font-family:'Baloo 2',cursive;margin:0;font-size:1.7rem;">Accueil admin</h2>
+          <h2 style="font-family:'Baloo 2',cursive;margin:0;font-size:1.7rem;">BackOffice COM' Impression</h2>
           <p class="sub" id="last-update">Aucune donnée chargée.</p>
         </div>
         <button class="btn btn-light btn-small" id="btn-logout" type="button">Déconnexion</button>
       </div>
       <div class="admin-tabs">
-        <button class="admin-tab" data-open-scope="jour" type="button">Fiche du jour</button>
-        <button class="admin-tab" data-open-scope="cours" type="button">Commandes en cours <span class="admin-tab-count" id="count-cours">0</span></button>
-        <button class="admin-tab" data-open-scope="terminees" type="button">Terminees <span class="admin-tab-count" id="count-terminees">0</span></button>
-        <button class="admin-tab" data-open-scope="annulees" type="button">Annulees <span class="admin-tab-count" id="count-annulees">0</span></button>
-        <button class="admin-tab" data-open-scope="rdv" type="button">Rendez-vous <span class="admin-tab-count" id="count-rdv">0</span></button>
-        <button class="admin-tab" data-open-scope="manual" type="button">Commande manuelle</button>
-        <button class="admin-tab" data-open-scope="avis" type="button">Avis <span class="admin-tab-count" id="count-avis">0</span></button>
-        <button class="admin-tab" data-open-scope="gammes" type="button">Gammes</button>
-        <button class="admin-tab" data-open-scope="produits" type="button">Produits <span class="admin-tab-count" id="count-produits">0</span></button>
-        <button class="admin-tab" data-open-scope="clients" type="button">Clients <span class="admin-tab-count" id="count-clients">0</span></button>
-        <button class="admin-tab" data-open-scope="site" type="button">Accueil et contenu</button>
-        <button class="admin-tab" data-open-scope="diagnostic" type="button">Diagnostic</button>
+        <button class="admin-tab" data-open-scope="jour" type="button"><span>Fiche du jour</span></button>
+        <button class="admin-tab" data-open-scope="commandes" type="button"><span>Commandes</span><span class="admin-tab-count" id="count-commandes">0</span></button>
+        <button class="admin-tab" data-open-scope="transactions" type="button"><span>Transactions</span><span class="admin-tab-count" id="count-transactions">0</span></button>
+        <button class="admin-tab" data-open-scope="produits" type="button"><span>Produits</span><span class="admin-tab-count" id="count-produits">0</span></button>
+        <button class="admin-tab" data-open-scope="gammes" type="button"><span>Gammes</span></button>
+        <button class="admin-tab" data-open-scope="clients" type="button"><span>Fiches clients</span><span class="admin-tab-count" id="count-clients">0</span></button>
+        <button class="admin-tab" data-open-scope="avis" type="button"><span>Avis</span><span class="admin-tab-count" id="count-avis">0</span></button>
+        <button class="admin-tab" data-open-scope="rdv" type="button"><span>Rendez-vous</span><span class="admin-tab-count" id="count-rdv">0</span></button>
+        <button class="admin-tab" data-open-scope="site" type="button"><span>Gestion site</span></button>
+        <button class="admin-tab" data-open-scope="diagnostic" type="button"><span>Diagnostic</span></button>
       </div>
       <div class="admin-summary">
         <article class="admin-summary-card">
-          <strong>Commandes a traiter</strong>
+          <strong>Commandes en cours</strong>
           <span class="count" id="count-cours-summary">0</span>
           <p>Recues, BAT, production et suivis actifs.</p>
         </article>
         <article class="admin-summary-card">
-          <strong>Produits</strong>
-          <span class="count" id="count-produits-summary">0</span>
-          <p>Catalogue, quantites, papiers, finitions et prix.</p>
+          <strong>Transactions</strong>
+          <span class="count" id="count-transactions-summary">0</span>
+          <p>CB, virements, Chorus et remboursements.</p>
         </article>
         <article class="admin-summary-card">
-          <strong>Clients</strong>
+          <strong>Fiches clients</strong>
           <span class="count" id="count-clients-summary">0</span>
           <p>Comptes clients, reglages pros et informations.</p>
         </article>
@@ -262,6 +274,29 @@
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body" id="detail-body"></div>
+    </div>
+  </section>
+
+  <section class="admin-section" id="modal-transactions">
+    <div class="box">
+      <div class="box-head">
+        <h2>Suivi des transactions</h2>
+        <button class="btn btn-light btn-small" data-close type="button">Retour</button>
+      </div>
+      <div class="box-body">
+        <div class="toolbar">
+          <input class="search" id="transactions-search" type="search" placeholder="Rechercher commande, client, paiement...">
+          <select id="transactions-filter" class="search" style="max-width:260px;">
+            <option value="">Tous les paiements</option>
+            <option value="CB">CB / SumUp</option>
+            <option value="Virement">Virement</option>
+            <option value="Administration Chorus">Administration Chorus</option>
+            <option value="Remboursement">Remboursements</option>
+          </select>
+          <button class="btn btn-dark btn-small" id="transactions-reload" type="button">Actualiser</button>
+        </div>
+        <div class="list" id="transactions-list"></div>
+      </div>
     </div>
   </section>
 

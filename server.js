@@ -496,6 +496,32 @@ function buildFallbackProductRef(seed) {
     return 'COM' + String((sum % 9999) + 1).padStart(4, '0');
 }
 
+function paymentInfoForPdf(definition) {
+    const mode = String((definition && definition.modeReglement) || '').trim();
+    const status = String((definition && definition.paymentStatus) || '').trim().toLowerCase();
+    const docKey = String((definition && definition.docKey) || '').toLowerCase();
+    if (status === 'paye') {
+        return {
+            label: 'Facture payee',
+            detail: mode === 'CB' || !mode ? 'Paiement recu par carte bancaire' : `Paiement recu par ${mode}`,
+            paid: true
+        };
+    }
+    if (mode === 'Virement') {
+        return { label: 'Paiement par virement', detail: 'Reglement attendu par virement bancaire', paid: false };
+    }
+    if (mode === 'Administration Chorus') {
+        return { label: 'Paiement Chorus Pro', detail: 'Reglement via administration Chorus Pro', paid: false };
+    }
+    if (docKey === 'devis') {
+        return { label: 'Devis non regle', detail: 'Aucun paiement requis avant validation du devis', paid: false };
+    }
+    if (docKey === 'facture') {
+        return { label: 'Facture a regler', detail: mode ? `Mode de reglement : ${mode}` : 'Paiement non encore enregistre', paid: false };
+    }
+    return { label: mode ? `Paiement : ${mode}` : 'Paiement non enregistre', detail: mode ? `Mode de reglement : ${mode}` : 'Mode de reglement non precise', paid: false };
+}
+
 function deriveRowsForStats(cmd) {
     const panierItems = parsePanierJson(cmd && cmd.panier_json);
     if (panierItems.length) {
@@ -973,10 +999,11 @@ app.post('/api/devis', upload.array('fichiers', 10), async (req, res) => {
             }
         }
 
+        const uploadDocuments = !isContact && !isPartenariat ? storeOrderUploadDocuments(numCmd, allFiles) : [];
         files.forEach(f => { try { fs.unlinkSync(f.path); } catch(e) {} });
         cartUploads.forEach(item => removeCartUpload(item.token));
         // Enregistrer dans le suivi de commandes (avec le même code que dans l'email)
-        const savedCommand = enregistrerCommande(d, panierTexte, prixTotal, numCmd, codeAcces);
+        const savedCommand = enregistrerCommande(d, panierTexte, prixTotal, numCmd, codeAcces, uploadDocuments);
         const loyalty = payeCB && d.email ? ajouterPoints(d.email, prixTotal, numCmd, d.prenom || '', d.nom || '') : null;
         let invoiceMailSent = false;
         let invoiceMailError = '';
@@ -1770,6 +1797,27 @@ function resolveCartUploads(rawTokens) {
     }).filter(Boolean);
 }
 
+function storeOrderUploadDocuments(orderNumber, files) {
+    const uploadDocsDir = path.join(DOCS_DIR, 'fichiers-client');
+    try { fs.mkdirSync(uploadDocsDir, { recursive: true }); } catch (e) {}
+    return (files || []).map((file, index) => {
+        if (!file || !file.path || !fs.existsSync(file.path)) return null;
+        const safeName = String(file.originalname || `fichier-client-${index + 1}`)
+            .replace(/[^a-zA-Z0-9._-]/g, '_');
+        const storedName = `${String(orderNumber || 'commande').replace(/[^a-zA-Z0-9._-]/g, '_')}_${Date.now()}_${index + 1}_${safeName}`;
+        const storedPath = path.join(uploadDocsDir, storedName);
+        fs.copyFileSync(file.path, storedPath);
+        return {
+            id: Date.now() + index,
+            nom: file.originalname || safeName,
+            fichier: path.join('fichiers-client', storedName),
+            type: 'Fichier client',
+            date: new Date().toLocaleDateString('fr-FR'),
+            archive: false
+        };
+    }).filter(Boolean);
+}
+
 function defaultSiteConfig() {
     return {
         topBanner: '',
@@ -2003,6 +2051,7 @@ function buildDailySummaryPdfBuffer(summary) {
     const orange = [0.96, 0.48, 0.13];
     const pale = [1, 0.97, 0.93];
     const lineColor = [0.93, 0.86, 0.80];
+    const paymentInfo = paymentInfoForPdf(definition || {});
     function color(values, op) { return `${values.map(v => Number(v).toFixed(3)).join(' ')} ${op}`; }
     function rect(x, y, w, h, fill, stroke) {
         if (fill) commands.push(`${color(fill, 'rg')} ${x} ${y} ${w} ${h} re f`);
@@ -3358,6 +3407,14 @@ app.get('/api/admin/clients/:id/document/:docId', (req, res) => {
     res.download(filePath, String(doc.nom || 'document').toLowerCase().endsWith('.pdf') ? doc.nom : doc.nom + '.pdf');
 });
 
+function documentDownloadName(doc) {
+    const name = String((doc && doc.nom) || 'document').trim() || 'document';
+    const stored = String((doc && doc.fichier) || '').trim();
+    if (path.extname(name)) return name;
+    const ext = path.extname(stored);
+    return ext ? name + ext : name + '.pdf';
+}
+
 // GET /api/commandes/:id/document/:docId — télécharger un document (client authentifié)
 app.get('/api/commandes/:id/document/:docId', authClient, (req, res) => {
     const commandes = lireCommandes();
@@ -3367,7 +3424,7 @@ app.get('/api/commandes/:id/document/:docId', authClient, (req, res) => {
     if (!doc) return res.status(404).json({ success:false });
     const filePath = path.join(DOCS_DIR, doc.fichier);
     if (!fs.existsSync(filePath)) return res.status(404).json({ success:false });
-    res.download(filePath, doc.nom.endsWith('.pdf') ? doc.nom : doc.nom+'.pdf');
+    res.download(filePath, documentDownloadName(doc));
 });
 
 // GET /api/admin/commandes/:id/document/:docId — télécharger (admin)
@@ -3381,7 +3438,7 @@ app.get('/api/admin/commandes/:id/document/:docId', (req, res) => {
     if (!doc) return res.status(404).send('Document introuvable');
     const filePath = path.join(DOCS_DIR, doc.fichier);
     if (!fs.existsSync(filePath)) return res.status(404).send('Fichier introuvable');
-    res.download(filePath, doc.nom.endsWith('.pdf') ? doc.nom : doc.nom+'.pdf');
+    res.download(filePath, documentDownloadName(doc));
 });
 
 app.listen(process.env.PORT || 3000, () => console.log(`Serveur demarre sur le port ${process.env.PORT || 3000}`));
@@ -3585,6 +3642,9 @@ function buildSimplePdfBuffer(definition) {
         text(`Livraison souhaitee`, 54, 706, { font: 'F2', size: 9 });
         text(definition.deliveryDate, 145, 706, { size: 9 });
     }
+    rect(40, 642, 245, 34, paymentInfo.paid ? [0.92, 0.99, 0.94] : [1, 0.96, 0.91], paymentInfo.paid ? [0.13, 0.77, 0.37] : lineColor);
+    text(paymentInfo.label, 54, 662, { font: 'F2', size: 10, color: paymentInfo.paid ? [0.08, 0.47, 0.22] : orange });
+    text(paymentInfo.detail, 54, 649, { size: 8 });
 
     rect(310, 642, 245, 104, null, lineColor);
     text(process.env.INVOICE_COMPANY_NAME || 'EI - Moreno Michael', 324, 724, { font: 'F2', size: 11 });
@@ -3638,10 +3698,10 @@ function buildSimplePdfBuffer(definition) {
 
     rect(40, 66, 515, 88, pale, lineColor);
     text('Details du paiement', 54, 132, { font: 'F2', size: 11, color: orange });
-    text(`Nom du beneficiaire  ${process.env.INVOICE_COMPANY_NAME || 'EI - Moreno Michael'}`, 54, 114, { size: 8.5 });
-    text(`BIC  ${process.env.INVOICE_BIC || 'QNTOFRP1XXX'}`, 54, 100, { size: 8.5 });
-    text(`IBAN  ${process.env.INVOICE_IBAN || 'FR7616958000014360415617762'}`, 54, 86, { size: 8.5 });
-    text(`Reference  ${definition.numero || docNumber()}`, 54, 72, { size: 8.5 });
+    text(`Statut  ${paymentInfo.label}`, 54, 114, { font: 'F2', size: 8.5, color: paymentInfo.paid ? [0.08, 0.47, 0.22] : dark });
+    text(`Mode  ${paymentInfo.detail}`, 54, 100, { size: 8.5 });
+    text(`Reference  ${definition.numero || docNumber()}`, 54, 86, { size: 8.5 });
+    text(definition.paymentId ? `Reference paiement  ${definition.paymentId}` : (paymentInfo.paid ? 'Reglement confirme' : `IBAN  ${process.env.INVOICE_IBAN || 'FR7616958000014360415617762'}`), 54, 72, { size: 8.5 });
     text(`${definition.title || 'Document'} ${docNumber()} - 1/1`, 445, 36, { size: 8, color: [0.45, 0.45, 0.45] });
 
     const stream = commands.join('\n');
@@ -3731,7 +3791,10 @@ function createGeneratedPdfForCommand(cmd, type) {
         ].filter(Boolean),
         productRows: getCommandPdfRows(cmd),
         total: cmd.prix_total || '--',
-        deliveryDate: cmd.date_livraison || ''
+        deliveryDate: cmd.date_livraison || '',
+        modeReglement: cmd.mode_reglement || (cmd.payment_status === 'paye' ? 'CB' : ''),
+        paymentStatus: cmd.payment_status || '',
+        paymentId: cmd.payment_id || ''
     });
     fs.writeFileSync(pdfPath, pdfBuffer);
     const doc = {
@@ -3779,7 +3842,10 @@ function rebuildManualPdfForCommand(cmd) {
         ].filter(Boolean),
         productRows: cmd.lignes || [],
         total: cmd.prix_total || '--',
-        deliveryDate: cmd.date_livraison || ''
+        deliveryDate: cmd.date_livraison || '',
+        modeReglement: cmd.mode_reglement || (cmd.payment_status === 'paye' ? 'CB' : ''),
+        paymentStatus: cmd.payment_status || '',
+        paymentId: cmd.payment_id || ''
     });
     fs.writeFileSync(pdfPath, pdfBuffer);
     doc.date = new Date().toLocaleDateString('fr-FR');
@@ -3897,7 +3963,10 @@ app.post('/api/commandes/manuelle', rateLimit({ windowMs: 15 * 60 * 1000, max: 2
                 ].filter(Boolean).join(' — ');
             }),
             total: d.prix_total || '--',
-            deliveryDate: d.date_livraison || ''
+            deliveryDate: d.date_livraison || '',
+            modeReglement: d.mode_reglement || 'CB',
+            paymentStatus: d.payment_status || '',
+            paymentId: d.payment_id || ''
         });
         fs.writeFileSync(pdfPath, pdfBuffer);
         documents.unshift({
@@ -3996,7 +4065,7 @@ app.post('/api/commandes/rdv-manuel', express.json(), rateLimit({ windowMs: 15 *
 
 // Enregistrer chaque pré-commande COM'Impression automatiquement
 // (hook appelé depuis /api/devis après succès)
-function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni) {
+function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni, initialDocuments) {
     if ((d.source || '').toLowerCase() !== 'com-impression') return null;
     const panierLow = (panierTexte || '').toLowerCase();
     if (panierLow.startsWith('contact') || panierLow.startsWith('partenariat')) return null;
@@ -4021,6 +4090,7 @@ function enregistrerCommande(d, panierTexte, prixTotal, numCmdFourni, codeFourni
             code_acces:  codeFourni || genererCode(),
             statut:      'Recue',
             notes:       '',
+            documents:   Array.isArray(initialDocuments) ? initialDocuments : [],
             created_at:  new Date().toISOString()
         };
         // Numéro déjà fourni depuis /api/devis
@@ -4208,7 +4278,7 @@ app.post('/api/commandes/:id/statut', express.json(), rateLimit({ windowMs: 15 *
             const transporter = createTransporter();
             const factureAttach = [];
             const accentColor = statut === 'Annulee' ? '#d9553f' : (statut === 'BAT fichier a revoir' ? '#d97706' : '#F47B20');
-            const reviewUrl = `${publicBaseUrl}/avis?commande=${encodeURIComponent(cmd.numero || cmd.id || '')}&prenom=${encodeURIComponent(cmd.prenom || '')}&produit=${encodeURIComponent((cmd.lignes && cmd.lignes[0] && cmd.lignes[0].produit) || '')}`;
+            const reviewUrl = `${publicBaseUrl.replace(/\/$/, '')}/avis.html?commande=${encodeURIComponent(cmd.numero || cmd.id || '')}&prenom=${encodeURIComponent(cmd.prenom || '')}&produit=${encodeURIComponent((cmd.lignes && cmd.lignes[0] && cmd.lignes[0].produit) || '')}`;
             const reviewBlock = statut === 'Expediee' ? `
                 <div style="text-align:center;margin:22px 0 26px;padding:18px;border-radius:18px;background:#fff7ef;border:1px solid #efd8c0;">
                     <p style="margin:0 0 14px;color:#5C5C5C;font-size:15px;line-height:1.6;">Votre retour aide COM' Impression à progresser et rassure les prochains clients.</p>

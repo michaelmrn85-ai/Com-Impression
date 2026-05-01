@@ -83,18 +83,22 @@
   function isInProgress(cmd){ return isStandardCommand(cmd) && !isDone(cmd) && !isCancelled(cmd); }
   function ordersForScope(scope){
     var commandes = state.commandes.filter(isStandardCommand);
+    if(scope==='commandes') return commandes;
     if(scope==='terminees') return commandes.filter(isDone);
     if(scope==='annulees') return commandes.filter(isCancelled);
     return state.commandes.filter(isInProgress);
   }
   function updateCounts(){
-    $('count-cours').textContent = state.commandes.filter(isInProgress).length;
-    $('count-terminees').textContent = state.commandes.filter(isStandardCommand).filter(isDone).length;
-    $('count-annulees').textContent = state.commandes.filter(isStandardCommand).filter(isCancelled).length;
+    if($('count-cours')) $('count-cours').textContent = state.commandes.filter(isInProgress).length;
+    if($('count-commandes')) $('count-commandes').textContent = state.commandes.filter(isStandardCommand).length;
+    if($('count-terminees')) $('count-terminees').textContent = state.commandes.filter(isStandardCommand).filter(isDone).length;
+    if($('count-annulees')) $('count-annulees').textContent = state.commandes.filter(isStandardCommand).filter(isCancelled).length;
     if($('count-rdv')) $('count-rdv').textContent = state.commandes.filter(isRdvCommand).length;
+    if($('count-transactions')) $('count-transactions').textContent = state.commandes.filter(isStandardCommand).length;
     if($('count-produits')) $('count-produits').textContent = state.catalog.length;
     if($('count-clients')) $('count-clients').textContent = state.clients.length;
     if($('count-cours-summary')) $('count-cours-summary').textContent = state.commandes.filter(isInProgress).length;
+    if($('count-transactions-summary')) $('count-transactions-summary').textContent = state.commandes.filter(isStandardCommand).length;
     if($('count-produits-summary')) $('count-produits-summary').textContent = state.catalog.length;
     if($('count-clients-summary')) $('count-clients-summary').textContent = state.clients.length;
     if($('count-avis-summary')) $('count-avis-summary').textContent = state.avis.length;
@@ -180,6 +184,7 @@
         loadAvisAdmin(false);
         if($('modal-orders').classList.contains('open')) renderOrders();
         if($('modal-rdv') && $('modal-rdv').classList.contains('open')) renderAppointments();
+        if($('modal-transactions') && $('modal-transactions').classList.contains('open')) renderTransactions();
       })
       .catch(function(err){
         $('last-update').textContent = 'Erreur : ' + (err.message || 'chargement impossible');
@@ -188,7 +193,7 @@
 
   function openOrders(scope){
     state.scope=scope;
-    var titles={cours:'Commandes en cours',terminees:'Commandes terminées',annulees:'Commandes annulées'};
+    var titles={commandes:'Commandes',cours:'Commandes en cours',terminees:'Commandes terminées',annulees:'Commandes annulées'};
     $('orders-title').textContent=titles[scope]||'Commandes';
     $('orders-search').value='';
     renderOrders();
@@ -219,6 +224,69 @@
         +'</div>'
         +'</div>';
     }).join('');
+  }
+
+  function paymentLabel(cmd){
+    var mode=String((cmd && cmd.mode_reglement) || (cmd && cmd.payment_status === 'paye' ? 'CB' : '') || 'CB').trim();
+    var status=String((cmd && cmd.payment_status) || '').trim();
+    if(cmd && cmd.statut === 'Annulee' && /remboursement/i.test(String(cmd.notes || '') + ' ' + String(cmd.refund_mode || ''))) return 'Remboursement ' + (cmd.refund_mode || '');
+    if(status === 'paye') return 'CB payée';
+    if(status === 'attente_virement' || mode === 'Virement') return 'Virement en attente';
+    if(status === 'attente_chorus' || mode === 'Administration Chorus') return 'Chorus en attente';
+    return mode || 'CB';
+  }
+
+  function renderTransactions(){
+    var list=$('transactions-list');
+    if(!list) return;
+    var q=(($('transactions-search')||{}).value||'').toLowerCase().trim();
+    var filter=(($('transactions-filter')||{}).value||'').trim();
+    var orders=state.commandes.filter(isStandardCommand).filter(function(cmd){
+      var payment=paymentLabel(cmd);
+      if(filter==='Remboursement' && payment.toLowerCase().indexOf('remboursement')===-1) return false;
+      if(filter && filter!=='Remboursement' && [cmd.mode_reglement, cmd.payment_status, payment].join(' ').indexOf(filter)===-1) return false;
+      if(!q) return true;
+      return [cmd.numero,cmd.prenom,cmd.nom,cmd.email,cmd.tel,cmd.prix_total,cmd.statut,cmd.mode_reglement,cmd.payment_status,cmd.payment_id,payment]
+        .join(' ').toLowerCase().indexOf(q)!==-1;
+    });
+    if(!orders.length){
+      list.innerHTML='<div class="empty">Aucune transaction trouvée.</div>';
+      return;
+    }
+    list.innerHTML=orders.map(function(cmd){
+      var fullName=((cmd.prenom||'')+' '+(cmd.nom||'')).trim()||'Client';
+      var payment=paymentLabel(cmd);
+      var canRefund = cmd.statut !== 'Annulee' && cmd.payment_status === 'paye';
+      return '<div class="order transaction-order">'
+        +'<div><div class="num">'+esc(cmd.numero||cmd.id)+'</div><div class="muted">'+esc(cmd.date||cmd.created_at||'')+'</div></div>'
+        +'<div><strong>'+esc(fullName)+'</strong><div class="muted">'+esc(cmd.email||'')+'</div></div>'
+        +'<div><span class="badge '+badgeClass(cmd.statut)+'">'+esc(payment)+'</span><div class="muted">'+esc(cmd.payment_id ? 'SumUp : '+cmd.payment_id : (cmd.mode_reglement || '--'))+'</div></div>'
+        +'<div><strong>'+esc(cmd.prix_total||'--')+'</strong><div class="muted">'+esc(STATUT_LABELS[cmd.statut]||cmd.statut||'Statut')+'</div></div>'
+        +'<div class="order-actions">'
+          +'<button class="btn btn-orange btn-small" data-detail="'+esc(cmd.id||cmd.numero)+'" type="button">Ouvrir</button>'
+          +(canRefund ? '<button class="btn btn-light btn-small" data-transaction-refund="'+esc(cmd.id||cmd.numero)+'" type="button">Rembourser</button>' : '')
+        +'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  function refundTransaction(id){
+    var cmd=findCommand(id);
+    if(!cmd) return;
+    var mode=window.prompt('Mode de remboursement : CB ou Virement', cmd.mode_reglement === 'Virement' ? 'Virement' : 'CB');
+    if(mode === null) return;
+    mode=/virement/i.test(mode) ? 'Virement' : 'CB';
+    if(!window.confirm('Créer un avoir et passer la commande '+(cmd.numero||cmd.id)+' en annulée ?')) return;
+    fetch(api('/api/commandes/'+encodeURIComponent(cmd.id||cmd.numero)+'/statut'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({statut:'Remboursement',refundMode:mode,mdp:state.mdp})
+    })
+    .then(function(r){ return r.json().then(function(d){ if(!r.ok || !d.success) throw new Error(d.error||'Remboursement impossible'); return d; }); })
+    .then(function(){
+      return loadCommandes().then(renderTransactions);
+    })
+    .catch(function(err){ alert(err.message || 'Remboursement impossible.'); });
   }
 
   function findCommand(id){
@@ -334,6 +402,75 @@
     .catch(function(err){ setStatus('rdv-manual-status','err',err.message||'Erreur rendez-vous.'); });
   }
 
+  function parseCommandCartRows(cmd){
+    if(Array.isArray(cmd && cmd.lignes) && cmd.lignes.length){
+      return cmd.lignes.map(function(row){
+        return {
+          title: row.produit || '',
+          ref: '',
+          quantity: row.qte || '',
+          total: row.montant || '',
+          file: row.fichier || '',
+          choices: Array.isArray(row.optionsLibres) ? row.optionsLibres.map(function(option){
+            return (option.nom || 'Option') + ' : ' + (option.valeur || '--');
+          }).filter(Boolean) : []
+        };
+      });
+    }
+    try{
+      var parsed=JSON.parse(String((cmd && cmd.panier_json) || '[]'));
+      if(Array.isArray(parsed) && parsed.length){
+        return parsed.map(function(item){
+          return {
+            title: item.title || item.label || item.produit || '',
+            ref: item.ref || '',
+            quantity: item.quantity || item.qte || '',
+            total: item.totalLabel || item.priceLabel || item.total || '',
+            file: Array.isArray(item.uploadNames) && item.uploadNames.length ? item.uploadNames.join(', ') : (item.file || item.fichier || ''),
+            choices: Array.isArray(item.configuration)
+              ? item.configuration.map(function(choice){
+                return [choice.stepName || choice.nom || choice.label, choice.choiceLabel || choice.valeur || choice.value].filter(Boolean).join(' : ');
+              }).filter(Boolean)
+              : String(item.configuration || '').split(' • ').map(function(choice){ return choice.trim(); }).filter(Boolean)
+          };
+        }).filter(function(row){ return row.title || row.ref || row.quantity || row.file || row.choices.length; });
+      }
+    }catch(e){}
+    return String((cmd && cmd.panier) || '').split(/\n|\|/).map(function(line){
+      return line.trim();
+    }).filter(Boolean).map(function(line){
+      return {
+        title: extractProduct(line),
+        ref: '',
+        quantity: extractQty(line),
+        total: extractAmount(line),
+        file: extractFile(line),
+        choices: []
+      };
+    });
+  }
+
+  function renderOrderRequestPanel(cmd){
+    var rows=parseCommandCartRows(cmd);
+    if(!rows.length) return '<p class="muted">Aucun détail produit enregistré.</p>';
+    return '<div class="admin-order-request-list">'+rows.map(function(row){
+      return '<article class="admin-order-request-item">'
+        +'<div class="admin-order-request-head">'
+          +'<strong>'+esc(row.title||'Produit')+'</strong>'
+          +(row.total ? '<span>'+esc(row.total)+'</span>' : '')
+        +'</div>'
+        +'<div class="admin-order-request-meta">'
+          +(row.ref ? '<span>Référence : <strong>'+esc(row.ref)+'</strong></span>' : '')
+          +(row.quantity ? '<span>Quantité : <strong>'+esc(row.quantity)+'</strong></span>' : '')
+          +(row.file ? '<span>Fichier : <strong>'+esc(row.file)+'</strong></span>' : '')
+        +'</div>'
+        +(row.choices && row.choices.length ? '<div class="admin-order-choice-list">'+row.choices.map(function(choice){
+          return '<span>'+esc(choice)+'</span>';
+        }).join('')+'</div>' : '')
+      +'</article>';
+    }).join('')+'</div>';
+  }
+
   function renderPanierTable(cmd){
     if(Array.isArray(cmd.lignes) && cmd.lignes.length){
       return '<div style="overflow:auto;"><table class="admin-table-mini">'
@@ -425,8 +562,8 @@
     }).join('');
     var docs=(cmd.documents||[]).map(function(doc){
       var href=api('/api/admin/commandes/'+encodeURIComponent(cmd.id||cmd.numero)+'/document/'+encodeURIComponent(doc.id)+'?mdp='+encodeURIComponent(state.mdp));
-      return '<a class="btn btn-light btn-small" href="'+href+'" target="_blank">📄 '+esc(doc.type||'Document')+'</a>';
-    }).join(' ');
+      return '<a class="btn btn-light btn-small admin-doc-link" href="'+href+'" target="_blank"><span>'+esc(doc.type||'Document')+'</span><small>'+esc(doc.nom||'Télécharger')+'</small></a>';
+    }).join('');
     var docUpload =
       '<div style="margin-top:14px;padding-top:14px;border-top:1px solid #f2e7df;">'
       +'<h3 style="margin-top:0;">Ajouter un document</h3>'
@@ -442,15 +579,13 @@
       +'<div class="status" id="detail-doc-status"></div>'
       +'</div>';
     $('detail-body').innerHTML =
-      '<div class="detail-grid">'
-      +'<section class="panel"><h3>Client</h3><div class="kv">'
-      +'<div><span>Nom</span><strong>'+esc(fullName)+'</strong></div>'
-      +'<div><span>Email</span><a href="mailto:'+esc(cmd.email||'')+'">'+esc(cmd.email||'--')+'</a></div>'
-      +'<div><span>Téléphone</span><strong>'+esc(cmd.tel||'--')+'</strong></div>'
-      +'<div><span>Profil</span><strong>'+esc(cmd.type_client||'Particulier')+'</strong></div>'
-      +'<div><span>SIRET</span><strong>'+esc(cmd.siret||'--')+'</strong></div>'
-      +'</div></section>'
-      +'<section class="panel"><h3>Modifier</h3>'
+      '<div class="detail-split">'
+      +'<div class="detail-main-col">'
+      +'<section class="panel"><h3>Commande & fichiers</h3>'
+      +renderOrderRequestPanel(cmd)
+      +'<div class="admin-doc-area"><h3>Documents disponibles</h3>'+(docs||'<p class="muted">Aucun document déposé pour cette commande.</p>')+docUpload+'</div>'
+      +'</section>'
+      +'<section class="panel"><h3>Modifier la commande</h3>'
       +'<div class="site-grid">'
       +'<div class="field"><label>Prénom</label><input id="edit-prenom" value="'+esc(cmd.prenom||'')+'"></div>'
       +'<div class="field"><label>Nom</label><input id="edit-nom" value="'+esc(cmd.nom||'')+'"></div>'
@@ -476,6 +611,7 @@
         +'<div class="field"><label>Précisions</label><textarea id="edit-rdv-message">'+esc(cmd.message||'')+'</textarea></div>'
         +'<button class="btn btn-orange btn-small" id="save-rdv-edit" type="button">Enregistrer le rendez-vous</button>'
       +'</section>' : '')
+      +'<section class="panel"><h3>Produits modifiables</h3>'+renderEditableProductRows(cmd)+'</section>'
       +'<section class="panel"><h3>Traitement</h3>'
       +'<div class="field"><label>Statut</label><select id="detail-statut">'+statutOptions+'</select></div>'
       +'<div class="field"><label>Mode de remboursement</label><select id="detail-refund-mode"><option value="CB">CB</option><option value="Virement">Virement</option></select></div>'
@@ -483,9 +619,17 @@
       +'<div class="field"><label>Notes internes</label><textarea id="detail-notes" placeholder="Notes visibles uniquement par toi">'+esc(cmd.notes||'')+'</textarea></div>'
       +'<button class="btn btn-dark btn-small" id="save-notes" type="button">Enregistrer les notes</button>'
       +'<div class="status" id="detail-status"></div></section>'
-      +'<section class="panel" style="grid-column:1/-1;"><h3>Produits</h3>'+renderEditableProductRows(cmd)+'</section>'
-      +'<section class="panel"><h3>Panier actuel</h3>'+renderPanierTable(cmd)+'</section>'
-      +'<section class="panel"><h3>Documents disponibles</h3>'+(docs||'<p class="muted">Aucun document déposé pour cette commande.</p>')+docUpload+'</section>'
+      +'</div>'
+      +'<aside class="detail-client-col">'
+      +'<section class="panel"><h3>Fiche client</h3><div class="kv">'
+      +'<div><span>Nom</span><strong>'+esc(fullName)+'</strong></div>'
+      +'<div><span>Email</span><a href="mailto:'+esc(cmd.email||'')+'">'+esc(cmd.email||'--')+'</a></div>'
+      +'<div><span>Téléphone</span><strong>'+esc(cmd.tel||'--')+'</strong></div>'
+      +'<div><span>Profil</span><strong>'+esc(cmd.type_client||'Particulier')+'</strong></div>'
+      +'<div><span>SIRET</span><strong>'+esc(cmd.siret||'--')+'</strong></div>'
+      +'</div></section>'
+      +'<section class="panel"><h3>Panier brut</h3>'+renderPanierTable(cmd)+'</section>'
+      +'</aside>'
       +'</div>';
     openModal('modal-detail',state.scope||'cours');
   }
@@ -2332,6 +2476,9 @@
     if($('products-create')) $('products-create').addEventListener('click',function(){ openProductEditor(); });
     if($('clients-create')) $('clients-create').addEventListener('click',function(){ openClientEditor(); });
     $('orders-search').addEventListener('input',renderOrders);
+    if($('transactions-search')) $('transactions-search').addEventListener('input',renderTransactions);
+    if($('transactions-filter')) $('transactions-filter').addEventListener('change',renderTransactions);
+    if($('transactions-reload')) $('transactions-reload').addEventListener('click',function(){ loadCommandes().then(renderTransactions); });
     if($('rdv-search')) $('rdv-search').addEventListener('input',renderAppointments);
     if($('products-search')) $('products-search').addEventListener('input',renderProductsList);
     if($('clients-search')) $('clients-search').addEventListener('input',renderClientsList);
@@ -2353,6 +2500,7 @@
         }
         if(scope==='jour'){ loadDailySummary(true); return; }
         if(scope==='rdv'){ renderAppointments(); openModal('modal-rdv','rdv'); return; }
+        if(scope==='transactions'){ renderTransactions(); openModal('modal-transactions','transactions'); return; }
         if(scope==='gammes'){ loadGammesAdmin(true); return; }
         if(scope==='avis'){ loadAvisAdmin(true); return; }
         if(scope==='manual'){ resetManualForm(); openModal('modal-manual','manual'); return; }
@@ -2369,6 +2517,8 @@
       if(detail) openDetail(detail.getAttribute('data-detail'));
       var deleteBtn=e.target.closest ? e.target.closest('[data-delete-command]') : null;
       if(deleteBtn){ deleteCommand(deleteBtn.getAttribute('data-delete-command')); return; }
+      var transactionRefund=e.target.closest ? e.target.closest('[data-transaction-refund]') : null;
+      if(transactionRefund){ refundTransaction(transactionRefund.getAttribute('data-transaction-refund')); return; }
       if(e.target && e.target.id==='save-statut') saveStatut();
       if(e.target && e.target.id==='save-command-edit') saveCommandEdit();
       if(e.target && e.target.id==='save-rdv-edit') saveRdvEdit();
