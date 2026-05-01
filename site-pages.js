@@ -230,10 +230,14 @@
       return !selections[key] || normaliseOptionKey(selections[key]) === normaliseOptionKey(config[key]);
     });
     if (!configOk) return false;
-    return (row.optionsLibres || []).every(function (option) {
-      var key = String((option && option.nom) || "").trim();
-      if (!key || !selections[key]) return true;
-      return normaliseOptionKey(selections[key]) === normaliseOptionKey(option && option.valeur);
+    var freeOptionValues = getRowStepValuesByKey(row, null);
+    return Object.keys(selections || {}).every(function (key) {
+      var selected = selections[key];
+      var values = freeOptionValues[normaliseOptionKey(key)];
+      if (!values || !values.length || !selected) return true;
+      return values.some(function (value) {
+        return normaliseOptionKey(selected) === normaliseOptionKey(value);
+      });
     });
   }
 
@@ -261,6 +265,30 @@
     return option ? option.valeur : "";
   }
 
+  function getRowStepValuesByKey(row, stepKey) {
+    var grouped = {};
+    (row && row.optionsLibres || []).forEach(function (item) {
+      var key = String((item && item.nom) || "").trim();
+      var value = String((item && item.valeur) || "").trim();
+      if (!key || !value) return;
+      var normalized = normaliseOptionKey(key);
+      if (stepKey && normalized !== normaliseOptionKey(stepKey)) return;
+      if (!grouped[normalized]) grouped[normalized] = [];
+      if (!grouped[normalized].some(function (existing) { return normaliseOptionKey(existing) === normaliseOptionKey(value); })) {
+        grouped[normalized].push(value);
+      }
+    });
+    return grouped;
+  }
+
+  function getRowStepValues(row, stepKey) {
+    if (!row || !stepKey) return [];
+    if (stepKey === "__subProductType") return row.subProductType ? [row.subProductType] : [];
+    if (row.config && row.config[stepKey]) return [row.config[stepKey]];
+    var grouped = getRowStepValuesByKey(row, stepKey);
+    return grouped[normaliseOptionKey(stepKey)] || [];
+  }
+
   function getLotQuantityOptions(product, selections) {
     return uniqueValues(getProductPricingRows(product).filter(function (row) {
       return row.type === "lot"
@@ -280,7 +308,7 @@
       var configuredKeys = configuredSteps.map(function (step) { return normaliseOptionKey(step && step.key); });
       getPricingFreeOptionKeys(product).forEach(function (key) {
         if (configuredKeys.indexOf(normaliseOptionKey(key)) === -1) {
-          configuredSteps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).map(function (row) { return getRowStepValue(row, key); })) });
+          configuredSteps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).reduce(function (values, row) { return values.concat(getRowStepValues(row, key)); }, [])) });
         }
       });
       return configuredSteps;
@@ -301,7 +329,7 @@
       steps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).map(function (row) { return row.config && row.config[key]; })) });
     });
     getPricingFreeOptionKeys(product).forEach(function (key) {
-      steps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).map(function (row) { return getRowStepValue(row, key); })) });
+      steps.push({ key: key, title: key, values: uniqueValues(getProductPricingRows(product).reduce(function (values, row) { return values.concat(getRowStepValues(row, key)); }, [])) });
     });
     var options = (product && product.options) || {};
     return steps.concat((product.optionKeys || Object.keys(options)).filter(function (key) {
@@ -349,7 +377,7 @@
       if (!selected) continue;
       if (step.key === "__subProductType") {
         if (!row.subProductType || normaliseOptionKey(row.subProductType) !== normaliseOptionKey(selected)) return false;
-      } else if (!getRowStepValue(row, step.key) || normaliseOptionKey(getRowStepValue(row, step.key)) !== normaliseOptionKey(selected)) {
+      } else if (!getRowStepValues(row, step.key).some(function (value) { return normaliseOptionKey(value) === normaliseOptionKey(selected); })) {
         return false;
       }
     }
@@ -361,9 +389,9 @@
     var rows = getProductPricingRows(product).filter(function (row) {
       return rowMatchesStepSelections(row, steps, stepIndex, selections);
     });
-    var labels = uniqueValues(rows.map(function (row) {
-      return getRowStepValue(row, step.key);
-    }));
+    var labels = uniqueValues(rows.reduce(function (values, row) {
+      return values.concat(getRowStepValues(row, step.key));
+    }, []));
     if (!labels.length) labels = uniqueValues((step.values || []).map(getStepChoiceLabel));
     return labels.map(function (label) { return getConfiguredChoice(step, label); });
   }

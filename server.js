@@ -1209,9 +1209,9 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 const freeOptionsOk = Object.keys(sels).every(key => {
                     const normalizedKey = normaliseOptionKey(key);
                     if (!pricingFreeOptionKeys.has(normalizedKey)) return true;
-                    const option = freeOptions.find(entry => normaliseOptionKey(entry.nom) === normalizedKey);
-                    if (!option) return false;
-                    return !sels[key] || normaliseOptionKey(sels[key]) === normaliseOptionKey(option.valeur);
+                    const options = freeOptions.filter(entry => normaliseOptionKey(entry.nom) === normalizedKey);
+                    if (!options.length) return false;
+                    return !sels[key] || options.some(option => normaliseOptionKey(sels[key]) === normaliseOptionKey(option.valeur));
                 });
                 return subProductOk && configOk && sideOk && formatOk && paperOk && finishingOk && freeOptionsOk;
             };
