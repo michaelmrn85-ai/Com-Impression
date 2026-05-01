@@ -222,10 +222,26 @@
     });
   }
 
-  function matchesCustomConfig(row, selections) {
+  function getProductConfigKeys(product) {
+    var keys = [];
+    getProductPricingRows(product).forEach(function (row) {
+      Object.keys((row && row.config) || {}).forEach(function (key) {
+        if (keys.indexOf(key) === -1) keys.push(key);
+      });
+    });
+    return keys;
+  }
+
+  function matchesCustomConfig(row, selections, product) {
     var selectedType = normaliseOptionKey((selections || {}).__subProductType || "");
     if (selectedType && row.subProductType && normaliseOptionKey(row.subProductType) !== selectedType) return false;
     var config = row.config || {};
+    var productConfigKeys = product ? getProductConfigKeys(product) : Object.keys(config);
+    var selectedConfigOk = productConfigKeys.every(function (key) {
+      if (!selections[key]) return true;
+      return config[key] && normaliseOptionKey(selections[key]) === normaliseOptionKey(config[key]);
+    });
+    if (!selectedConfigOk) return false;
     return Object.keys(config).every(function (key) {
       return !selections[key] || normaliseOptionKey(selections[key]) === normaliseOptionKey(config[key]);
     });
@@ -234,7 +250,7 @@
   function getLotQuantityOptions(product, selections) {
     return uniqueValues(getProductPricingRows(product).filter(function (row) {
       return row.type === "lot"
-        && matchesCustomConfig(row, selections)
+        && matchesCustomConfig(row, selections, product)
         && matchesSelectedSide(row, selections)
         && matchesSelectedFormat(row, selections)
         && matchesSelectedPricingField(row, selections, "paper", /papier|grammage/i)
@@ -969,6 +985,7 @@
     var documentPageCount = 1;
     var documentCopies = 1;
     var configSteps = getProductConfigSteps(product);
+    if (configSteps.length) selections = {};
     var currentStepIndex = 0;
 
     function updateSelectionSummary() {
@@ -1099,7 +1116,7 @@
       }
       if (selectedQuantityMode === "dimensions") {
         currentQuantityOptions = uniqueValues(getProductPricingRows(product).filter(function (row) {
-          return row.type === "dimensions" && matchesCustomConfig(row, selections);
+          return row.type === "dimensions" && matchesCustomConfig(row, selections, product);
         }).map(function (row) { return row.quantity; }));
         if (currentQuantityOptions.length) {
           var selectedDimQty = selectedValue || String(currentQuantityOptions[0]);
