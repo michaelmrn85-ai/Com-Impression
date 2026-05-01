@@ -1160,11 +1160,15 @@ body[data-page="client"] #client-dashboard-view .section-head {
 
 .cart-table-row {
   display: grid;
-  grid-template-columns: minmax(280px, 2fr) minmax(180px, 1fr) 150px 76px;
-  gap: 18px;
+  grid-template-columns: minmax(260px, 1.8fr) minmax(0, 1fr) minmax(112px, 132px) 54px;
+  gap: 14px;
   align-items: start;
   padding: 18px 20px;
   border-bottom: 1px solid #f1e6dc;
+}
+
+.cart-table-row > * {
+  min-width: 0;
 }
 
 .cart-table-head {
@@ -1204,17 +1208,21 @@ body[data-page="client"] #client-dashboard-view .section-head {
 .cart-label .muted {
   font-size: 0.93rem;
   line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .cart-total-cell.product-price {
   font-size: 1.05rem;
   line-height: 1.4;
+  white-space: nowrap;
 }
 
 .cart-file-cell {
   color: var(--muted);
   font-weight: 600;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .cart-remove-btn {
@@ -1245,6 +1253,15 @@ body[data-page="client"] #client-dashboard-view .section-head {
 
 .cart-cell-value {
   display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.cart-file-cell .cart-cell-value {
+  font-size: 0.88rem;
+  line-height: 1.35;
+  word-break: break-all;
 }
 
 .client-summary-name {
