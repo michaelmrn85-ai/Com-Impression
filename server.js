@@ -1194,10 +1194,11 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 .filter(key => /finit|pellic|vernis|soft/i.test(key))
                 .map(key => normaliseOptionKey(sels[key]))
                 .filter(Boolean);
-            const matchesPricingSelections = item => {
+            const matchesPricingSelections = (item, ignoredConfigKeys = new Set()) => {
                 const selectedSubProduct = normaliseOptionKey(sels.__subProductType || sels['Type de produit'] || '');
                 const subProductOk = !selectedSubProduct || !item.subProductType || normaliseOptionKey(item.subProductType) === selectedSubProduct;
                 const configOk = !item.config || !Object.keys(item.config).length || Object.keys(item.config).every(key => {
+                    if (ignoredConfigKeys.has(normaliseOptionKey(key))) return true;
                     const selected = sels[key];
                     return !selected || normaliseOptionKey(selected) === normaliseOptionKey(item.config[key]);
                 });
@@ -1215,11 +1216,12 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 });
                 return subProductOk && configOk && sideOk && formatOk && paperOk && finishingOk && freeOptionsOk;
             };
-            const pricingMatchScore = item => {
+            const pricingMatchScore = (item, ignoredConfigKeys = new Set()) => {
                 let score = 0;
                 if (sels.__subProductType && item.subProductType && normaliseOptionKey(item.subProductType) === normaliseOptionKey(sels.__subProductType)) score += 8;
                 if (item.config && typeof item.config === 'object') {
                     Object.keys(item.config).forEach(key => {
+                        if (ignoredConfigKeys.has(normaliseOptionKey(key))) return;
                         if (sels[key] && normaliseOptionKey(sels[key]) === normaliseOptionKey(item.config[key])) score += 10;
                     });
                 }
@@ -1244,8 +1246,8 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 if (item.finishing && selectedFinishingValues.includes(normaliseOptionKey(item.finishing))) score += 4;
                 return score;
             };
-            const sortPricingMatches = list => list.slice().sort((a, b) => {
-                const scoreDiff = pricingMatchScore(b) - pricingMatchScore(a);
+            const sortPricingMatches = (list, ignoredConfigKeys = new Set()) => list.slice().sort((a, b) => {
+                const scoreDiff = pricingMatchScore(b, ignoredConfigKeys) - pricingMatchScore(a, ignoredConfigKeys);
                 if (scoreDiff) return scoreDiff;
                 return Number(b.total || 0) - Number(a.total || 0);
             });
@@ -1253,7 +1255,16 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             const parsedWidth = Number(width);
             const parsedHeight = Number(height);
             const tiers = normaliseQuantityPricing(productData.quantityPricing);
-            const lotTiersForOption = sortPricingMatches(tiers.filter(item => item.type === 'lot' && matchesPricingSelections(item)));
+            const dossierTiers = productId === 'impression-doc'
+                ? sortPricingMatches(tiers.filter(item => item.type === 'dossier' && matchesPricingSelections(item)))
+                : [];
+            const dossierConfigKeys = new Set();
+            dossierTiers.forEach(item => {
+                if (!item.config || typeof item.config !== 'object') return;
+                Object.keys(item.config).forEach(key => dossierConfigKeys.add(normaliseOptionKey(key)));
+            });
+            const baseIgnoredKeys = productId === 'impression-doc' ? dossierConfigKeys : new Set();
+            const lotTiersForOption = sortPricingMatches(tiers.filter(item => item.type === 'lot' && matchesPricingSelections(item, baseIgnoredKeys)), baseIgnoredKeys);
             if (lotTiersForOption.length) {
                 responseQuantityOptions = uniquePositiveNumbers(lotTiersForOption.map(item => item.quantity));
                 if (quantityMode === 'lot' && !responseQuantityOptions.includes(parseInt(quantityValue, 10))) {
@@ -1263,7 +1274,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             let chosen = null;
             if (!isNaN(parsedWidth) && parsedWidth > 0 && !isNaN(parsedHeight) && parsedHeight > 0) {
-                const dimensionalTiers = sortPricingMatches(tiers.filter(item => item.type === 'dimensions' && matchesPricingSelections(item)));
+                const dimensionalTiers = sortPricingMatches(tiers.filter(item => item.type === 'dimensions' && matchesPricingSelections(item, baseIgnoredKeys)), baseIgnoredKeys);
                 if (dimensionalTiers.length) {
                     responseQuantityOptions = uniquePositiveNumbers(dimensionalTiers.map(item => item.quantity));
                     if (quantityMode === 'dimensions' && responseQuantityOptions.length && !responseQuantityOptions.includes(parseInt(quantityValue, 10))) {
@@ -1276,11 +1287,11 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 }
             }
             if (!chosen) {
-                let quantityTiers = tiers.filter(item => item.type !== 'dimensions');
+                let quantityTiers = tiers.filter(item => item.type !== 'dimensions' && item.type !== 'dossier');
                 if (quantityMode === 'lot' || quantityMode === 'unitaire' || quantityMode === 'pages') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
-                const optionTiers = sortPricingMatches(quantityTiers.filter(matchesPricingSelections));
+                const optionTiers = sortPricingMatches(quantityTiers.filter(item => matchesPricingSelections(item, baseIgnoredKeys)), baseIgnoredKeys);
                 if (optionTiers.length) quantityTiers = optionTiers;
                 const unitTiers = quantityMode === 'lot' ? [] : quantityTiers.filter(item => item.type === 'unitaire');
                 const effectiveQty = quantityMode === 'lot' && lotTiersForOption.length && !lotTiersForOption.some(item => item.quantity === parsedQty)
@@ -1313,6 +1324,12 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                 } else {
                     numeric = (chosen.type === 'unitaire' || chosen.type === 'pages') ? chosen.total * unitMultiplier : chosen.total;
                     purchaseValue = chosen.purchasePrice == null ? null : ((chosen.type === 'unitaire' || chosen.type === 'pages') ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
+                    if (productId === 'impression-doc' && dossierTiers.length) {
+                        const dossierSale = dossierTiers.reduce((sum, item) => sum + (Number(item.total) || 0), 0) * safeCopies;
+                        const dossierPurchase = dossierTiers.reduce((sum, item) => sum + (item.purchasePrice == null ? 0 : (Number(item.purchasePrice) || 0)), 0) * safeCopies;
+                        numeric += dossierSale;
+                        if (purchaseValue != null) purchaseValue += dossierPurchase;
+                    }
                     priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
                     if (chosen.type === 'unitaire' || chosen.type === 'pages') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
                 }

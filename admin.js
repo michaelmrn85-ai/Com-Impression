@@ -1696,6 +1696,7 @@
   function renderProductPathTariffRow(row){
     var isDimensions = row && row.type === 'dimensions';
     var isPages = row && row.type === 'pages';
+    var isDossier = row && row.type === 'dossier';
     var optionsHtml = (Array.isArray(row && row.optionsLibres) ? row.optionsLibres : []).map(function(option){
       return '<div class="product-pricing-option-row">'
         +'<div class="field"><label>Nom option</label><input class="product-pricing-option-name" placeholder="Nom libre" value="'+esc(option&&option.nom||'')+'"></div>'
@@ -1704,14 +1705,14 @@
       +'</div>';
     }).join('');
     return '<div class="product-path-tariff-row">'
-      +'<div class="field"><label>Type tarif</label><select class="product-path-tariff-type"><option value="lot" '+(row&&row.type==='lot'?'selected':'')+'>Quantite lot</option><option value="unitaire" '+(row&&row.type==='unitaire'?'selected':'')+'>Quantite unitaire</option><option value="dimensions" '+(row&&row.type==='dimensions'?'selected':'')+'>Dimensions / m2</option><option value="pages" '+(isPages?'selected':'')+'>Pages / brochure</option></select></div>'
-      +'<div class="field product-path-tariff-qty-field"><label>'+esc(isPages?'Prix pour pages':'Quantité')+'</label><input class="product-path-tariff-qty" inputmode="numeric" placeholder="'+(isPages?'8':'100')+'" value="'+esc(row&&row.quantity||'')+'"></div>'
+      +'<div class="field"><label>Type tarif</label><select class="product-path-tariff-type"><option value="lot" '+(row&&row.type==='lot'?'selected':'')+'>Quantite lot</option><option value="unitaire" '+(row&&row.type==='unitaire'?'selected':'')+'>Quantite unitaire</option><option value="dossier" '+(isDossier?'selected':'')+'>Par dossier</option><option value="dimensions" '+(row&&row.type==='dimensions'?'selected':'')+'>Dimensions / m2</option><option value="pages" '+(isPages?'selected':'')+'>Pages / brochure</option></select></div>'
+      +'<div class="field product-path-tariff-qty-field"><label>'+esc(isPages?'Prix pour pages':(isDossier?'Base dossier':'Quantité'))+'</label><input class="product-path-tariff-qty" inputmode="numeric" placeholder="'+(isPages?'8':(isDossier?'1':'100'))+'" value="'+esc(row&&row.quantity||'')+'"></div>'
       +'<div class="field product-path-tariff-page-min-field"><label>Minimum pages</label><input class="product-path-tariff-page-min" inputmode="numeric" placeholder="8" value="'+esc(row&&row.pageMin||'')+'"></div>'
       +'<div class="field product-path-tariff-page-step-field"><label>Palier pages</label><input class="product-path-tariff-page-step" inputmode="numeric" placeholder="4" value="'+esc(row&&row.pageStep||'')+'"></div>'
       +'<div class="field product-path-tariff-width-field"><label>Largeur</label><input class="product-path-tariff-width" inputmode="decimal" placeholder="Largeur" value="'+esc(row&&row.width||'')+'"'+(isDimensions?'':' disabled')+'></div>'
       +'<div class="field product-path-tariff-height-field"><label>Hauteur</label><input class="product-path-tariff-height" inputmode="decimal" placeholder="Hauteur" value="'+esc(row&&row.height||'')+'"'+(isDimensions?'':' disabled')+'></div>'
       +'<div class="field"><label>Prix achat TTC</label><input class="product-path-tariff-purchase" inputmode="decimal" placeholder="8,50" value="'+esc(row&&row.purchasePrice||'')+'"></div>'
-      +'<div class="field"><label>Prix vente TTC</label><input class="product-path-tariff-sale" inputmode="decimal" placeholder="'+(isDimensions?'Prix / m2':(isPages?'Prix page':'15,90'))+'" value="'+esc(row&&row.salePrice||'')+'"></div>'
+      +'<div class="field"><label>Prix vente TTC</label><input class="product-path-tariff-sale" inputmode="decimal" placeholder="'+(isDimensions?'Prix / m2':(isPages?'Prix page':(isDossier?'Prix par dossier':'15,90')))+'" value="'+esc(row&&row.salePrice||'')+'"></div>'
       +'<div class="field product-path-margin-field"><label>Marge</label><span class="pricing-margin product-path-margin">0,00 %</span></div>'
       +'<button class="btn-icon product-path-tariff-remove" type="button" title="Supprimer le tarif">×</button>'
       +'<div class="product-path-options-box">'
@@ -1761,6 +1762,10 @@
         if(qty){ qty.disabled=false; qty.placeholder='8'; if(!(qty.value||'').trim()) qty.value='8'; }
         if(pageMin && !(pageMin.value||'').trim()) pageMin.value='8';
         if(pageStep && !(pageStep.value||'').trim()) pageStep.value='4';
+        if(width){ width.value=''; width.disabled=true; }
+        if(height){ height.value=''; height.disabled=true; }
+      } else if(type === 'dossier'){
+        if(qty){ qty.disabled=false; qty.placeholder='1'; if(!(qty.value||'').trim()) qty.value='1'; }
         if(width){ width.value=''; width.disabled=true; }
         if(height){ height.value=''; height.disabled=true; }
       } else {

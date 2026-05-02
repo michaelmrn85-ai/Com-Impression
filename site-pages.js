@@ -150,6 +150,16 @@
     });
   }
 
+  function countPdfPagesFromFiles(files) {
+    var list = Array.prototype.slice.call(files || []).filter(function (file) {
+      return /\.pdf$/i.test(file && file.name || "");
+    });
+    if (!list.length) return Promise.reject(new Error("Ajoutez au moins un PDF pour detecter le nombre de pages."));
+    return Promise.all(list.map(countPdfPagesFromFile)).then(function (counts) {
+      return counts.reduce(function (sum, count) { return sum + count; }, 0);
+    });
+  }
+
   function renderFixedProductInfo(product) {
     var paperRaw = getOptionFirstValue(product, function (key) { return /papier|grammage/i.test(key); });
     var finishRaw = getOptionFirstValue(product, function (key) { return /finit|pellic|vernis|soft/i.test(key); });
@@ -1227,13 +1237,13 @@
       var files = Array.prototype.slice.call((($("product-files") || {}).files) || []);
       uploadSummary.textContent = files.length ? files.map(function (file) { return file.name; }).join(", ") : "Aucun fichier";
       if (!isImpressionDocumentProduct(product) || !files.length) return;
-      countPdfPagesFromFile(files[0])
+      countPdfPagesFromFiles(files)
         .then(function (pageCount) {
           selectedQuantityMode = "unitaire";
           documentPageCount = pageCount;
           renderQuantityField(String(pageCount));
           requestPricing(String(pageCount)).then(function () {
-            setStatus(priceStatus, "ok", "PDF detecte : " + pageCount + " page" + (pageCount > 1 ? "s" : "") + ".");
+            setStatus(priceStatus, "ok", "PDF detecte : " + pageCount + " page" + (pageCount > 1 ? "s" : "") + " au total.");
           });
         })
         .catch(function () {
