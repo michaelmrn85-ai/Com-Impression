@@ -1392,7 +1392,7 @@
 
     function renderFilters() {
       if (!filters) return;
-      filters.innerHTML = ['<button type="button" class="filter-btn' + (!activeGamme ? " active" : "") + '" data-gamme="">Toutes les gammes</button>'].concat(gammes.map(function (gamme) {
+      filters.innerHTML = ['<button type="button" class="filter-btn' + (!activeGamme ? " active" : "") + '" data-gamme="">Toutes les categories</button>'].concat(gammes.map(function (gamme) {
         return '<button type="button" class="filter-btn' + (gamme.slug === activeGamme ? " active" : "") + '" data-gamme="' + esc(gamme.slug) + '">' + esc(gamme.title) + "</button>";
       })).join("");
     }
@@ -1418,7 +1418,7 @@
       var currentGamme = getActiveGamme();
 
       if (currentGamme && currentGamme.comingSoon && !searchQuery) {
-        grid.innerHTML = '<div class="empty-state">Cette gamme sera ajoutee prochainement au catalogue en ligne.</div>';
+        grid.innerHTML = '<div class="empty-state">Cette categorie sera ajoutee prochainement au catalogue en ligne.</div>';
         return;
       }
 
@@ -2888,44 +2888,56 @@
   }
 
   function initHomePage() {
-    function renderHomeGammes(catalog) {
+    var homeSiteConfig = {};
+
+    function renderHomeFeaturedProducts(catalog) {
       var grid = $("gammes-grid");
       if (!grid) return;
       var gammes = (catalog && catalog.gammes) || [];
-      if (!gammes.length) {
-        grid.innerHTML = '<div class="search-empty show"><p>Aucune gamme disponible pour le moment.</p></div>';
+      var selectedIds = Array.isArray(homeSiteConfig.seasonalProductIds) ? homeSiteConfig.seasonalProductIds : [];
+      var entries = [];
+      gammes.forEach(function (gamme) {
+        (gamme.products || []).forEach(function (product) {
+          if (!selectedIds.length || selectedIds.indexOf(product.id) !== -1) {
+            entries.push({ gamme: gamme, product: product });
+          }
+        });
+      });
+      if (!entries.length) {
+        grid.innerHTML = '<div class="search-empty show"><p>Les produits mis en avant seront ajoutes depuis le back office.</p></div>';
         return;
       }
-      grid.innerHTML = gammes.map(function (gamme, index) {
-        var products = Array.isArray(gamme.products) ? gamme.products : [];
-        var productItems = products.slice(0, 3).map(function (product) {
-          return '<li>' + esc(product.title || "Produit") + '</li>';
-        }).join("");
-        if (!productItems) {
-          productItems = '<li>Catalogue en preparation</li>';
-        }
-        return '<article class="gamme-card" data-search="' + esc([gamme.title, gamme.description, products.map(function (product) { return product.title; }).join(" ")].join(" ")) + '">'
-          + '<div class="gamme-badge">Gamme ' + esc(String(index + 1)) + '</div>'
-          + '<h3>' + esc(gamme.title || "Gamme") + '</h3>'
-          + '<p>' + esc(gamme.description || "Decouvrez les produits de cette gamme.") + '</p>'
-          + '<ul>' + productItems + '</ul>'
-          + '<a class="mini-btn" href="' + esc(resolveAppUrl("/produits?gamme=" + encodeURIComponent(gamme.slug))) + '" data-gamme-link="' + esc(gamme.slug) + '">Choisir cette gamme</a>'
+      grid.innerHTML = entries.slice(0, 8).map(function (entry) {
+        var product = entry.product || {};
+        var gamme = entry.gamme || {};
+        var details = [
+          product.sizeInfo,
+          product.priceLabel || euro(product.priceValue),
+          product.deliveryDelayDays ? "Delai " + product.deliveryDelayDays + " j" : ""
+        ].filter(Boolean);
+        return '<article class="gamme-card" data-search="' + esc([gamme.title, product.title, product.summary, details.join(" ")].join(" ")) + '">'
+          + '<div class="gamme-badge">' + esc(gamme.title || "Categorie") + '</div>'
+          + '<h3>' + esc(product.title || "Produit") + '</h3>'
+          + '<p>' + esc(product.summary || "Produit disponible prochainement.") + '</p>'
+          + (details.length ? '<ul>' + details.map(function (item) { return '<li>' + esc(item) + '</li>'; }).join("") + '</ul>' : '')
+          + '<a class="mini-btn" href="' + esc(resolveAppUrl("/produit?gamme=" + encodeURIComponent(gamme.slug || "") + "&produit=" + encodeURIComponent(product.id || ""))) + '" data-product-link="' + esc(product.id || "") + '" data-gamme-link="' + esc(gamme.slug || "") + '">Voir le produit</a>'
         + '</article>';
       }).join("");
 
-      grid.querySelectorAll("[data-gamme-link]").forEach(function (link) {
+      grid.querySelectorAll("[data-product-link]").forEach(function (link) {
         link.addEventListener("click", function (event) {
           event.preventDefault();
-          goTo("/produits?gamme=" + encodeURIComponent(link.getAttribute("data-gamme-link")));
+          goTo("/produit?gamme=" + encodeURIComponent(link.getAttribute("data-gamme-link") || "") + "&produit=" + encodeURIComponent(link.getAttribute("data-product-link") || ""));
         });
       });
     }
 
-    fetch(API_BASE + "/api/site-config")
+    var siteConfigPromise = fetch(API_BASE + "/api/site-config")
       .then(function (response) { return response.json().catch(function () { return {}; }); })
       .then(function (json) {
         var config = json && json.config ? json.config : null;
-        if (!config) return;
+        if (!config) return {};
+        homeSiteConfig = config;
         if ($("home-brand-subtitle")) $("home-brand-subtitle").textContent = config.heroSlogan || $("home-brand-subtitle").textContent;
         if ($("home-hero-badge")) $("home-hero-badge").textContent = config.heroBadge || $("home-hero-badge").textContent;
         if ($("home-hero-title")) {
@@ -2956,11 +2968,14 @@
         if ($("home-hero-image") && config.heroImage) {
           $("home-hero-image").src = config.heroImage;
         }
+        return config;
       })
-      .catch(function () {});
+      .catch(function () { return {}; });
 
-    loadCatalogFromApi()
-      .then(renderHomeGammes)
+    siteConfigPromise.then(function () {
+      return loadCatalogFromApi();
+    })
+      .then(renderHomeFeaturedProducts)
       .catch(function () {});
 
     var avisGrid = document.querySelector(".avis-grid");

@@ -345,7 +345,7 @@
         <button class="admin-tab" data-open-scope="avis" type="button"><span>Avis</span><span class="admin-tab-count" id="count-avis">0</span></button>
         <button class="admin-tab" data-open-scope="rdv" type="button"><span>Rendez-vous</span><span class="admin-tab-count" id="count-rdv">0</span></button>
         <button class="admin-tab" data-open-scope="produits" type="button"><span>Produits</span><span class="admin-tab-count" id="count-produits">0</span></button>
-        <button class="admin-tab" data-open-scope="gammes" type="button"><span>Gammes</span></button>
+        <button class="admin-tab" data-open-scope="gammes" type="button"><span>Catégories</span></button>
         <button class="admin-tab" data-open-scope="site" type="button"><span>Gestion site</span></button>
         <button class="admin-tab" data-open-scope="fidelisation" type="button"><span>Fidélisation</span></button>
         <button class="admin-tab" data-open-scope="stock" type="button"><span>Produit stock</span></button>
@@ -505,7 +505,7 @@
         </div>
         <div class="day-kpis" id="day-kpis"></div>
         <div class="panel">
-          <h3>Totaux par gamme</h3>
+          <h3>Totaux par catégorie</h3>
           <div id="day-gamme-table"></div>
         </div>
       </div>
@@ -558,13 +558,13 @@
       <div class="box-body">
         <div class="toolbar">
           <div>
-            <strong>Gestion des gammes du site</strong>
-            <div class="muted">Modifie l'ordre, le nom, la description, masque une gamme ou ajoute une nouvelle gamme.</div>
+            <strong>Gestion des catégories du site</strong>
+            <div class="muted">Modifie l'ordre, le nom, la description, masque une catégorie ou ajoute une nouvelle catégorie.</div>
           </div>
-          <button class="btn btn-light btn-small" id="gamme-add" type="button">+ Ajouter une gamme</button>
+          <button class="btn btn-light btn-small" id="gamme-add" type="button">+ Ajouter une catégorie</button>
         </div>
         <div class="list" id="gammes-list"></div>
-        <button class="btn btn-orange" id="gammes-save" type="button">Enregistrer les gammes</button>
+        <button class="btn btn-orange" id="gammes-save" type="button">Enregistrer les catégories</button>
         <div class="status" id="gammes-status"></div>
       </div>
     </div>
@@ -585,7 +585,7 @@
           <div class="panel">
             <h3>2. En-tête accueil</h3>
             <div class="field"><label>Badge au-dessus du titre</label><input id="site-hero-badge" placeholder="Ex : Communication visuelle qui vend mieux"></div>
-            <div class="field"><label>Sous-titre</label><input id="site-hero-slogan" placeholder="Ex : Vos vraies gammes COM' Impression"></div>
+            <div class="field"><label>Sous-titre</label><input id="site-hero-slogan" placeholder="Ex : Impression, communication et supports sur mesure"></div>
             <div class="field"><label>Ligne 1</label><input id="site-hero-line1" placeholder="Ex : L'impression"></div>
             <div class="field"><label>Mot mis en avant</label><input id="site-hero-highlight" placeholder="Ex : colorée"></div>
             <div class="field"><label>Ligne 2</label><input id="site-hero-line2" placeholder="Ex : qui fait la différence !"></div>
@@ -781,7 +781,7 @@
       </div>
       <div class="box-body">
         <div class="toolbar">
-          <input class="search" id="products-search" type="search" placeholder="Rechercher un produit ou une gamme...">
+          <input class="search" id="products-search" type="search" placeholder="Rechercher un produit ou une catégorie...">
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="btn btn-light btn-small" id="products-create" type="button">Nouveau produit</button>
             <button class="btn btn-dark btn-small" id="products-reload" type="button">Actualiser</button>

@@ -21,6 +21,7 @@ const SUMUP_MERCHANT_CODE = String(process.env.SUMUP_MERCHANT_CODE || '').trim()
 const PUBLIC_MAINTENANCE_ACTIVE = String(process.env.PUBLIC_MAINTENANCE_ACTIVE || 'true').toLowerCase() !== 'false';
 const LEGACY_CATALOG_DISABLED = String(process.env.LEGACY_CATALOG_DISABLED || 'true').toLowerCase() !== 'false';
 const CATALOG_RESET_AT = Date.parse(process.env.CATALOG_RESET_AT || '2026-05-03T09:23:18.000Z');
+const CATEGORY_RESET_AT = Date.parse(process.env.CATEGORY_RESET_AT || '2026-05-03T09:23:18.000Z');
 const KNOWN_PUBLIC_ORIGINS = Array.from(new Set([
     process.env.PUBLIC_BASE_URL,
     process.env.SITE_BASE_URL,
@@ -1503,14 +1504,7 @@ function buildProductOverrideKey(legacyCat, productId) {
 }
 
 function defaultGammesConfig() {
-    return [
-        { legacy: 'compro', slug: 'com-pro', title: "Com'Pro", description: "Supports print pour entreprises, commerces et activites pro.", builtin: true, hidden: false },
-        { legacy: 'comext', slug: 'com-exterieur', title: "Com'Exterieur", description: "Supports grand format et visibilite exterieure.", builtin: true, hidden: false },
-        { legacy: 'comevt', slug: 'com-evenementiel', title: "Com'Evenementiel", description: "Supports pour mariages, salons, receptions et evenements.", builtin: true, hidden: false },
-        { legacy: 'comperso', slug: 'com-personnalisee', title: "Com'Personnalisee", description: "Textile, goodies et objets personnalises.", builtin: true, hidden: false },
-        { legacy: 'comservices', slug: 'com-services', title: "Com'Services", description: "Impression, plastification, photo et services du quotidien.", builtin: true, hidden: false },
-        { legacy: 'com-gourmand', slug: 'com-gourmand', title: "Com'Gourmand", description: "Une future gamme de gourmandises personnalisees pour vos evenements et cadeaux clients.", builtin: true, hidden: false, comingSoon: true }
-    ];
+    return [];
 }
 
 function normaliseGammeConfig(item, fallback) {
@@ -1531,6 +1525,12 @@ function normaliseGammeConfig(item, fallback) {
 
 function lireGammesConfig() {
     const defaults = defaultGammesConfig();
+    const obsoleteLegacy = new Set(['compro', 'comext', 'comevt', 'comperso', 'comservices', 'com-gourmand', 'imprimerie', 'communication', 'support-exterieur', 'evenement']);
+    const isAfterCategoryReset = item => {
+        if (!CATEGORY_RESET_AT || Number.isNaN(CATEGORY_RESET_AT)) return true;
+        const itemDate = Date.parse((item && (item.created_at || item.updated_at)) || '');
+        return !Number.isNaN(itemDate) && itemDate > CATEGORY_RESET_AT;
+    };
     let saved = [];
     try {
         saved = JSON.parse(fs.readFileSync(GAMMES_CONFIG_FILE, 'utf8'));
@@ -1543,6 +1543,8 @@ function lireGammesConfig() {
     const merged = defaults.map(base => normaliseGammeConfig(Object.assign({}, base, byLegacy[base.legacy] || {}), base));
     saved.forEach(item => {
         if (!item || !item.legacy || defaults.some(base => base.legacy === item.legacy)) return;
+        if (obsoleteLegacy.has(String(item.legacy))) return;
+        if (!isAfterCategoryReset(item)) return;
         merged.push(normaliseGammeConfig(item));
     });
     return merged;
@@ -1550,10 +1552,14 @@ function lireGammesConfig() {
 
 function sauvegarderGammesConfig(list) {
     const defaults = defaultGammesConfig();
+    const now = new Date().toISOString();
     const next = (Array.isArray(list) ? list : []).map(item => {
         const legacy = String((item && item.legacy) || '').trim();
         const base = defaults.find(defaultItem => defaultItem.legacy === legacy);
-        return normaliseGammeConfig(item, base);
+        const normalised = normaliseGammeConfig(item, base);
+        normalised.created_at = (item && item.created_at) || now;
+        normalised.updated_at = now;
+        return normalised;
     });
     fs.writeFileSync(GAMMES_CONFIG_FILE, JSON.stringify(next, null, 2));
     return next;
@@ -1920,24 +1926,24 @@ function storeOrderUploadDocuments(orderNumber, files) {
 function defaultSiteConfig() {
     return {
         topBanner: '',
-        heroBadge: 'Communication visuelle qui vend mieux',
+        heroBadge: 'Impression et communication',
         heroLine1: 'Vos supports,',
-        heroHighlight: 'vos gammes,',
+        heroHighlight: 'vos categories,',
         heroLine2: 'votre image.',
-        heroSlogan: "Vos vraies gammes COM' Impression, reunies proprement",
-        heroText: "Retrouvez vos gammes COM' Impression pour choisir rapidement le bon support, du print professionnel aux produits personnalises.",
+        heroSlogan: "Impression, communication et supports sur mesure",
+        heroText: "Retrouvez vos produits COM' Impression pour choisir rapidement le bon support, du print professionnel aux besoins personnalises.",
         heroImage: '',
         heroPanelTitle: "COM' Impression",
-        heroPanelText: 'Un acces simple a vos gammes, votre compte et votre panier.',
+        heroPanelText: 'Un acces simple au catalogue, a votre compte et a votre panier.',
         heroPanelItems: [
             'Recherche rapide',
             'Compte client',
             'Panier simple'
         ],
-        productsTitle: "Tout ce qu'il faut pour",
-        productsAccent: 'communiquer',
-        productsSubtitle: 'Des supports print de qualité, pour tous vos projets pro ou perso.',
-        seasonalProductIds: ['fairepart-a5', 'fairepart-a6', 'carte-invit', 'menu-evt-carte'],
+        productsTitle: "Produits",
+        productsAccent: 'mis en avant',
+        productsSubtitle: 'Une selection courte que vous pilotez depuis le back office.',
+        seasonalProductIds: [],
         cgvContent: [
             "Les CGV definitives doivent encore etre ajoutees avant lancement public.",
             "Cette page temporaire evite les liens casses pendant la finalisation technique du site."
@@ -3071,7 +3077,7 @@ app.get('/api/client/verify', (req, res) => {
                             Votre compte est maintenant bien valide.
                         </p>
                         <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 22px;">
-                            Venez decouvrir sur notre site toutes nos gammes d'impression, nos services, vos rendez-vous, vos devis et le suivi de vos commandes.
+                            Venez decouvrir sur notre site toutes nos categories d'impression, nos services, vos rendez-vous, vos devis et le suivi de vos commandes.
                         </p>
                         <div style="text-align:center;margin:28px 0;">
                             <a href="${siteHomeUrl}" style="display:inline-block;max-width:320px;background:#F47B20;color:#fff;padding:14px 26px;border-radius:50px;font-weight:700;text-decoration:none;font-size:15px;line-height:1.3;box-shadow:0 4px 0 #D4621A;">Decouvrir le site</a>

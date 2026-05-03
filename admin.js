@@ -46,13 +46,7 @@
     'Association'
   ];
 
-  var PRODUCT_GAMME_OPTIONS = [
-    { value:'compro', label:"Com'Pro" },
-    { value:'comext', label:"Com'Exterieur" },
-    { value:'comevt', label:"Com'Evenementiel" },
-    { value:'comperso', label:"Com'Personnalisee" },
-    { value:'comservices', label:"Com'Services" }
-  ];
+  var PRODUCT_GAMME_OPTIONS = [];
 
   function $(id){ return document.getElementById(id); }
   function api(path){ return API_BASE.replace(/\/$/,'') + path; }
@@ -1326,20 +1320,20 @@
     if(!list) return;
     var gammes=Array.isArray(state.gammesAdmin) ? state.gammesAdmin : [];
     if(!gammes.length){
-      list.innerHTML='<div class="empty">Aucune gamme.</div>';
+      list.innerHTML='<div class="empty">Aucune catégorie.</div>';
       return;
     }
     list.innerHTML=gammes.map(function(gamme, index){
       return '<div class="panel gamme-editor" data-gamme-index="'+index+'">'
         +'<div class="site-grid">'
-          +'<div class="field"><label>Nom de la gamme</label><input class="gamme-title" value="'+esc(gamme.title||'')+'"></div>'
+          +'<div class="field"><label>Nom de la catégorie</label><input class="gamme-title" value="'+esc(gamme.title||'')+'"></div>'
           +'<div class="field"><label>Identifiant</label><input class="gamme-legacy" value="'+esc(gamme.legacy||'')+'" '+(gamme.builtin?'disabled':'')+'></div>'
         +'</div>'
         +'<div class="field"><label>Description</label><textarea class="gamme-description">'+esc(gamme.description||'')+'</textarea></div>'
         +'<div class="template-actions">'
           +'<button class="btn btn-light btn-small gamme-up" type="button">Monter</button>'
           +'<button class="btn btn-light btn-small gamme-down" type="button">Descendre</button>'
-          +'<label style="display:flex;align-items:center;gap:8px;font-weight:800;"><input class="gamme-hidden" type="checkbox" style="width:auto;" '+(gamme.hidden?'checked':'')+'> Masquer la gamme</label>'
+          +'<label style="display:flex;align-items:center;gap:8px;font-weight:800;"><input class="gamme-hidden" type="checkbox" style="width:auto;" '+(gamme.hidden?'checked':'')+'> Masquer la catégorie</label>'
           +(!gamme.builtin ? '<button class="btn-icon gamme-delete" type="button" title="Supprimer">×</button>' : '')
         +'</div>'
       +'</div>';
@@ -1373,16 +1367,16 @@
       state.catalog = flattenCatalog(state.gammes);
       renderGammesList();
       renderProductsList();
-      setStatus('gammes-status','ok','Gammes enregistrées.');
+      setStatus('gammes-status','ok','Catégories enregistrées.');
     })
-    .catch(function(err){ setStatus('gammes-status','err',err.message||'Erreur gammes.'); });
+    .catch(function(err){ setStatus('gammes-status','err',err.message||'Erreur catégories.'); });
   }
 
   function addGammeAdmin(){
     state.gammesAdmin = Array.isArray(state.gammesAdmin) ? state.gammesAdmin : [];
     state.gammesAdmin.push({
       legacy:'gamme-'+Date.now(),
-      title:'Nouvelle gamme',
+      title:'Nouvelle catégorie',
       description:'',
       builtin:false,
       hidden:false
@@ -1428,7 +1422,7 @@
     }).join('');
     $('product-edit-body').innerHTML=
       '<div class="product-meta-grid">'
-      +'<div class="field"><label>Gamme</label><select id="product-edit-gamme">'+gammeOptions+'</select></div>'
+      +'<div class="field"><label>Catégorie</label><select id="product-edit-gamme">'+gammeOptions+'</select></div>'
       +'<div class="field"><label>Reference</label><input value="'+esc(entryRef.product.ref||'')+'" disabled></div>'
       +'<div class="field"><label>Libelle</label><input id="product-edit-name" value="'+esc(entryRef.product.title||'')+'"></div>'
       +'</div>'
@@ -2529,7 +2523,7 @@
     if(!wrap) return;
     var signature = "Bien cordialement,\\nMichael\\nCOM' Impression\\n07 43 69 56 41\\nmichael@com-impression.fr\\nhttps://com-impression.fr";
     var templates = [
-      { id:'welcome', title:'Bienvenue client', text:"Bonjour [Prénom],\\n\\nBienvenue chez COM' Impression. Je suis ravi de vous compter parmi nos clients.\\n\\nVous pouvez dès maintenant découvrir nos gammes d'impression, préparer vos projets, suivre vos commandes et prendre rendez-vous directement sur le site.\\n\\nSi vous avez besoin d'un conseil ou d'un accompagnement, je reste disponible.\\n\\n"+signature },
+      { id:'welcome', title:'Bienvenue client', text:"Bonjour [Prénom],\\n\\nBienvenue chez COM' Impression. Je suis ravi de vous compter parmi nos clients.\\n\\nVous pouvez dès maintenant découvrir nos catégories d'impression, préparer vos projets, suivre vos commandes et prendre rendez-vous directement sur le site.\\n\\nSi vous avez besoin d'un conseil ou d'un accompagnement, je reste disponible.\\n\\n"+signature },
       { id:'devis', title:'Envoi de devis', text:"Bonjour [Prénom],\\n\\nVeuillez trouver ci-joint votre devis COM' Impression.\\n\\nJe reste à votre disposition pour l'ajuster selon vos quantités, vos finitions ou vos délais. Dès votre retour, je pourrai valider la suite du projet avec vous.\\n\\n"+signature },
       { id:'bat', title:'Envoi du BAT', text:"Bonjour [Prénom],\\n\\nVous trouverez ci-joint votre BAT pour validation.\\n\\nMerci de me confirmer votre accord par retour de mail afin que nous puissions lancer la production. Si vous souhaitez une correction, indiquez-moi simplement les modifications à prévoir.\\n\\n"+signature },
       { id:'relance', title:'Relance douce', text:"Bonjour [Prénom],\\n\\nJe me permets de revenir vers vous concernant votre projet / devis COM' Impression.\\n\\nSi vous souhaitez avancer, ajuster un point ou simplement être conseillé sur le bon support, je suis disponible pour vous accompagner.\\n\\n"+signature }
