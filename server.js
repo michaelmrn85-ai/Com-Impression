@@ -1332,7 +1332,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
             }
             if (!chosen) {
                 let quantityTiers = tiers.filter(item => item.type !== 'dimensions' && item.type !== 'dossier');
-                if (quantityMode === 'lot' || quantityMode === 'unitaire' || quantityMode === 'pages') {
+                if (quantityMode === 'lot' || quantityMode === 'unitaire' || quantityMode === 'pages' || quantityMode === 'auto_pages') {
                     quantityTiers = quantityTiers.filter(item => item.type === quantityMode);
                 }
                 const optionTiers = sortPricingMatches(quantityTiers.filter(item => matchesPricingSelections(item, baseIgnoredKeys)), baseIgnoredKeys);
@@ -1366,8 +1366,8 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                     purchaseValue = chosen.purchasePrice == null ? null : chosen.purchasePrice * surfaceM2 * safeQty;
                     priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
                 } else {
-                    numeric = (chosen.type === 'unitaire' || chosen.type === 'pages') ? chosen.total * unitMultiplier : chosen.total;
-                    purchaseValue = chosen.purchasePrice == null ? null : ((chosen.type === 'unitaire' || chosen.type === 'pages') ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
+                    numeric = (chosen.type === 'unitaire' || chosen.type === 'pages' || chosen.type === 'auto_pages') ? chosen.total * unitMultiplier : chosen.total;
+                    purchaseValue = chosen.purchasePrice == null ? null : ((chosen.type === 'unitaire' || chosen.type === 'pages' || chosen.type === 'auto_pages') ? chosen.purchasePrice * unitMultiplier : chosen.purchasePrice);
                     if (productId === 'impression-doc' && dossierTiers.length) {
                         const dossierSale = dossierTiers.reduce((sum, item) => sum + (Number(item.total) || 0), 0) * safeCopies;
                         const dossierPurchase = dossierTiers.reduce((sum, item) => sum + (item.purchasePrice == null ? 0 : (Number(item.purchasePrice) || 0)), 0) * safeCopies;
@@ -1375,7 +1375,7 @@ app.post('/api/catalog-pricing', express.json(), (req, res) => {
                         if (purchaseValue != null) purchaseValue += dossierPurchase;
                     }
                     priceLabel = chosen.total.toFixed(2).replace('.', ',') + ' EUR';
-                    if (chosen.type === 'unitaire' || chosen.type === 'pages') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
+                    if (chosen.type === 'unitaire' || chosen.type === 'pages' || chosen.type === 'auto_pages') priceLabel = numeric.toFixed(2).replace('.', ',') + ' EUR';
                 }
             }
         } else if (productData.priceLabel && numeric == null) {

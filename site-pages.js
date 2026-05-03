@@ -194,6 +194,7 @@
     var modes = [];
     if (rows.some(function (row) { return row.type === "lot"; })) modes.push("lot");
     if (rows.some(function (row) { return row.type === "unitaire"; }) || product.requiresQuantityInput) modes.push("unitaire");
+    if (rows.some(function (row) { return row.type === "auto_pages"; })) modes.push("auto_pages");
     if (rows.some(function (row) { return row.type === "pages"; })) modes.push("pages");
     if (rows.some(function (row) { return row.type === "dimensions"; }) || product.hasDimensions) modes.push("dimensions");
     if (!modes.length) modes.push(product.requiresQuantityInput ? "unitaire" : "lot");
@@ -1052,7 +1053,9 @@
     var currentPurchaseValue = null;
     var currentQuantityOptions = Array.isArray(product.quantityOptions) ? product.quantityOptions.slice() : [];
     var quantityModes = getProductQuantityModes(product);
-    var selectedQuantityMode = isImpressionDocumentProduct(product) ? "unitaire" : (quantityModes[0] || "lot");
+    var selectedQuantityMode = isImpressionDocumentProduct(product) && getProductPricingRows(product).some(function (row) { return row.type === "auto_pages"; })
+      ? "auto_pages"
+      : (isImpressionDocumentProduct(product) ? "unitaire" : (quantityModes[0] || "lot"));
     var documentPageCount = 1;
     var documentCopies = 1;
     var configSteps = getProductConfigSteps(product);
@@ -1176,7 +1179,7 @@
       }
       var modeHtml = quantityModes.length > 1
         ? '<div class="quantity-mode-grid">' + quantityModes.map(function (mode) {
-            var label = mode === "unitaire" ? "Unitaire" : (mode === "dimensions" ? "Dimensions" : (mode === "pages" ? "Pages brochure" : "Quantite lot"));
+            var label = mode === "unitaire" ? "Unitaire" : (mode === "dimensions" ? "Dimensions" : (mode === "pages" ? "Pages brochure" : (mode === "auto_pages" ? "Pages PDF" : "Quantite lot")));
             return '<button type="button" class="quantity-chip' + (mode === selectedQuantityMode ? ' active' : '') + '" data-qty-mode="' + esc(mode) + '">' + esc(label) + '</button>';
           }).join("") + '</div>'
         : '';
@@ -1246,7 +1249,7 @@
       if (!isImpressionDocumentProduct(product) || !files.length) return;
       countPdfPagesFromFiles(files)
         .then(function (pageCount) {
-          selectedQuantityMode = "unitaire";
+          selectedQuantityMode = getProductPricingRows(product).some(function (row) { return row.type === "auto_pages"; }) ? "auto_pages" : "unitaire";
           documentPageCount = pageCount;
           renderQuantityField(String(pageCount));
           requestPricing(String(pageCount)).then(function () {
