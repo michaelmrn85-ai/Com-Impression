@@ -18,6 +18,9 @@ const ADMIN_PASSWORD = String(
 const SUMUP_PUBLIC_API_KEY = String(process.env.SUMUP_PUBLIC_API_KEY || '').trim();
 const SUMUP_SECRET_API_KEY = String(process.env.SUMUP_SECRET_API_KEY || '').trim();
 const SUMUP_MERCHANT_CODE = String(process.env.SUMUP_MERCHANT_CODE || '').trim();
+const PUBLIC_MAINTENANCE_ACTIVE = String(process.env.PUBLIC_MAINTENANCE_ACTIVE || 'true').toLowerCase() !== 'false';
+const LEGACY_CATALOG_DISABLED = String(process.env.LEGACY_CATALOG_DISABLED || 'true').toLowerCase() !== 'false';
+const CATALOG_RESET_AT = Date.parse(process.env.CATALOG_RESET_AT || '2026-05-03T09:23:18.000Z');
 const KNOWN_PUBLIC_ORIGINS = Array.from(new Set([
     process.env.PUBLIC_BASE_URL,
     process.env.SITE_BASE_URL,
@@ -68,6 +71,30 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use((req, res, next) => {
+    if (!PUBLIC_MAINTENANCE_ACTIVE || req.method !== 'GET') return next();
+    const publicPath = String(req.path || '/');
+    if (
+        publicPath === '/admin' ||
+        publicPath === '/admin.js' ||
+        publicPath === '/health' ||
+        publicPath.startsWith('/api/') ||
+        publicPath.startsWith('/media/') ||
+        publicPath.startsWith('/uploads/') ||
+        publicPath.startsWith('/cart-uploads/')
+    ) {
+        return next();
+    }
+    if (/\.(png|jpe?g|webp|gif|svg|ico|css|js|json|txt|xml|woff2?|ttf|map)$/i.test(publicPath)) {
+        return next();
+    }
+    const accept = String(req.headers.accept || '');
+    if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return next();
+    res.status(503);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Retry-After', '3600');
+    res.sendFile(path.join(__dirname, 'maintenance.html'));
+});
 app.use(express.static(__dirname));
 
 const RATE_LIMIT_STORE = new Map();
@@ -238,8 +265,14 @@ function buildCatalogApiPayload() {
     const order = lireGammesConfig().filter(group => !group.hidden);
 
     let refIndex = 1;
+    const isAfterCatalogReset = item => {
+        if (!CATALOG_RESET_AT || Number.isNaN(CATALOG_RESET_AT)) return true;
+        const rawDate = item && (item.created_at || item.updated_at);
+        const productDate = Date.parse(rawDate || '');
+        return !Number.isNaN(productDate) && productDate > CATALOG_RESET_AT;
+    };
     const gammes = order.map(group => {
-        const legacyProducts = (cat[group.legacy] || []).filter(prod => {
+        const legacyProducts = LEGACY_CATALOG_DISABLED ? [] : (cat[group.legacy] || []).filter(prod => {
             const override = overrides[buildProductOverrideKey(group.legacy, prod.id)] || {};
             return !override.deleted;
         }).map(prod => {
@@ -325,7 +358,7 @@ function buildCatalogApiPayload() {
         });
 
         const extraProducts = customProducts
-            .filter(item => item && item.legacyCat === group.legacy)
+            .filter(item => item && item.legacyCat === group.legacy && isAfterCatalogReset(item))
             .map(item => {
                 const paperOptions = normaliseCsvList(item.paperOptions);
                 const formatOptions = normaliseCsvList(item.formatOptions);
