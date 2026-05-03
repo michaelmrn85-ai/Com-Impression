@@ -891,8 +891,15 @@
 
   function getEstimatedDeliveryDate(product) {
     var days = Number(product && product.deliveryDelayDays);
-    if (isNaN(days) || days < 0) return "";
-    return formatDateFr(addDeliveryDays(new Date(), days));
+    var hours = Number(product && product.deliveryDelayHours);
+    if ((isNaN(days) || days < 0) && (isNaN(hours) || hours < 0)) return "";
+    var date = addDeliveryDays(new Date(), isNaN(days) || days < 0 ? 0 : days);
+    if (!isNaN(hours) && hours > 0) {
+      date.setHours(date.getHours() + hours);
+      var minutes = String(date.getMinutes()).padStart(2, "0");
+      return formatDateFr(date) + " à " + String(date.getHours()).padStart(2, "0") + "h" + (minutes === "00" ? "" : minutes);
+    }
+    return formatDateFr(date);
   }
 
   function buildOrderRows(cart) {
@@ -2913,7 +2920,10 @@
         var details = [
           product.sizeInfo,
           product.priceLabel || euro(product.priceValue),
-          product.deliveryDelayDays ? "Delai " + product.deliveryDelayDays + " j" : ""
+          (product.deliveryDelayDays || product.deliveryDelayHours) ? "Delai " + [
+            product.deliveryDelayDays ? product.deliveryDelayDays + " j" : "",
+            product.deliveryDelayHours ? product.deliveryDelayHours + " h" : ""
+          ].filter(Boolean).join(" ") : ""
         ].filter(Boolean);
         return '<article class="gamme-card" data-search="' + esc([gamme.title, product.title, product.summary, details.join(" ")].join(" ")) + '">'
           + '<div class="gamme-badge">' + esc(gamme.title || "Categorie") + '</div>'

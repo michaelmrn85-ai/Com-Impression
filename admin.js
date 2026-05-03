@@ -1392,9 +1392,11 @@
 
   function openProductEditor(key){
     var entry=key ? findAdminProduct(key) : null;
+    var categoryOptions = getAdminGammeOptions();
+    var defaultLegacyCat = categoryOptions.length ? categoryOptions[0].value : '';
     state.selectedProduct=entry || {
       gammeTitle:'',
-      legacyCat:'compro',
+      legacyCat:defaultLegacyCat,
       product:{
         ref:getNextProductRef(),
         id:'',
@@ -1411,18 +1413,22 @@
         uploadEnabled:true,
         hasDimensions:false,
         requiresQuantityInput:false,
-        deliveryDelayDays:''
+        deliveryDelayDays:'',
+        deliveryDelayHours:''
       },
       isNew:true
     };
     $('product-edit-title').textContent=(state.selectedProduct.isNew?'Creation produit':'Edition produit')+' — '+((state.selectedProduct.product && state.selectedProduct.product.title)||'Produit');
     var entryRef = state.selectedProduct;
-    var gammeOptions = getAdminGammeOptions().map(function(item){
+    var gammeOptions = categoryOptions.map(function(item){
       return '<option value="'+item.value+'" '+(entryRef.legacyCat===item.value?'selected':'')+'>'+item.label+'</option>';
     }).join('');
+    var categoryField = categoryOptions.length
+      ? '<div class="field"><label>Catégorie</label><select id="product-edit-gamme">'+gammeOptions+'</select></div>'
+      : '<div class="field"><label>Catégorie</label><div class="empty">Crée d abord une catégorie dans l onglet Catégories.</div><input id="product-edit-gamme" type="hidden" value=""></div>';
     $('product-edit-body').innerHTML=
       '<div class="product-meta-grid">'
-      +'<div class="field"><label>Catégorie</label><select id="product-edit-gamme">'+gammeOptions+'</select></div>'
+      +categoryField
       +'<div class="field"><label>Reference</label><input value="'+esc(entryRef.product.ref||'')+'" disabled></div>'
       +'<div class="field"><label>Libelle</label><input id="product-edit-name" value="'+esc(entryRef.product.title||'')+'"></div>'
       +'</div>'
@@ -1431,7 +1437,10 @@
       +'<div class="field"><label>Apercu photo</label><div id="product-edit-image-preview" style="min-height:180px;border:1px solid #eee3d9;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+(entryRef.product.imageUrl?'<img src="'+esc(entryRef.product.imageUrl)+'" alt="Apercu produit" style="width:100%;height:180px;object-fit:cover;display:block;">':'<span class="muted">Aucune image</span>')+'</div></div>'
       +'</div>'
       +'<div class="field"><label>Taille affichée (information fixe)</label><input id="product-edit-size" placeholder="A4, 10x15, 8,5x5,4..." value="'+esc(entryRef.product.sizeInfo||'')+'"></div>'
+      +'<div class="site-grid">'
       +'<div class="field"><label>Delai de livraison (jours)</label><input id="product-edit-delivery-delay" type="number" min="0" step="1" placeholder="Ex: 5" value="'+esc(entryRef.product.deliveryDelayDays==null?'':entryRef.product.deliveryDelayDays)+'"></div>'
+      +'<div class="field"><label>Delai complementaire (heures)</label><input id="product-edit-delivery-hours" type="number" min="0" step="1" placeholder="Ex: 9" value="'+esc(entryRef.product.deliveryDelayHours==null?'':entryRef.product.deliveryDelayHours)+'"></div>'
+      +'</div>'
       +'<div class="field"><label>Cheminements et tarifs</label>'+renderProductPathEditor(entryRef.product || {})+'</div>'
       +'<div class="site-grid">'
       +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 14px;font-weight:800;"><input id="product-edit-upload" type="checkbox" style="width:auto;" '+(entryRef.product.uploadEnabled!==false?'checked':'')+'> Upload actif sur la fiche produit</label>'
@@ -1897,12 +1906,17 @@
     var quantityOptions = pricingRows.filter(function(row){ return row.type !== 'dimensions'; }).map(function(row){ return row.quantity; }).filter(Boolean).join(',');
     var saleLabel = firstRow.salePrice ? formatPriceValue(firstRow.salePrice) : ((entry.product||{}).priceLabel||'Sur devis');
     var endpoint = entry.isNew ? '/api/admin/products' : ('/api/admin/products/'+encodeURIComponent(entry.legacyCat)+'/'+encodeURIComponent(entry.product.id));
+    var selectedLegacyCat = (($('product-edit-gamme')||{}).value||entry.legacyCat||'').trim();
+    if(!selectedLegacyCat){
+      setStatus('product-edit-status','err','Crée d abord une catégorie avant de créer un produit.');
+      return;
+    }
     fetch(api(endpoint),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         mdp:state.mdp,
-        legacyCat:($('product-edit-gamme').value||entry.legacyCat||'').trim(),
+        legacyCat:selectedLegacyCat,
         title:($('product-edit-name').value||'').trim(),
         sizeInfo:(($('product-edit-size')||{}).value||'').trim(),
         summary:'',
@@ -1918,6 +1932,7 @@
         subProductTypes:pathData ? [] : (($('product-edit-subtypes')||{}).value||'').split(/\n|,/).map(function(value){ return value.trim(); }).filter(Boolean),
         configSteps:pathData ? pathData.configSteps : readProductConfigStepsEditor(),
         deliveryDelayDays:($('product-edit-delivery-delay').value||'').trim(),
+        deliveryDelayHours:($('product-edit-delivery-hours').value||'').trim(),
         quantityPricing:pricing,
         uploadEnabled:!!(($('product-edit-upload')||{}).checked),
         requiresQuantityInput:pricingRows.some(function(row){ return row.type === 'unitaire'; }),
