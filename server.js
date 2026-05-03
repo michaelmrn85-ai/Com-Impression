@@ -18,7 +18,7 @@ const ADMIN_PASSWORD = String(
 const SUMUP_PUBLIC_API_KEY = String(process.env.SUMUP_PUBLIC_API_KEY || '').trim();
 const SUMUP_SECRET_API_KEY = String(process.env.SUMUP_SECRET_API_KEY || '').trim();
 const SUMUP_MERCHANT_CODE = String(process.env.SUMUP_MERCHANT_CODE || '').trim();
-const PUBLIC_MAINTENANCE_ACTIVE = String(process.env.PUBLIC_MAINTENANCE_ACTIVE || 'true').toLowerCase() !== 'false';
+const PUBLIC_MAINTENANCE_DEFAULT = String(process.env.PUBLIC_MAINTENANCE_ACTIVE || 'true').toLowerCase() !== 'false';
 const LEGACY_CATALOG_DISABLED = String(process.env.LEGACY_CATALOG_DISABLED || 'true').toLowerCase() !== 'false';
 const CATALOG_RESET_AT = Date.parse(process.env.CATALOG_RESET_AT || '2026-05-03T09:23:18.000Z');
 const CATEGORY_RESET_AT = Date.parse(process.env.CATEGORY_RESET_AT || '2026-05-03T09:23:18.000Z');
@@ -73,7 +73,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use((req, res, next) => {
-    if (!PUBLIC_MAINTENANCE_ACTIVE || req.method !== 'GET') return next();
+    if (!isPublicMaintenanceActive() || req.method !== 'GET') return next();
     const publicPath = String(req.path || '/');
     if (
         publicPath === '/admin' ||
@@ -94,7 +94,15 @@ app.use((req, res, next) => {
     res.status(503);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Retry-After', '3600');
-    res.sendFile(path.join(__dirname, 'maintenance.html'));
+    try {
+        const siteConfig = lireSiteConfig();
+        const html = fs.readFileSync(path.join(__dirname, 'maintenance.html'), 'utf8')
+            .replace(/<h1>[\s\S]*?<\/h1>/, `<h1>${escapeHtml(siteConfig.maintenanceTitle || 'Mise à jour en cours')}</h1>`)
+            .replace(/<p data-maintenance-message>[\s\S]*?<\/p>/, `<p data-maintenance-message>${escapeHtml(siteConfig.maintenanceMessage || "Le site COM' Impression est en cours de reconstruction. Merci de votre compréhension.")}</p>`);
+        return res.type('html').send(html);
+    } catch (e) {
+        return res.sendFile(path.join(__dirname, 'maintenance.html'));
+    }
 });
 app.use(express.static(__dirname));
 
@@ -1927,6 +1935,9 @@ function storeOrderUploadDocuments(orderNumber, files) {
 
 function defaultSiteConfig() {
     return {
+        maintenanceEnabled: PUBLIC_MAINTENANCE_DEFAULT,
+        maintenanceTitle: 'Mise à jour en cours',
+        maintenanceMessage: "Le site COM' Impression est en cours de reconstruction. Merci de votre compréhension.",
         topBanner: '',
         homeBannerEnabled: true,
         homeBannerTitle: 'Bienvenue chez COM’ Impression',
@@ -1977,6 +1988,7 @@ function defaultSiteConfig() {
 
 function normaliserSiteConfig(raw) {
     const base = defaultSiteConfig();
+    const pickText = (key) => raw && Object.prototype.hasOwnProperty.call(raw, key) ? String(raw[key] || '') : base[key];
     const ids = Array.isArray(raw && raw.seasonalProductIds)
         ? raw.seasonalProductIds
         : String((raw && raw.seasonalProductIds) || '')
@@ -1990,12 +2002,15 @@ function normaliserSiteConfig(raw) {
             .map(s => s.trim())
             .filter(Boolean);
     return {
+        maintenanceEnabled: raw && raw.maintenanceEnabled != null ? !!raw.maintenanceEnabled : base.maintenanceEnabled,
+        maintenanceTitle: pickText('maintenanceTitle'),
+        maintenanceMessage: pickText('maintenanceMessage'),
         topBanner: (raw && raw.topBanner) || base.topBanner,
         homeBannerEnabled: raw && raw.homeBannerEnabled != null ? !!raw.homeBannerEnabled : base.homeBannerEnabled,
-        homeBannerTitle: (raw && raw.homeBannerTitle) || base.homeBannerTitle,
-        homeBannerText: (raw && raw.homeBannerText) || base.homeBannerText,
-        homeBannerButtonLabel: (raw && raw.homeBannerButtonLabel) || base.homeBannerButtonLabel,
-        homeBannerButtonUrl: (raw && raw.homeBannerButtonUrl) || base.homeBannerButtonUrl,
+        homeBannerTitle: pickText('homeBannerTitle'),
+        homeBannerText: pickText('homeBannerText'),
+        homeBannerButtonLabel: pickText('homeBannerButtonLabel'),
+        homeBannerButtonUrl: pickText('homeBannerButtonUrl'),
         heroBadge: (raw && raw.heroBadge) || base.heroBadge,
         heroLine1: (raw && raw.heroLine1) || base.heroLine1,
         heroHighlight: (raw && raw.heroHighlight) || base.heroHighlight,
@@ -2015,6 +2030,14 @@ function normaliserSiteConfig(raw) {
         faqContent: (raw && raw.faqContent) || base.faqContent,
         updated_at: (raw && raw.updated_at) || ''
     };
+}
+
+function isPublicMaintenanceActive() {
+    try {
+        return lireSiteConfig().maintenanceEnabled !== false;
+    } catch (e) {
+        return PUBLIC_MAINTENANCE_DEFAULT;
+    }
 }
 
 app.use((req, res, next) => {

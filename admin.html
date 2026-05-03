@@ -209,10 +209,23 @@
     .upload-preview{margin-top:12px;border:2px solid #f0e4dc;border-radius:18px;background:#fff;min-height:140px;display:flex;align-items:center;justify-content:center;overflow:hidden}
     .upload-preview img{display:block;max-width:100%;max-height:220px;object-fit:cover}
     .season-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:6px}
-    .season-item{display:flex;gap:10px;align-items:flex-start;border:2px solid #f0e4dc;border-radius:16px;padding:10px 12px;background:#fff}
+    .season-item{display:grid;grid-template-columns:auto 74px minmax(0,1fr);gap:10px;align-items:center;border:2px solid #f0e4dc;border-radius:16px;padding:10px 12px;background:#fff}
     .season-item input{margin-top:3px;width:auto}
+    .season-thumb{width:74px;height:52px;border-radius:12px;background:#fff4e8;border:1px solid #f0e4dc;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#a89b92;font-size:.72rem;text-align:center}
+    .season-thumb img{width:100%;height:100%;object-fit:cover;display:block}
     .season-item strong{display:block;font-size:.9rem}
     .season-item span{display:block;color:var(--muted);font-size:.8rem;line-height:1.35}
+    .site-control-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+    .site-control-grid .panel{grid-column:span 6}
+    .site-control-grid .panel.wide{grid-column:1/-1}
+    .site-control-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 16px}
+    .site-control-kpi{border:1px solid #f0e4dc;border-radius:18px;background:#fffaf5;padding:14px}
+    .site-control-kpi strong{display:block;font-family:'Baloo 2',cursive;color:var(--or);font-size:1rem}
+    .site-control-kpi span{display:block;color:#5f5751;font-size:.82rem;margin-top:3px}
+    .media-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .media-guide div{border:1px dashed #efd8c0;border-radius:16px;background:#fffaf5;padding:12px}
+    .media-guide strong{display:block;color:var(--or);font-family:'Baloo 2',cursive}
+    .media-guide span{display:block;color:#5f5751;font-size:.84rem;line-height:1.4}
     .template-card{border:2px solid #eee0d6;border-radius:20px;padding:16px;background:#fffdfa;display:grid;gap:12px}
     .template-card h3{margin:0;font-family:'Baloo 2',cursive;font-size:1.15rem}
     .template-card textarea{min-height:220px;font-family:inherit;line-height:1.6}
@@ -233,7 +246,7 @@
     .empty{padding:34px;text-align:center;color:var(--muted);background:#fff8ef;border:1px dashed var(--line);border-radius:20px}
     @media(max-width:1100px){.admin-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
     @media(max-width:1250px){.cash-register{grid-template-columns:1fr}.cash-ticket{max-width:none}.cash-register .manual-line{grid-template-columns:minmax(160px,1fr) 120px 140px minmax(170px,1fr) auto}}
-    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid,.cash-register,.cash-search-grid{grid-template-columns:1fr}.product-path-connector{display:none}.detail-grid,.detail-split,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}.cash-ticket{position:static}}
+    @media(max-width:900px){.admin-summary,.day-kpis{grid-template-columns:1fr 1fr}.order,.manual-line,.manual-option-row,.product-pricing-option-row,.product-step-editor-head,.product-step-choice-row,.product-path-step-row,.product-path-tariff-row,.season-list,.product-meta-grid,.cash-register,.cash-search-grid,.media-guide,.site-control-kpis{grid-template-columns:1fr}.site-control-grid{grid-template-columns:1fr}.site-control-grid .panel{grid-column:1/-1}.product-path-connector{display:none}.detail-grid,.detail-split,.site-grid{grid-template-columns:1fr}.topbar,.dash-head{flex-direction:column;align-items:stretch}.pricing-table-wrap{overflow:auto}.pricing-table{min-width:980px}.admin-tabs{top:102px;padding:12px}.topbar{margin-bottom:36px}.cash-ticket{position:static}}
     @media(max-width:560px){.admin-summary,.day-kpis,.admin-tabs{grid-template-columns:1fr}.page{width:min(100% - 20px,1240px)}.login-card,.dashboard,.admin-section,.box{box-shadow:0 12px 26px rgba(23,19,16,.08)}.topbar{top:8px;padding:16px;margin-bottom:28px}.admin-tabs{top:98px;border-radius:22px;margin-bottom:24px}.dashboard,.admin-section{padding:24px}}
     @media(max-width:1100px){
       .page{padding-top:24px}
@@ -573,28 +586,52 @@
   <section class="admin-section" id="site-editor-section" style="width:min(1180px,calc(100% - 32px));margin:0 auto 40px;padding:0 0 28px;">
     <div class="box" style="max-height:none;">
       <div class="box-head">
-        <h2>Accueil et contenu</h2>
+        <h2>Centre de contrôle du site</h2>
         <button class="btn btn-light btn-small" data-close type="button">Retour</button>
       </div>
       <div class="box-body">
-        <div class="site-grid">
-          <div class="panel">
-            <h3>1. Bandeau haut du site</h3>
+        <div class="site-control-kpis">
+          <div class="site-control-kpi"><strong>Maintenance</strong><span>Ouverture et fermeture du site public</span></div>
+          <div class="site-control-kpi"><strong>Accueil</strong><span>Bannière, produits et message haut</span></div>
+          <div class="site-control-kpi"><strong>Contenus</strong><span>FAQ, CGV, mentions légales</span></div>
+          <div class="site-control-kpi"><strong>Formats</strong><span>Tailles images conseillées</span></div>
+        </div>
+        <div class="site-control-grid">
+          <div class="panel wide">
+            <h3>1. État du site</h3>
+            <label style="display:flex;align-items:center;gap:8px;margin:0 0 14px;font-weight:800;"><input id="site-maintenance-enabled" type="checkbox" style="width:auto;"> Site public en maintenance</label>
+            <div class="site-grid">
+              <div class="field"><label>Titre affiché en maintenance</label><input id="site-maintenance-title" placeholder="Mise à jour en cours"></div>
+              <div class="field"><label>Message maintenance</label><input id="site-maintenance-message" placeholder="Le site revient bientôt."></div>
+            </div>
+            <p class="muted">Le BackOffice reste accessible même quand le site public est fermé.</p>
+          </div>
+
+          <div class="panel wide">
+            <h3>2. Accueil — bandeau haut</h3>
             <div class="field"><label>Message du bandeau</label><input id="site-top-banner" placeholder="Ex : Livraison offerte des 150 EUR"></div>
           </div>
-          <div class="panel">
-            <h3>2. En-tête accueil</h3>
+
+          <div class="panel wide">
+            <h3>3. Accueil — bannière principale</h3>
+            <label style="display:flex;align-items:center;gap:8px;margin:0 0 14px;font-weight:800;"><input id="site-home-banner-enabled" type="checkbox" style="width:auto;"> Afficher la bannière d’accueil</label>
+            <div class="field"><label>Titre de la bannière</label><input id="site-home-banner-title" placeholder="Ex : Impression rapide pour vos supports essentiels"></div>
+            <div class="field"><label>Texte de la bannière</label><textarea id="site-home-banner-text" placeholder="Texte court affiché sur la bannière"></textarea></div>
+            <div class="site-grid">
+              <div class="field"><label>Texte du bouton</label><input id="site-home-banner-button-label" placeholder="Ex : Voir les produits"></div>
+              <div class="field"><label>Lien du bouton</label><input id="site-home-banner-button-url" placeholder="./produits.html"></div>
+            </div>
             <div class="field"><label>Badge au-dessus du titre</label><input id="site-hero-badge" placeholder="Ex : Communication visuelle qui vend mieux"></div>
             <div class="field"><label>Sous-titre</label><input id="site-hero-slogan" placeholder="Ex : Impression, communication et supports sur mesure"></div>
-            <div class="field"><label>Ligne 1</label><input id="site-hero-line1" placeholder="Ex : L'impression"></div>
-            <div class="field"><label>Mot mis en avant</label><input id="site-hero-highlight" placeholder="Ex : colorée"></div>
-            <div class="field"><label>Ligne 2</label><input id="site-hero-line2" placeholder="Ex : qui fait la différence !"></div>
-            <div class="field"><label>Texte descriptif</label><textarea id="site-hero-text" placeholder="Texte sous le titre"></textarea></div>
+            <div class="field" style="display:none;"><label>Ligne 1</label><input id="site-hero-line1" placeholder="Ex : L'impression"></div>
+            <div class="field" style="display:none;"><label>Mot mis en avant</label><input id="site-hero-highlight" placeholder="Ex : colorée"></div>
+            <div class="field" style="display:none;"><label>Ligne 2</label><input id="site-hero-line2" placeholder="Ex : qui fait la différence !"></div>
+            <div class="field" style="display:none;"><label>Texte descriptif</label><textarea id="site-hero-text" placeholder="Texte sous le titre"></textarea></div>
             <div class="field">
               <label>Image du bandeau</label>
               <div class="upload-box">
                 <input id="site-hero-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
-                <div class="muted" style="margin-top:8px;">Envoie une image au format du bandeau. PNG, JPG, WEBP ou SVG.</div>
+                <div class="muted" style="margin-top:8px;">Format conseillé : 2400×1100 px. Accepté : PNG, JPG, WEBP ou SVG.</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
                   <button class="btn btn-light btn-small" id="site-hero-image-clear" type="button">Retirer l'image</button>
                 </div>
@@ -602,14 +639,16 @@
               </div>
             </div>
           </div>
-          <div class="panel">
-            <h3>3. Bloc d'information accueil</h3>
+
+          <div class="panel wide" style="display:none;">
+            <h3>Compatibilité ancienne bannière</h3>
             <div class="field"><label>Titre du bloc</label><input id="site-panel-title" placeholder="Ex : Un accueil plus complet et plus utile"></div>
             <div class="field"><label>Texte du bloc</label><textarea id="site-panel-text" placeholder="Texte de presentation du bloc accueil"></textarea></div>
             <div class="field" style="display:none;"><label>Liste interne</label><textarea id="site-panel-items"></textarea></div>
           </div>
-          <div class="panel">
-            <h3>4. Produits mis en avant accueil</h3>
+
+          <div class="panel wide">
+            <h3>4. Accueil — produits mis en avant</h3>
             <div class="field"><label>Titre section</label><input id="site-products-title" placeholder="Ex : Tout ce qu'il faut pour"></div>
             <div class="field"><label>Mot accent</label><input id="site-products-accent" placeholder="Ex : communiquer"></div>
             <div class="field"><label>Sous-titre section</label><textarea id="site-products-subtitle" placeholder="Texte d'introduction de la section"></textarea></div>
@@ -617,13 +656,15 @@
               <label>Produits mis en avant</label>
               <div class="season-list" id="site-products-list"></div>
             </div>
-            <p class="muted">La liste vient du catalogue actuel, pas de l’ancien site.</p>
+            <p class="muted">Seuls les produits avec photo peuvent être affichés sur l’accueil. Photo produit conseillée : 1600×900 px.</p>
           </div>
+
           <div class="panel">
-            <h3>5. Popup information client</h3>
+            <h3>5. Information client</h3>
             <div class="field"><label>Popup incident / information</label><textarea id="site-popup-message" placeholder="Message visible par les clients"></textarea></div>
             <p class="muted">La sauvegarde publie directement les réglages sur le site public.</p>
           </div>
+
           <div class="panel">
             <h3>6. Codes réduction</h3>
             <div class="site-grid">
@@ -634,12 +675,22 @@
             <button class="btn btn-orange btn-small" id="promo-create" type="button">Créer le code</button>
             <div class="list" id="promo-list" style="margin-top:12px;"></div>
           </div>
-          <div class="panel">
+
+          <div class="panel wide">
             <h3>7. Pages de contenu</h3>
             <div class="field"><label>FAQ</label><textarea id="site-faq-content" placeholder="Questions et réponses de la FAQ"></textarea></div>
             <div class="field"><label>Conditions générales de vente</label><textarea id="site-cgv-content" placeholder="Texte des CGV"></textarea></div>
             <div class="field"><label>Mentions légales</label><textarea id="site-legal-content" placeholder="Texte des mentions légales"></textarea></div>
             <p class="muted">Le bouton Publier sur le site met à jour les pages FAQ, CGV et Mentions légales.</p>
+          </div>
+
+          <div class="panel wide">
+            <h3>8. Tailles d’images conseillées</h3>
+            <div class="media-guide">
+              <div><strong>Bannière accueil</strong><span>2400×1100 px, JPG ou WEBP léger. Zone importante centrée.</span></div>
+              <div><strong>Photo produit</strong><span>1600×900 px. Obligatoire pour afficher un produit sur l’accueil.</span></div>
+              <div><strong>Choix d’étape</strong><span>900×600 px. Fond simple, produit bien visible.</span></div>
+            </div>
           </div>
         </div>
         <button class="btn btn-orange" id="site-save" type="button">Publier sur le site</button>

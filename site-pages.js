@@ -2950,6 +2950,19 @@
         homeSiteConfig = config;
         if ($("home-brand-subtitle")) $("home-brand-subtitle").textContent = config.heroSlogan || $("home-brand-subtitle").textContent;
         if ($("home-hero-badge")) $("home-hero-badge").textContent = config.heroBadge || $("home-hero-badge").textContent;
+        if ($("home-banner")) {
+          $("home-banner").hidden = config.homeBannerEnabled === false;
+        }
+        if ($("home-banner-title")) {
+          $("home-banner-title").textContent = config.homeBannerTitle || config.heroPanelTitle || $("home-banner-title").textContent;
+        }
+        if ($("home-banner-text")) {
+          $("home-banner-text").textContent = config.homeBannerText || config.heroPanelText || $("home-banner-text").textContent;
+        }
+        if ($("home-go-products")) {
+          $("home-go-products").textContent = config.homeBannerButtonLabel || $("home-go-products").textContent;
+          $("home-go-products").setAttribute("href", config.homeBannerButtonUrl || "./produits.html");
+        }
         if ($("home-hero-title")) {
           $("home-hero-title").textContent = [config.heroLine1, config.heroHighlight, config.heroLine2].filter(Boolean).join(" ").trim() || $("home-hero-title").textContent;
         }
@@ -2975,8 +2988,16 @@
             $("home-products-subtitle").textContent = "";
           }
         }
-        if ($("home-hero-image") && config.heroImage) {
-          $("home-hero-image").src = config.heroImage;
+        if ($("home-hero-image")) {
+          if (config.heroImage) {
+            $("home-hero-image").src = config.heroImage;
+            $("home-hero-image").alt = config.homeBannerTitle || "Banniere COM' Impression";
+            if ($("home-banner")) $("home-banner").classList.add("has-image");
+          } else {
+            $("home-hero-image").removeAttribute("src");
+            $("home-hero-image").alt = "";
+            if ($("home-banner")) $("home-banner").classList.remove("has-image");
+          }
         }
         return config;
       })
@@ -3019,8 +3040,12 @@
 
     var productsCta = $("home-go-products");
     if (productsCta) {
-      productsCta.addEventListener("click", function () {
-        goTo("/produits");
+      productsCta.addEventListener("click", function (event) {
+        var href = productsCta.getAttribute("href") || "";
+        if (!href || href === "./produits.html" || href === "/produits" || href === "produits.html") {
+          event.preventDefault();
+          goTo("/produits");
+        }
       });
     }
 

@@ -1048,20 +1048,25 @@
     if(!wrap) return;
     var selected = Array.isArray(selectedIds) ? selectedIds : [];
     var options = state.catalog.map(function(entry){
+      var imageUrl = entry.product.imageUrl || entry.product.image || '';
       return {
         id: entry.product.id,
         label: entry.product.title || entry.product.id,
-        meta: (entry.gammeTitle || '') + (entry.product.ref ? ' • ' + entry.product.ref : '')
+        meta: (entry.gammeTitle || '') + (entry.product.ref ? ' • ' + entry.product.ref : ''),
+        imageUrl: imageUrl
       };
+    }).filter(function(item){
+      return !!item.imageUrl;
     });
     if(!options.length){
-      wrap.innerHTML = '<div class="empty">Charge le catalogue pour choisir les produits mis en avant.</div>';
+      wrap.innerHTML = '<div class="empty">Aucun produit avec photo. Ajoute une photo produit au format 1600×900 px avant de le mettre sur l’accueil.</div>';
       return;
     }
     wrap.innerHTML = options.map(function(item){
       var checked = selected.indexOf(item.id) !== -1 ? 'checked' : '';
       return '<label class="season-item">'
         +'<input type="checkbox" class="site-product-check" value="'+esc(item.id)+'" '+checked+'>'
+        +'<div class="season-thumb"><img src="'+esc(item.imageUrl)+'" alt=""></div>'
         +'<div><strong>'+esc(item.label)+'</strong><span>'+esc(item.meta)+'</span></div>'
         +'</label>';
     }).join('');
@@ -1084,7 +1089,15 @@
   }
 
   function remplirSiteConfig(config){
+    if($('site-maintenance-enabled')) $('site-maintenance-enabled').checked = config.maintenanceEnabled !== false;
+    if($('site-maintenance-title')) $('site-maintenance-title').value = config.maintenanceTitle || '';
+    if($('site-maintenance-message')) $('site-maintenance-message').value = config.maintenanceMessage || '';
     $('site-top-banner').value = config.topBanner || '';
+    if($('site-home-banner-enabled')) $('site-home-banner-enabled').checked = config.homeBannerEnabled !== false;
+    if($('site-home-banner-title')) $('site-home-banner-title').value = config.homeBannerTitle || '';
+    if($('site-home-banner-text')) $('site-home-banner-text').value = config.homeBannerText || '';
+    if($('site-home-banner-button-label')) $('site-home-banner-button-label').value = config.homeBannerButtonLabel || '';
+    if($('site-home-banner-button-url')) $('site-home-banner-button-url').value = config.homeBannerButtonUrl || '';
     $('site-hero-badge').value = config.heroBadge || '';
     $('site-hero-slogan').value = config.heroSlogan || '';
     $('site-hero-line1').value = config.heroLine1 || '';
@@ -1117,7 +1130,15 @@
           .then(function(incidentData){
             var incident = (incidentData && incidentData.incident) || {};
             remplirSiteConfig({
+              maintenanceEnabled: state.siteConfig.maintenanceEnabled,
+              maintenanceTitle: state.siteConfig.maintenanceTitle,
+              maintenanceMessage: state.siteConfig.maintenanceMessage,
               topBanner: state.siteConfig.topBanner,
+              homeBannerEnabled: state.siteConfig.homeBannerEnabled,
+              homeBannerTitle: state.siteConfig.homeBannerTitle,
+              homeBannerText: state.siteConfig.homeBannerText,
+              homeBannerButtonLabel: state.siteConfig.homeBannerButtonLabel,
+              homeBannerButtonUrl: state.siteConfig.homeBannerButtonUrl,
               heroBadge: state.siteConfig.heroBadge,
               heroSlogan: state.siteConfig.heroSlogan,
               heroLine1: state.siteConfig.heroLine1,
@@ -1204,7 +1225,15 @@
   function saveSiteConfig(){
     var payload = {
       mdp: state.mdp,
+      maintenanceEnabled: !!(($('site-maintenance-enabled')||{}).checked),
+      maintenanceTitle: (($('site-maintenance-title')||{}).value || '').trim(),
+      maintenanceMessage: (($('site-maintenance-message')||{}).value || '').trim(),
       topBanner: $('site-top-banner').value || '',
+      homeBannerEnabled: !!(($('site-home-banner-enabled')||{}).checked),
+      homeBannerTitle: (($('site-home-banner-title')||{}).value || '').trim(),
+      homeBannerText: (($('site-home-banner-text')||{}).value || '').trim(),
+      homeBannerButtonLabel: (($('site-home-banner-button-label')||{}).value || '').trim(),
+      homeBannerButtonUrl: (($('site-home-banner-button-url')||{}).value || '').trim(),
       heroBadge: $('site-hero-badge').value || '',
       heroLine1: $('site-hero-line1').value || '',
       heroHighlight: $('site-hero-highlight').value || '',

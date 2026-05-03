@@ -289,14 +289,7 @@
     .hero {
       max-width: var(--max);
       margin: 0 auto;
-      padding: 48px 24px 20px;
-    }
-
-    .hero-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0;
-      align-items: stretch;
+      padding: 42px 24px 20px;
     }
 
     .hero-tag {
@@ -383,79 +376,76 @@
       line-height: 1.5;
     }
 
-    .hero-panel {
+    .home-banner {
       position: relative;
-      min-height: 340px;
+      min-height: min(520px, 58vh);
       border-radius: var(--radius-xl);
       overflow: hidden;
-      background: linear-gradient(160deg, #1c1713 0%, #2b241e 100%);
+      background: linear-gradient(135deg, #1b1511 0%, #31241c 100%);
       color: var(--white);
       box-shadow: var(--shadow);
-      padding: 28px;
+      display: flex;
+      align-items: end;
+      isolation: isolate;
     }
 
-    .hero-panel::before {
+    .home-banner::before {
       content: "";
       position: absolute;
-      right: -70px;
-      top: -50px;
-      width: 220px;
-      height: 220px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, rgba(255, 122, 26, 0.95), rgba(255, 122, 26, 0.2));
-      opacity: 0.9;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(23, 19, 16, 0.84) 0%, rgba(23, 19, 16, 0.44) 48%, rgba(23, 19, 16, 0.1) 100%),
+        radial-gradient(circle at 88% 18%, rgba(255, 122, 26, 0.58), transparent 24%);
+      z-index: 1;
     }
 
-    .hero-panel::after {
-      content: "";
+    .home-banner[hidden] {
+      display: none !important;
+    }
+
+    .home-banner-image {
       position: absolute;
-      left: -36px;
-      bottom: 30px;
-      width: 150px;
-      height: 150px;
-      border-radius: 999px;
-      background: rgba(255, 122, 26, 0.22);
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.92;
     }
 
-    .panel-card,
-    .hero-list {
+    .home-banner-content {
       position: relative;
       z-index: 1;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 24px;
-      backdrop-filter: blur(10px);
-    }
-
-    .panel-card {
-      padding: 26px;
-      margin-bottom: 0;
+      width: min(720px, 100%);
+      padding: clamp(28px, 5vw, 58px);
       display: grid;
-      grid-template-columns: minmax(240px, 420px) minmax(0, 1fr);
-      gap: 28px;
-      align-items: center;
+      gap: 16px;
     }
 
-    .hero-logo {
-      width: min(100%, 420px);
-      margin: 0 auto;
-    }
-
-    .panel-card h2 {
+    .home-banner-title {
       font-family: "Sora", sans-serif;
-      font-size: clamp(2rem, 4vw, 3.2rem);
-      line-height: 1.08;
-      margin-bottom: 10px;
+      font-size: clamp(2.7rem, 6vw, 5.7rem);
+      line-height: 0.94;
+      letter-spacing: -0.06em;
+      max-width: 11ch;
     }
 
-    .panel-copy {
-      display: grid;
-      gap: 14px;
-      align-content: center;
+    .home-banner-text {
+      max-width: 58ch;
+      color: rgba(255, 255, 255, 0.84);
+      line-height: 1.7;
+      font-size: 1.06rem;
+    }
+
+    .home-banner .main-btn {
+      width: fit-content;
+      margin-top: 4px;
+    }
+
+    .home-banner:not(.has-image) .home-banner-image {
+      display: none;
     }
 
     .panel-card p,
-    .hero-inline-list li,
     .hero-list li,
     .section-title p,
     .gamme-card p,
@@ -466,55 +456,6 @@
     .search-empty p {
       color: rgba(255, 255, 255, 0.76);
       line-height: 1.7;
-    }
-
-    .hero-list {
-      list-style: none;
-      padding: 18px 20px;
-      display: grid;
-      gap: 12px;
-    }
-
-    .hero-list li {
-      color: rgba(255, 255, 255, 0.82);
-      padding-left: 16px;
-      position: relative;
-    }
-
-    .hero-list li::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 10px;
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--orange);
-    }
-
-    .hero-inline-list {
-      list-style: none;
-      display: grid;
-      gap: 10px;
-      margin-top: 4px;
-      padding: 0;
-    }
-
-    .hero-inline-list li {
-      padding-left: 16px;
-      position: relative;
-      color: rgba(255, 255, 255, 0.82);
-    }
-
-    .hero-inline-list li::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 10px;
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--orange);
     }
 
     .section {
@@ -1138,27 +1079,13 @@
 
   <main>
     <section class="hero" id="accueil">
-      <div class="hero-grid">
-        <div class="hero-panel">
-          <div class="panel-card">
-            <img class="hero-logo" id="home-hero-image" src="./com-logo.png" alt="COM' Impression">
-            <div class="panel-copy">
-              <div class="hero-tag" id="home-hero-badge">Communication visuelle qui vend mieux</div>
-              <h2 id="home-panel-title">COM' Impression</h2>
-              <p id="home-panel-text">
-                Un acces simple au catalogue, a votre compte et a votre panier.
-              </p>
-              <ul class="hero-inline-list" id="home-panel-list">
-                <li>Recherche rapide</li>
-                <li>Acces direct au compte</li>
-                <li>Panier simple</li>
-              </ul>
-              <div class="hero-cta">
-                <a class="main-btn" href="./produits.html" id="home-go-products">Voir les produits</a>
-                <a class="alt-btn" href="./rendez-vous.html">Prendre rendez-vous</a>
-              </div>
-            </div>
-          </div>
+      <div class="home-banner" id="home-banner">
+        <img class="home-banner-image" id="home-hero-image" src="" alt="">
+        <div class="home-banner-content">
+          <div class="hero-tag" id="home-hero-badge">Impression et communication</div>
+          <h1 class="home-banner-title" id="home-banner-title">Bienvenue chez COM’ Impression</h1>
+          <p class="home-banner-text" id="home-banner-text">Un accueil simple pour choisir vos supports, préparer vos fichiers et suivre vos commandes.</p>
+          <a class="main-btn" href="./produits.html" id="home-go-products">Voir les produits</a>
         </div>
       </div>
     </section>
